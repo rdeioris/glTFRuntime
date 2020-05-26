@@ -28,7 +28,39 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(FString Filename
 
 FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject) : Root(JsonObject)
 {
+	bAllNodesCached = false;
+}
 
+bool FglTFRuntimeParser::LoadNodes(TArray<FglTFRuntimeNode>& Nodes)
+{
+	if (bAllNodesCached)
+	{
+		Nodes = AllNodesCache;
+		return true;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonNodes;
+
+	// no meshes ?
+	if (!Root->TryGetArrayField("nodes", JsonNodes))
+	{
+		return false;
+	}
+
+	for (int32 Index = 0; Index < JsonNodes->Num(); Index++)
+	{
+		FglTFRuntimeNode Node;
+		if (!LoadNode(Index, Node))
+		{
+			return false;
+		}
+		Nodes.Add(Node);
+	}
+
+	AllNodesCache = Nodes;
+	bAllNodesCached = true;
+
+	return true;
 }
 
 bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes)
@@ -53,6 +85,59 @@ bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes)
 	}
 
 	return true;
+}
+
+bool FglTFRuntimeParser::GetNodeChildren(FglTFRuntimeNode& Node, TArray<FglTFRuntimeNode>& Nodes)
+{
+	// this is pretty hacky as this function requires to directly work on the cache
+	if (!bAllNodesCached)
+	{
+		TArray<FglTFRuntimeNode> AllNodes;
+		if (!LoadNodes(AllNodes))
+			return false;
+	}
+
+	for (int32 ChildIndex : Node.Children)
+	{
+		if (ChildIndex >= AllNodesCache.Num())
+			return false;
+		Nodes.Add(AllNodesCache[ChildIndex]);
+	}
+
+	return true;
+}
+
+bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
+{
+	if (Index < 0)
+		return false;
+
+	if (bAllNodesCached)
+	{
+		if (Index >= AllNodesCache.Num())
+			return false;
+		Node = AllNodesCache[Index];
+		return true;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonNodes;
+
+	// no materials ?
+	if (!Root->TryGetArrayField("nodes", JsonNodes))
+	{
+		return false;
+	}
+
+	if (Index >= JsonNodes->Num())
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> JsonNodeObject = (*JsonNodes)[Index]->AsObject();
+	if (!JsonNodeObject)
+		return false;
+
+	return LoadNode_Internal(JsonNodeObject.ToSharedRef(), Node, JsonNodes->Num());
 }
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
@@ -127,6 +212,59 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(int32 Index)
 	StaticMeshesCache.Add(Index, StaticMesh);
 
 	return StaticMesh;
+}
+
+bool FglTFRuntimeParser::LoadNode_Internal(TSharedRef<FJsonObject> JsonNodeObject, FglTFRuntimeNode& Node, int32 NodesCount)
+{
+	int64 MeshIndex;
+	if (JsonNodeObject->TryGetNumberField("mesh", MeshIndex))
+	{
+		Node.StaticMesh = LoadStaticMesh(MeshIndex);
+		if (!Node.StaticMesh)
+			return false;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues;
+	if (JsonNodeObject->TryGetArrayField("matrix", JsonMatrixValues))
+	{
+		if (JsonMatrixValues->Num() != 16)
+			return false;
+
+		FMatrix Matrix;
+
+		for (int32 i = 0; i < 16; i++)
+		{
+			double Value;
+			if (!(*JsonMatrixValues)[i]->TryGetNumber(Value))
+			{
+				return false;
+			}
+
+			Matrix.M[i / 4][i % 4] = Value;
+		}
+
+		Node.Transform = FTransform(Matrix);
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonChildren;
+	if (JsonNodeObject->TryGetArrayField("children", JsonChildren))
+	{
+		for (int32 i = 0; i < JsonChildren->Num(); i++)
+		{
+			int64 ChildIndex;
+			if (!(*JsonChildren)[i]->TryGetNumber(ChildIndex))
+			{
+				return false;
+			}
+
+			if (ChildIndex >= NodesCount)
+				return false;
+
+			Node.Children.Add(ChildIndex);
+		}
+	}
+
+	return true;
 }
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject)

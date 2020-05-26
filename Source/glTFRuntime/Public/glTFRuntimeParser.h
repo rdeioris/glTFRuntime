@@ -39,6 +39,11 @@ public:
 
 	UMaterialInterface* LoadMaterial(int32 Index);
 
+	bool LoadNodes(TArray<FglTFRuntimeNode>& Nodes);
+	bool LoadNode(int32 Index, FglTFRuntimeNode& Node);
+
+	bool GetNodeChildren(FglTFRuntimeNode& Node, TArray<FglTFRuntimeNode>& Nodes);
+
 	bool BuildPrimitive(UStaticMeshDescription* MeshDescription, TSharedRef<FJsonObject> JsonPrimitiveObject);
 
 	bool GetBuffer(int32 Index, TArray<uint8>& Bytes);
@@ -83,8 +88,11 @@ protected:
 
 	TArray<FStaticMaterial> StaticMaterials;
 
+	TArray<FglTFRuntimeNode> AllNodesCache;
+	bool bAllNodesCached;
+
 	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject);
 	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject);
+	bool LoadNode_Internal(TSharedRef<FJsonObject> JsonNodeObject, FglTFRuntimeNode& Node, int32 NodesCount);
 
-	TArray<FglTFRuntimeNode> Nodes;
 };
