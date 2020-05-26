@@ -717,3 +717,9 @@ int64 FglTFRuntimeParser::GetTypeSize(const FString Type) const
 
 	return 0;
 }
+
+void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
+{
+	Collector.AddReferencedObjects(StaticMeshesCache);
+	Collector.AddReferencedObjects(MaterialsCache);
+}

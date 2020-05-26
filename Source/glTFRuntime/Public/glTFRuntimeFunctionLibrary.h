@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "glTFRuntimeParser.h"
 #include "glTFRuntimeFunctionLibrary.generated.h"
 
 /**
@@ -20,5 +21,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load StaticMeshes from Filename"))
 	static TArray<UStaticMesh*> glTFLoadStaticMeshesFromFilename(FString Filename, bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Nodes from Filename"))
+	static TArray<FglTFRuntimeNode> glTFLoadNodesFromFilename(FString Filename, bool& bSuccess);
 	
 };

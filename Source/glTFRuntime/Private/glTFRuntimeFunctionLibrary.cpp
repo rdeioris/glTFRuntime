@@ -2,7 +2,6 @@
 
 
 #include "glTFRuntimeFunctionLibrary.h"
-#include "glTFRuntimeParser.h"
 
 UStaticMesh* UglTFRuntimeFunctionLibrary::glTFLoadStaticMeshFromFilename(FString Filename, int32 Index)
 {
@@ -31,4 +30,24 @@ TArray<UStaticMesh*> UglTFRuntimeFunctionLibrary::glTFLoadStaticMeshesFromFilena
 
 	bSuccess = true;
 	return StaticMeshes;
+}
+
+TArray<FglTFRuntimeNode> UglTFRuntimeFunctionLibrary::glTFLoadNodesFromFilename(FString Filename, bool& bSuccess)
+{
+	TArray<FglTFRuntimeNode> Nodes;
+	bSuccess = false;
+
+	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename);
+	if (!Parser)
+	{
+		return TArray<FglTFRuntimeNode>();
+	}
+
+	if (!Parser->LoadNodes(Nodes))
+	{
+		return TArray<FglTFRuntimeNode>();
+	}
+
+	bSuccess = true;
+	return Nodes;
 }

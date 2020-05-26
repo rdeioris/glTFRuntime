@@ -13,22 +13,28 @@ struct FglTFRuntimeNode
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadonly)
 	FString Name;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadonly)
 	FTransform Transform;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadonly)
 	UStaticMesh* StaticMesh;
 
 	TArray<int32> Children;
+
+	FglTFRuntimeNode()
+	{
+		Transform = FTransform::Identity;
+		StaticMesh = nullptr;
+	}
 };
 
 /**
  *
  */
-class GLTFRUNTIME_API FglTFRuntimeParser
+class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject
 {
 public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject);
@@ -77,6 +83,8 @@ public:
 
 		return true;
 	}
+
+	void AddReferencedObjects(FReferenceCollector& Collector);
 
 protected:
 	TSharedRef<FJsonObject> Root;
