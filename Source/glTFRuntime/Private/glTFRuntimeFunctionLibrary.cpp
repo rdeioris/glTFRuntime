@@ -12,3 +12,23 @@ UStaticMesh* UglTFRuntimeFunctionLibrary::glTFLoadStaticMeshFromFilename(FString
 
 	return Parser->LoadStaticMesh(Index);
 }
+
+TArray<UStaticMesh*> UglTFRuntimeFunctionLibrary::glTFLoadStaticMeshesFromFilename(FString Filename, bool& bSuccess)
+{
+	TArray<UStaticMesh*> StaticMeshes;
+	bSuccess = false;
+
+	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename);
+	if (!Parser)
+	{
+		return TArray<UStaticMesh*>();
+	}
+
+	if (!Parser->LoadStaticMeshes(StaticMeshes))
+	{
+		return TArray<UStaticMesh*>();
+	}
+
+	bSuccess = true;
+	return StaticMeshes;
+}

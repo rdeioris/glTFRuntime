@@ -55,6 +55,43 @@ bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes)
 	return true;
 }
 
+UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
+{
+	if (Index < 0)
+		return nullptr;
+
+	// first check cache
+	if (MaterialsCache.Contains(Index))
+	{
+		return MaterialsCache[Index];
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonMaterials;
+
+	// no materials ?
+	if (!Root->TryGetArrayField("materials", JsonMaterials))
+	{
+		return nullptr;
+	}
+
+	if (Index >= JsonMaterials->Num())
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> JsonMaterialObject = (*JsonMaterials)[Index]->AsObject();
+	if (!JsonMaterialObject)
+		return nullptr;
+
+	UMaterialInterface* Material = LoadMaterial_Internal(JsonMaterialObject.ToSharedRef());
+	if (!Material)
+		return nullptr;
+
+	MaterialsCache.Add(Index, Material);
+
+	return Material;
+}
+
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(int32 Index)
 {
 	if (Index < 0)
@@ -92,6 +129,42 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(int32 Index)
 	return StaticMesh;
 }
 
+UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject)
+{
+	UMaterialInterface* BaseMaterial = (UMaterialInterface*)StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, TEXT("/glTFRuntime/M_glTFRuntimeBase"));
+	if (!BaseMaterial)
+		return nullptr;
+
+	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+	if (!Material)
+		return nullptr;
+
+	const TSharedPtr<FJsonObject>* JsonPBRObject;
+	if (JsonMaterialObject->TryGetObjectField("pbrMetallicRoughness", JsonPBRObject))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* baseColorFactorValues;
+		if ((*JsonPBRObject)->TryGetArrayField("baseColorFactor", baseColorFactorValues))
+		{
+			if (baseColorFactorValues->Num() != 4)
+				return nullptr;
+
+			double R, G, B, A;
+			if (!(*baseColorFactorValues)[0]->TryGetNumber(R))
+				return nullptr;
+			if (!(*baseColorFactorValues)[1]->TryGetNumber(G))
+				return nullptr;
+			if (!(*baseColorFactorValues)[2]->TryGetNumber(B))
+				return nullptr;
+			if (!(*baseColorFactorValues)[3]->TryGetNumber(A))
+				return nullptr;
+
+			Material->SetVectorParameterValue("baseColorFactor", FLinearColor(R, G, B, A));
+		}
+	}
+
+	return Material;
+}
+
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject)
 {
 	// get primitives
@@ -105,6 +178,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	UStaticMesh* StaticMesh = NewObject<UStaticMesh>();
 
 	UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
+
+	StaticMaterials.Empty();
 
 	for (TSharedPtr<FJsonValue> JsonPrimitive : *JsonPrimitives)
 	{
@@ -131,13 +206,21 @@ bool FglTFRuntimeParser::BuildPrimitive(UStaticMeshDescription* MeshDescription,
 	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
 		return false;
 
+	UMaterialInterface* StaticMeshMaterial = UMaterial::GetDefaultMaterial(MD_Surface);
+
+	int64 MaterialIndex;
+	if (JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
+	{
+		StaticMeshMaterial = LoadMaterial(MaterialIndex);
+		if (!StaticMeshMaterial)
+			return false;
+	}
+
 	FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
 
-	int32 MaterialSlotIndex = StaticMaterials.Num();
-	FName MaterialSlotName = FName(FString::FromInt(MaterialSlotIndex));
 	TPolygonGroupAttributesRef<FName> PolygonGroupMaterialSlotNames = MeshDescription->GetPolygonGroupMaterialSlotNames();
-	PolygonGroupMaterialSlotNames[PolygonGroupID] = MaterialSlotName;
-	StaticMaterials.Add(FStaticMaterial(UMaterial::GetDefaultMaterial(MD_Surface), MaterialSlotName));
+	PolygonGroupMaterialSlotNames[PolygonGroupID] = StaticMeshMaterial->GetFName();
+	StaticMaterials.Add(FStaticMaterial(StaticMeshMaterial, StaticMeshMaterial->GetFName()));
 
 	TVertexAttributesRef<FVector> PositionsAttributesRef = MeshDescription->GetVertexPositions();
 	TVertexInstanceAttributesRef<FVector> NormalsInstanceAttributesRef = MeshDescription->GetVertexInstanceNormals();

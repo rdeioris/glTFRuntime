@@ -17,5 +17,8 @@ class GLTFRUNTIME_API UglTFRuntimeFunctionLibrary : public UBlueprintFunctionLib
 public:
 	UFUNCTION(BlueprintCallable, meta=(DisplayName="glTF Load StaticMesh from Filename"))
 	static UStaticMesh* glTFLoadStaticMeshFromFilename(FString Filename, int32 Index);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load StaticMeshes from Filename"))
+	static TArray<UStaticMesh*> glTFLoadStaticMeshesFromFilename(FString Filename, bool& bSuccess);
 	
 };

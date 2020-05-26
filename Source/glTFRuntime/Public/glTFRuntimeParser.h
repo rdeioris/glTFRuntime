@@ -6,6 +6,25 @@
 #include "Dom/JsonValue.h"
 #include "Engine/StaticMesh.h"
 
+#include "glTFRuntimeParser.generated.h"
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeNode
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	FString Name;
+
+	UPROPERTY(EditAnywhere)
+	FTransform Transform;
+
+	UPROPERTY(EditAnywhere)
+	UStaticMesh* StaticMesh;
+
+	TArray<int32> Children;
+};
+
 /**
  *
  */
@@ -17,6 +36,8 @@ public:
 
 	UStaticMesh* LoadStaticMesh(int32 Index);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes);
+
+	UMaterialInterface* LoadMaterial(int32 Index);
 
 	bool BuildPrimitive(UStaticMeshDescription* MeshDescription, TSharedRef<FJsonObject> JsonPrimitiveObject);
 
@@ -56,9 +77,14 @@ protected:
 	TSharedRef<FJsonObject> Root;
 
 	TMap<int32, UStaticMesh*> StaticMeshesCache;
+	TMap<int32, UMaterialInterface*> MaterialsCache;
+
 	TMap<int32, TArray<uint8>> BuffersCache;
 
 	TArray<FStaticMaterial> StaticMaterials;
 
 	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject);
+	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject);
+
+	TArray<FglTFRuntimeNode> Nodes;
 };
