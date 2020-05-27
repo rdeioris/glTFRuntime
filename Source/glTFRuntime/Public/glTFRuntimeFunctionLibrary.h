@@ -24,5 +24,11 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Nodes from Filename"))
 	static TArray<FglTFRuntimeNode> glTFLoadNodesFromFilename(FString Filename, bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Scene from Filename"))
+	static TArray<FglTFRuntimeNode> glTFLoadSceneFromFilename(FString Filename, int32 Index, bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Get Node Children"))
+	static TArray<FglTFRuntimeNode> glTFGetNodeChildren(FglTFRuntimeNode Node);
 	
 };

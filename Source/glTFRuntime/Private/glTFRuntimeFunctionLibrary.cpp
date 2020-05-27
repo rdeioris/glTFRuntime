@@ -51,3 +51,28 @@ TArray<FglTFRuntimeNode> UglTFRuntimeFunctionLibrary::glTFLoadNodesFromFilename(
 	bSuccess = true;
 	return Nodes;
 }
+
+TArray<FglTFRuntimeNode> UglTFRuntimeFunctionLibrary::glTFLoadSceneFromFilename(FString Filename, int32 Index, bool& bSuccess)
+{
+	TArray<FglTFRuntimeNode> Nodes;
+	bSuccess = false;
+
+	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename);
+	if (!Parser)
+	{
+		return TArray<FglTFRuntimeNode>();
+	}
+
+	if (!Parser->LoadScene(Index, Nodes))
+	{
+		return TArray<FglTFRuntimeNode>();
+	}
+
+	bSuccess = true;
+	return Nodes;
+}
+
+TArray<FglTFRuntimeNode> UglTFRuntimeFunctionLibrary::glTFGetNodeChildren(FglTFRuntimeNode Node)
+{
+	return Node.Children;
+}

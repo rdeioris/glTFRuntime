@@ -13,16 +13,17 @@ struct FglTFRuntimeNode
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadonly)
-	FString Name;
+		UPROPERTY(EditAnywhere, BlueprintReadonly)
+		FString Name;
 
 	UPROPERTY(EditAnywhere, BlueprintReadonly)
-	FTransform Transform;
+		FTransform Transform;
 
 	UPROPERTY(EditAnywhere, BlueprintReadonly)
-	UStaticMesh* StaticMesh;
+		UStaticMesh* StaticMesh;
 
-	TArray<int32> Children;
+	TArray<int32> ChildrenIndexes;
+	TArray<FglTFRuntimeNode> Children;
 
 	FglTFRuntimeNode()
 	{
@@ -48,7 +49,7 @@ public:
 	bool LoadNodes(TArray<FglTFRuntimeNode>& Nodes);
 	bool LoadNode(int32 Index, FglTFRuntimeNode& Node);
 
-	bool GetNodeChildren(FglTFRuntimeNode& Node, TArray<FglTFRuntimeNode>& Nodes);
+	bool LoadScene(int32 Index, TArray<FglTFRuntimeNode>& Nodes);
 
 	bool BuildPrimitive(UStaticMeshDescription* MeshDescription, TSharedRef<FJsonObject> JsonPrimitiveObject);
 
@@ -103,4 +104,5 @@ protected:
 	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject);
 	bool LoadNode_Internal(TSharedRef<FJsonObject> JsonNodeObject, FglTFRuntimeNode& Node, int32 NodesCount);
 
+	void FixNodeChildren(FglTFRuntimeNode& Node);
 };

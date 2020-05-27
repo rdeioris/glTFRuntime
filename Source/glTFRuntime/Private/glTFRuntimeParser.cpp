@@ -47,10 +47,14 @@ bool FglTFRuntimeParser::LoadNodes(TArray<FglTFRuntimeNode>& Nodes)
 		return false;
 	}
 
+	// first round for getting all nodes (no children management)
 	for (int32 Index = 0; Index < JsonNodes->Num(); Index++)
 	{
+		TSharedPtr<FJsonObject> JsonNodeObject = (*JsonNodes)[Index]->AsObject();
+		if (!JsonNodeObject)
+			return false;
 		FglTFRuntimeNode Node;
-		if (!LoadNode(Index, Node))
+		if (!LoadNode_Internal(JsonNodeObject.ToSharedRef(), Node, JsonNodes->Num()))
 		{
 			return false;
 		}
@@ -59,6 +63,63 @@ bool FglTFRuntimeParser::LoadNodes(TArray<FglTFRuntimeNode>& Nodes)
 
 	AllNodesCache = Nodes;
 	bAllNodesCached = true;
+
+	// fix children
+	for (FglTFRuntimeNode& CachedNode : AllNodesCache)
+	{
+		FixNodeChildren(CachedNode);
+	}
+
+	return true;
+}
+
+void FglTFRuntimeParser::FixNodeChildren(FglTFRuntimeNode& Node)
+{
+	for (int32 Index : Node.ChildrenIndexes)
+	{
+		// no need to check for index validity, it has already been managed on the previous run
+		int32 NewIndex = Node.Children.Add(AllNodesCache[Index]);
+		FixNodeChildren(Node.Children[NewIndex]);
+	}
+}
+
+bool FglTFRuntimeParser::LoadScene(int32 Index, TArray<FglTFRuntimeNode>& Nodes)
+{
+	if (Index < 0)
+		return false;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonScenes;
+
+	// no scenes ?
+	if (!Root->TryGetArrayField("scenes", JsonScenes))
+	{
+		return false;
+	}
+
+	if (Index >= JsonScenes->Num())
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> JsonSceneObject = (*JsonScenes)[Index]->AsObject();
+	if (!JsonSceneObject)
+		return nullptr;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonSceneNodes;
+
+	if (JsonSceneObject->TryGetArrayField("nodes", JsonSceneNodes))
+	{
+		for (TSharedPtr<FJsonValue> JsonSceneNode : *JsonSceneNodes)
+		{
+			int64 NodeIndex;
+			if (!JsonSceneNode->TryGetNumber(NodeIndex))
+				return false;
+			FglTFRuntimeNode SceneNode;
+			if (!LoadNode(NodeIndex, SceneNode))
+				return false;
+			Nodes.Add(SceneNode);
+		}
+	}
 
 	return true;
 }
@@ -87,57 +148,21 @@ bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes)
 	return true;
 }
 
-bool FglTFRuntimeParser::GetNodeChildren(FglTFRuntimeNode& Node, TArray<FglTFRuntimeNode>& Nodes)
-{
-	// this is pretty hacky as this function requires to directly work on the cache
-	if (!bAllNodesCached)
-	{
-		TArray<FglTFRuntimeNode> AllNodes;
-		if (!LoadNodes(AllNodes))
-			return false;
-	}
-
-	for (int32 ChildIndex : Node.Children)
-	{
-		if (ChildIndex >= AllNodesCache.Num())
-			return false;
-		Nodes.Add(AllNodesCache[ChildIndex]);
-	}
-
-	return true;
-}
-
 bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 {
-	if (Index < 0)
-		return false;
-
-	if (bAllNodesCached)
+	// a bit hacky, but allows zero-copy for cached values
+	if (!bAllNodesCached)
 	{
-		if (Index >= AllNodesCache.Num())
+		TArray<FglTFRuntimeNode> Nodes;
+		if (!LoadNodes(Nodes))
 			return false;
-		Node = AllNodesCache[Index];
-		return true;
 	}
 
-	const TArray<TSharedPtr<FJsonValue>>* JsonNodes;
-
-	// no materials ?
-	if (!Root->TryGetArrayField("nodes", JsonNodes))
-	{
-		return false;
-	}
-
-	if (Index >= JsonNodes->Num())
-	{
-		return false;
-	}
-
-	TSharedPtr<FJsonObject> JsonNodeObject = (*JsonNodes)[Index]->AsObject();
-	if (!JsonNodeObject)
+	if (Index >= AllNodesCache.Num())
 		return false;
 
-	return LoadNode_Internal(JsonNodeObject.ToSharedRef(), Node, JsonNodes->Num());
+	Node = AllNodesCache[Index];
+	return true;
 }
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
@@ -260,7 +285,7 @@ bool FglTFRuntimeParser::LoadNode_Internal(TSharedRef<FJsonObject> JsonNodeObjec
 			if (ChildIndex >= NodesCount)
 				return false;
 
-			Node.Children.Add(ChildIndex);
+			Node.ChildrenIndexes.Add(ChildIndex);
 		}
 	}
 
@@ -513,8 +538,6 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray<uint8>& Bytes)
 		return false;
 	}
 
-	UE_LOG(LogTemp, Error, TEXT("buffers read"));
-
 	TSharedPtr<FJsonObject> JsonBufferObject = (*JsonBuffers)[Index]->AsObject();
 	if (!JsonBufferObject)
 		return false;
@@ -522,8 +545,6 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray<uint8>& Bytes)
 	int64 ByteLength;
 	if (!JsonBufferObject->TryGetNumberField("byteLength", ByteLength))
 		return false;
-
-	UE_LOG(LogTemp, Error, TEXT("byteLength %lld"), ByteLength);
 
 	FString Uri;
 	if (!JsonBufferObject->TryGetStringField("uri", Uri))
@@ -537,14 +558,10 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray<uint8>& Bytes)
 
 	int32 StringIndex = Uri.Find(Base64Signature, ESearchCase::IgnoreCase, ESearchDir::FromStart, 5);
 
-	UE_LOG(LogTemp, Error, TEXT("StringIndex %d"), StringIndex);
-
 	if (StringIndex < 5)
 		return false;
 
 	StringIndex += Base64Signature.Len();
-
-	UE_LOG(LogTemp, Error, TEXT("base64: %s"), *Uri.Mid(StringIndex));
 
 	if (FBase64::Decode(Uri.Mid(StringIndex), Bytes))
 	{
@@ -643,8 +660,6 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& Elements, int64& Elemen
 	FString Type;
 	if (!JsonAccessorObject->TryGetStringField("type", Type))
 		return false;
-
-	UE_LOG(LogTemp, Error, TEXT("Accessor %d %lld %lld %s"), Index, ComponentType, Count, *Type);
 
 	ElementSize = GetComponentTypeSize(ComponentType);
 	if (ElementSize == 0)
