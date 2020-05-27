@@ -26,9 +26,14 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(FString Filename
 	return MakeShared<FglTFRuntimeParser>(JsonObject.ToSharedRef());
 }
 
-FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject) : Root(JsonObject)
+FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, FMatrix InBasis) : Root(JsonObject), Basis(InBasis)
 {
 	bAllNodesCached = false;
+}
+
+FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject) : FglTFRuntimeParser(JsonObject, FBasisVectorMatrix(FVector(0, 0, -1), FVector(1, 0, 0), FVector(0, 1, 0), FVector::ZeroVector)* FScaleMatrix(100))
+{
+
 }
 
 bool FglTFRuntimeParser::LoadNodes(TArray<FglTFRuntimeNode>& Nodes)
@@ -202,6 +207,43 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
 	return Material;
 }
 
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index)
+{
+	if (Index < 0)
+		return nullptr;
+
+	// first check cache
+	if (SkeletalMeshesCache.Contains(Index))
+	{
+		return SkeletalMeshesCache[Index];
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;
+
+	// no meshes ?
+	if (!Root->TryGetArrayField("meshes", JsonMeshes))
+	{
+		return nullptr;
+	}
+
+	if (Index >= JsonMeshes->Num())
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> JsonMeshObject = (*JsonMeshes)[Index]->AsObject();
+	if (!JsonMeshObject)
+		return nullptr;
+
+	USkeletalMesh* SkeletalMesh = LoadSkeletalMesh_Internal(JsonMeshObject.ToSharedRef());
+	if (!SkeletalMesh)
+		return nullptr;
+
+	SkeletalMeshesCache.Add(Index, SkeletalMesh);
+
+	return SkeletalMesh;
+}
+
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(int32 Index)
 {
 	if (Index < 0)
@@ -268,7 +310,7 @@ bool FglTFRuntimeParser::LoadNode_Internal(TSharedRef<FJsonObject> JsonNodeObjec
 			Matrix.M[i / 4][i % 4] = Value;
 		}
 
-		Node.Transform = FTransform(Matrix);
+		Node.Transform = FTransform(Basis.Inverse() * Matrix * Basis);
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonChildren;
@@ -326,6 +368,24 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 	}
 
 	return Material;
+}
+
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject)
+{
+	// get skin
+	int64 SkinIndex;
+	if (!JsonMeshObject->TryGetNumberField("skin", SkinIndex))
+		return nullptr;
+
+	USkeleton* Skeleton = nullptr;
+
+	// do we already have a skeleton cached ?
+	if (SkeletonsCache.Contains(SkinIndex))
+	{
+		Skeleton = SkeletonsCache[SkinIndex];
+	}
+
+	return nullptr;
 }
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject)
@@ -394,17 +454,35 @@ bool FglTFRuntimeParser::BuildPrimitive(UStaticMeshDescription* MeshDescription,
 
 	TArray<FVector> Positions;
 	TArray<FVector> Normals;
+	TArray<FVector2D> TexCoords0;
+	TArray<FVector2D> TexCoords1;
 
 	// POSITION is required for generating a valid MeshDescription
 	if (!(*JsonAttributesObject)->HasField("POSITION"))
 		return false;
 
-	if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "POSITION", Positions))
+	if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "POSITION", Positions,
+		[&](FVector Value) -> FVector {return Basis.TransformPosition(Value); }))
 		return false;
 
 	if ((*JsonAttributesObject)->HasField("NORMAL"))
 	{
-		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "NORMAL", Normals))
+		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "NORMAL", Normals,
+			[&](FVector Value) -> FVector { return Basis.TransformVector(Value).GetSafeNormal(); }))
+			return false;
+	}
+
+	if ((*JsonAttributesObject)->HasField("TEXCOORD_0"))
+	{
+		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "TEXCOORD_0", TexCoords0,
+			[&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, 1 - Value.Y); }))
+			return false;
+	}
+
+	if ((*JsonAttributesObject)->HasField("TEXCOORD_1"))
+	{
+		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "TEXCOORD_1", TexCoords1,
+			[&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, 1 - Value.Y); }))
 			return false;
 	}
 
@@ -499,7 +577,7 @@ bool FglTFRuntimeParser::BuildPrimitive(UStaticMeshDescription* MeshDescription,
 
 			TArray<FEdgeID> Edges;
 			// fix winding
-			VertexInstancesIDs.Swap(1, 2);
+			//VertexInstancesIDs.Swap(1, 2);
 			FTriangleID TriangleID = MeshDescription->CreateTriangle(PolygonGroupID, VertexInstancesIDs, Edges);
 			if (TriangleID == FTriangleID::Invalid)
 			{
@@ -737,4 +815,5 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 {
 	Collector.AddReferencedObjects(StaticMeshesCache);
 	Collector.AddReferencedObjects(MaterialsCache);
+	Collector.AddReferencedObjects(SkeletonsCache);
 }

@@ -38,6 +38,7 @@ struct FglTFRuntimeNode
 class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject
 {
 public:
+	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, FMatrix InBasis);
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject);
 	static TSharedPtr<FglTFRuntimeParser> FromFilename(FString Filename);
 
@@ -51,6 +52,8 @@ public:
 
 	bool LoadScene(int32 Index, TArray<FglTFRuntimeNode>& Nodes);
 
+	USkeletalMesh* LoadSkeletalMesh(int32 Index);
+
 	bool BuildPrimitive(UStaticMeshDescription* MeshDescription, TSharedRef<FJsonObject> JsonPrimitiveObject);
 
 	bool GetBuffer(int32 Index, TArray<uint8>& Bytes);
@@ -60,8 +63,8 @@ public:
 	int64 GetComponentTypeSize(const int64 ComponentType) const;
 	int64 GetTypeSize(const FString Type) const;
 
-	template<typename T>
-	bool BuildPrimitiveAttribute(TSharedRef<FJsonObject> JsonAttributesObject, const FString Name, TArray<T>& Data)
+	template<typename T, typename Callback>
+	bool BuildPrimitiveAttribute(TSharedRef<FJsonObject> JsonAttributesObject, const FString Name, TArray<T>& Data, Callback Filter = [&](T InValue) -> T {return InValue})
 	{
 		int64 AccessorIndex;
 		if (!JsonAttributesObject->TryGetNumberField(Name, AccessorIndex))
@@ -79,7 +82,8 @@ public:
 		{
 			int64 Index = i * (Elements * ElementSize);
 			T* Ptr = (T*)&(Bytes[Index]);
-			Data.Add(*Ptr);
+			T Value = Filter(*Ptr);
+			Data.Add(Value);
 		}
 
 		return true;
@@ -92,6 +96,8 @@ protected:
 
 	TMap<int32, UStaticMesh*> StaticMeshesCache;
 	TMap<int32, UMaterialInterface*> MaterialsCache;
+	TMap<int32, USkeleton*> SkeletonsCache;
+	TMap<int32, USkeletalMesh*> SkeletalMeshesCache;
 
 	TMap<int32, TArray<uint8>> BuffersCache;
 
@@ -104,5 +110,9 @@ protected:
 	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject);
 	bool LoadNode_Internal(TSharedRef<FJsonObject> JsonNodeObject, FglTFRuntimeNode& Node, int32 NodesCount);
 
+	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject);
+
 	void FixNodeChildren(FglTFRuntimeNode& Node);
+
+	FMatrix Basis;
 };
