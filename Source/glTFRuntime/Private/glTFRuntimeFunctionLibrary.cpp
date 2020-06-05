@@ -3,76 +3,13 @@
 
 #include "glTFRuntimeFunctionLibrary.h"
 
-UStaticMesh* UglTFRuntimeFunctionLibrary::glTFLoadStaticMeshFromFilename(FString Filename, int32 Index)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(FString Filename)
 {
-	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename);
-	if (!Parser)
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+		return nullptr;
+	if (!Asset->LoadFromFilename(Filename))
 		return nullptr;
 
-	return Parser->LoadStaticMesh(Index);
-}
-
-TArray<UStaticMesh*> UglTFRuntimeFunctionLibrary::glTFLoadStaticMeshesFromFilename(FString Filename, bool& bSuccess)
-{
-	TArray<UStaticMesh*> StaticMeshes;
-	bSuccess = false;
-
-	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename);
-	if (!Parser)
-	{
-		return TArray<UStaticMesh*>();
-	}
-
-	if (!Parser->LoadStaticMeshes(StaticMeshes))
-	{
-		return TArray<UStaticMesh*>();
-	}
-
-	bSuccess = true;
-	return StaticMeshes;
-}
-
-TArray<FglTFRuntimeNode> UglTFRuntimeFunctionLibrary::glTFLoadNodesFromFilename(FString Filename, bool& bSuccess)
-{
-	TArray<FglTFRuntimeNode> Nodes;
-	bSuccess = false;
-
-	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename);
-	if (!Parser)
-	{
-		return TArray<FglTFRuntimeNode>();
-	}
-
-	if (!Parser->LoadNodes(Nodes))
-	{
-		return TArray<FglTFRuntimeNode>();
-	}
-
-	bSuccess = true;
-	return Nodes;
-}
-
-TArray<FglTFRuntimeNode> UglTFRuntimeFunctionLibrary::glTFLoadSceneFromFilename(FString Filename, int32 Index, bool& bSuccess)
-{
-	TArray<FglTFRuntimeNode> Nodes;
-	bSuccess = false;
-
-	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename);
-	if (!Parser)
-	{
-		return TArray<FglTFRuntimeNode>();
-	}
-
-	if (!Parser->LoadScene(Index, Nodes))
-	{
-		return TArray<FglTFRuntimeNode>();
-	}
-
-	bSuccess = true;
-	return Nodes;
-}
-
-TArray<FglTFRuntimeNode> UglTFRuntimeFunctionLibrary::glTFGetNodeChildren(FglTFRuntimeNode Node)
-{
-	return Node.Children;
+	return Asset;
 }

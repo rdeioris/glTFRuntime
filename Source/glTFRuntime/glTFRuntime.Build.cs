@@ -25,7 +25,7 @@ public class glTFRuntime : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",
+				"Core"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -36,11 +36,11 @@ public class glTFRuntime : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
-				"Slate",
-				"SlateCore",
 				"JSON",
 				"MeshDescription",
-				"StaticMeshDescription"
+				"StaticMeshDescription",
+				"RenderCore",
+				"RHI",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "glTFRuntimeParser.h"
+#include "glTFRuntimeAsset.h"
 #include "glTFRuntimeFunctionLibrary.generated.h"
 
 /**
@@ -16,19 +16,7 @@ class GLTFRUNTIME_API UglTFRuntimeFunctionLibrary : public UBlueprintFunctionLib
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, meta=(DisplayName="glTF Load StaticMesh from Filename"))
-	static UStaticMesh* glTFLoadStaticMeshFromFilename(FString Filename, int32 Index);
-
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load StaticMeshes from Filename"))
-	static TArray<UStaticMesh*> glTFLoadStaticMeshesFromFilename(FString Filename, bool& bSuccess);
-
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Nodes from Filename"))
-	static TArray<FglTFRuntimeNode> glTFLoadNodesFromFilename(FString Filename, bool& bSuccess);
-
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Scene from Filename"))
-	static TArray<FglTFRuntimeNode> glTFLoadSceneFromFilename(FString Filename, int32 Index, bool& bSuccess);
-
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Get Node Children"))
-	static TArray<FglTFRuntimeNode> glTFGetNodeChildren(FglTFRuntimeNode Node);
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="glTF Load Asset from Filename"), Category="glTFRuntime")
+	static UglTFRuntimeAsset* glTFLoadAssetFromFilename(FString Filename);
 	
 };
