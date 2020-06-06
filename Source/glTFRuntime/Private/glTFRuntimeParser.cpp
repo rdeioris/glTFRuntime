@@ -866,7 +866,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 		{
 			M *= InverseBindMatricesMap[Node.ParentIndex];
 		}
-	
+
 		UE_LOG(LogTemp, Error, TEXT("***** %d *****"), Node.Index);
 		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[0][0], M.M[0][1], M.M[0][2], M.M[0][3]);
 		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[1][0], M.M[1][1], M.M[1][2], M.M[1][3]);
@@ -1433,7 +1433,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 
 	UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
 
-	StaticMaterials.Empty();
+	TArray<FStaticMaterial> StaticMaterials;
 
 	for (FglTFRuntimePrimitive& Primitive : Primitives)
 	{
@@ -1514,179 +1514,6 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, false);
 
 	return StaticMesh;
-}
-
-bool FglTFRuntimeParser::BuildPrimitive(UStaticMeshDescription* MeshDescription, TSharedRef<FJsonObject> JsonPrimitiveObject)
-{
-	const TSharedPtr<FJsonObject>* JsonAttributesObject;
-	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
-		return false;
-
-	UMaterialInterface* StaticMeshMaterial = UMaterial::GetDefaultMaterial(MD_Surface);
-
-	int64 MaterialIndex;
-	if (JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
-	{
-		StaticMeshMaterial = LoadMaterial(MaterialIndex);
-		if (!StaticMeshMaterial)
-			return false;
-	}
-
-	FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
-
-	TPolygonGroupAttributesRef<FName> PolygonGroupMaterialSlotNames = MeshDescription->GetPolygonGroupMaterialSlotNames();
-	PolygonGroupMaterialSlotNames[PolygonGroupID] = StaticMeshMaterial->GetFName();
-	FStaticMaterial StaticMaterial(StaticMeshMaterial, StaticMeshMaterial->GetFName());
-	StaticMaterial.UVChannelData.bInitialized = true;
-	StaticMaterials.Add(StaticMaterial);
-
-	TVertexAttributesRef<FVector> PositionsAttributesRef = MeshDescription->GetVertexPositions();
-	TVertexInstanceAttributesRef<FVector> NormalsInstanceAttributesRef = MeshDescription->GetVertexInstanceNormals();
-
-	TArray<FVertexInstanceID> VertexInstancesIDs;
-	TArray<FVertexID> VerticesIDs;
-	TArray<FVertexID> TriangleVerticesIDs;
-
-	TArray<FVector> Positions;
-	TArray<FVector> Normals;
-	TArray<FVector2D> TexCoords0;
-	TArray<FVector2D> TexCoords1;
-
-	// POSITION is required for generating a valid MeshDescription
-	if (!(*JsonAttributesObject)->HasField("POSITION"))
-		return false;
-
-	/*	if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "POSITION", Positions,
-			[&](FVector Value) -> FVector {return Basis.TransformPosition(Value); }))
-			return false;
-
-		if ((*JsonAttributesObject)->HasField("NORMAL"))
-		{
-			if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "NORMAL", Normals,
-				[&](FVector Value) -> FVector { return Basis.TransformVector(Value).GetSafeNormal(); }))
-				return false;
-		}
-
-		if ((*JsonAttributesObject)->HasField("TEXCOORD_0"))
-		{
-			if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "TEXCOORD_0", TexCoords0,
-				[&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, 1 - Value.Y); }))
-				return false;
-		}
-
-		if ((*JsonAttributesObject)->HasField("TEXCOORD_1"))
-		{
-			if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "TEXCOORD_1", TexCoords1,
-				[&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, 1 - Value.Y); }))
-				return false;
-		}
-
-		TArray<uint32> Indices;
-		int64 IndicesAccessorIndex;
-		if (JsonPrimitiveObject->TryGetNumberField("indices", IndicesAccessorIndex))
-		{
-			TArray<uint8> IndicesBytes;
-			int64 ComponentType, Elements, ElementSize, Count;
-			if (!GetAccessor(IndicesAccessorIndex, ComponentType, Elements, ElementSize, Count, IndicesBytes))
-				return false;
-
-			if (Elements != 1)
-				return false;
-
-			for (int64 i = 0; i < Count; i++)
-			{
-				int64 IndexIndex = i * (Elements * ElementSize);
-
-				uint32 VertexIndex;
-				if (ElementSize == 1)
-				{
-					VertexIndex = IndicesBytes[IndexIndex];
-				}
-				else if (ElementSize == 2)
-				{
-					uint16* IndexPtr = (uint16*)&(IndicesBytes[IndexIndex]);
-					VertexIndex = *IndexPtr;
-				}
-				else if (ElementSize == 4)
-				{
-					uint32* IndexPtr = (uint32*)&(IndicesBytes[IndexIndex]);
-					VertexIndex = *IndexPtr;
-				}
-				else
-				{
-					return false;
-				}
-
-				Indices.Add(VertexIndex);
-			}
-		}
-		else
-		{
-			// no indices ?
-			for (int32 i = 0; i < Positions.Num(); i++)
-			{
-				Indices.Add(i);
-			}
-		}
-
-		*/
-
-	for (FVector& Position : Positions)
-	{
-		FVertexID VertexID = MeshDescription->CreateVertex();
-		PositionsAttributesRef[VertexID] = Position;
-		VerticesIDs.Add(VertexID);
-	}
-
-	TArray<uint32> Indices;
-
-	for (uint32 VertexIndex : Indices)
-	{
-		if (VertexIndex >= (uint32)VerticesIDs.Num())
-			return false;
-
-		FVertexInstanceID NewVertexInstanceID = MeshDescription->CreateVertexInstance(VerticesIDs[VertexIndex]);
-		if (Normals.Num() > 0)
-		{
-			if (VertexIndex >= (uint32)Normals.Num())
-			{
-				NormalsInstanceAttributesRef[NewVertexInstanceID] = FVector::ZeroVector;
-			}
-			else
-			{
-				NormalsInstanceAttributesRef[NewVertexInstanceID] = Normals[VertexIndex];
-			}
-		}
-
-		VertexInstancesIDs.Add(NewVertexInstanceID);
-		TriangleVerticesIDs.Add(VerticesIDs[VertexIndex]);
-
-		if (VertexInstancesIDs.Num() == 3)
-		{
-			// degenerate ?
-			if (TriangleVerticesIDs[0] == TriangleVerticesIDs[1] ||
-				TriangleVerticesIDs[1] == TriangleVerticesIDs[2] ||
-				TriangleVerticesIDs[0] == TriangleVerticesIDs[2])
-			{
-				VertexInstancesIDs.Empty();
-				TriangleVerticesIDs.Empty();
-				continue;
-			}
-
-			TArray<FEdgeID> Edges;
-			// fix winding
-			//VertexInstancesIDs.Swap(1, 2);
-			FTriangleID TriangleID = MeshDescription->CreateTriangle(PolygonGroupID, VertexInstancesIDs, Edges);
-			if (TriangleID == FTriangleID::Invalid)
-			{
-				return false;
-			}
-			VertexInstancesIDs.Empty();
-			TriangleVerticesIDs.Empty();
-		}
-	}
-
-	return true;
 }
 
 bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray<uint8>& Bytes)

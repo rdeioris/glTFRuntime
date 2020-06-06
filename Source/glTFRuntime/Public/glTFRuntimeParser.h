@@ -129,8 +129,6 @@ public:
 
 	USkeletalMesh* LoadSkeletalMesh(int32 Index, int32 SkinIndex, int32 NodeIndex);
 
-	bool BuildPrimitive(UStaticMeshDescription* MeshDescription, TSharedRef<FJsonObject> JsonPrimitiveObject);
-
 	bool GetBuffer(int32 Index, TArray<uint8>& Bytes);
 	bool GetBufferView(int32 Index, TArray<uint8>& Bytes, int64& Stride);
 	bool GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray<uint8>& Bytes);
@@ -220,8 +218,6 @@ protected:
 	TMap<int32, USkeletalMesh*> SkeletalMeshesCache;
 
 	TMap<int32, TArray<uint8>> BuffersCache;
-
-	TArray<FStaticMaterial> StaticMaterials;
 
 	TArray<FglTFRuntimeNode> AllNodesCache;
 	bool bAllNodesCached;
