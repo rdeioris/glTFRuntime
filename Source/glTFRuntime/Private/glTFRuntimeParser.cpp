@@ -248,7 +248,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
 	return Material;
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index, int32 SkinIndex)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index, int32 SkinIndex, int32 NodeIndex)
 {
 	if (Index < 0)
 		return nullptr;
@@ -291,7 +291,24 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index, int32 SkinIndex
 	if (!JsonSkinObject)
 		return nullptr;
 
-	USkeletalMesh* SkeletalMesh = LoadSkeletalMesh_Internal(JsonMeshObject.ToSharedRef(), JsonSkinObject.ToSharedRef());
+	FTransform RootTransform = FTransform::Identity;
+	if (NodeIndex > INDEX_NONE)
+	{
+		FglTFRuntimeNode Node;
+		if (!LoadNode(NodeIndex, Node))
+			return nullptr;
+		RootTransform = Node.Transform;
+		while (Node.ParentIndex != INDEX_NONE)
+		{
+			if (!LoadNode(Node.ParentIndex, Node))
+				return nullptr;
+			RootTransform *= Node.Transform;
+		}
+
+		RootTransform = RootTransform.Inverse();
+	}
+
+	USkeletalMesh* SkeletalMesh = LoadSkeletalMesh_Internal(JsonMeshObject.ToSharedRef(), JsonSkinObject.ToSharedRef(), RootTransform);
 	if (!SkeletalMesh)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Unable to load skeletal mesh"));
@@ -382,8 +399,6 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 
 			Matrix.M[i / 4][i % 4] = Value;
 		}
-
-		//Matrix = Basis.Inverse() * Matrix * Basis;
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonScaleValues;
@@ -423,7 +438,6 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 
 		FQuat Quat = { X, Y, Z, W };
 
-		//Matrix *= Basis.Inverse() * FQuatRotationMatrix(Quat) * Basis;
 		Matrix *= FQuatRotationMatrix(Quat);
 	}
 
@@ -448,7 +462,7 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 
 	Matrix.ScaleTranslation(FVector(Scale, Scale, Scale));
 	Node.Transform = FTransform(Basis.Inverse() * Matrix * Basis);
-	//Node->Transform = FTransform(Matrix);
+	//Node.Transform = FTransform(Basis * Matrix);
 
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonChildren;
@@ -518,7 +532,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 	return Material;
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, FTransform& RootTransform)
 {
 
 	// get primitives
@@ -536,7 +550,6 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>();
 
 	TMap<int32, FName> BoneMap;
-	FTransform RootTransform;
 
 	if (!FillReferenceSkeleton(JsonSkinObject, SkeletalMesh->RefSkeleton, BoneMap, RootTransform))
 	{
@@ -554,10 +567,11 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	for (FglTFRuntimePrimitive& Primitive : Primitives)
 	{
 		int32 Base = Points.Num();
-		for (FVector Point : Primitive.Positions)
+		/*for (FVector Point : Primitive.Positions)
 		{
 			Points.Add(RootTransform.TransformPosition(Point));
-		}
+		}*/
+		Points.Append(Primitive.Positions);
 
 		int32 TriangleIndex = 0;
 
@@ -679,9 +693,55 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	return SkeletalMesh;
 }
 
+bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)
+{
+	if (Index == RootIndex)
+		return true;
+
+	FglTFRuntimeNode Node;
+	if (!LoadNode(Index, Node))
+		return false;
+
+	while (Node.ParentIndex != INDEX_NONE)
+	{
+		if (!LoadNode(Node.ParentIndex, Node))
+			return false;
+		if (Node.Index == RootIndex)
+			return true;
+	}
+
+	return false;
+}
+
+int32 FglTFRuntimeParser::FindCommonRoot(TArray<int32> Indices)
+{
+	int32 CurrentRootIndex = Indices[0];
+	bool bTryNextParent = true;
+
+	while (bTryNextParent)
+	{
+		FglTFRuntimeNode Node;
+		if (!LoadNode(CurrentRootIndex, Node))
+			return INDEX_NONE;
+
+		bTryNextParent = false;
+		for (int32 Index : Indices)
+		{
+			if (!HasRoot(Index, CurrentRootIndex))
+			{
+				bTryNextParent = true;
+				CurrentRootIndex = Node.ParentIndex;
+				break;
+			}
+		}
+	}
+
+	return CurrentRootIndex;
+}
+
 bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, FTransform& RootTransform)
 {
-	RootTransform = FTransform::Identity;
+	//RootTransform = FTransform::Identity;
 
 	// get the list of valid joints	
 	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
@@ -710,7 +770,9 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	int64 RootBoneIndex;
 	if (!JsonSkinObject->TryGetNumberField("skeleton", RootBoneIndex))
 	{
-		RootBoneIndex = Joints[0];
+		RootBoneIndex = FindCommonRoot(Joints);
+		if (RootBoneIndex == INDEX_NONE)
+			return false;
 		bHasRoot = false;
 	}
 
@@ -720,7 +782,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 		return false;
 	}
 
-	if (!bHasRoot)
+	/*if (!bHasRoot)
 	{
 		while (RootNode.ParentIndex != INDEX_NONE && Joints.Contains(RootNode.ParentIndex))
 		{
@@ -731,7 +793,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 				return false;
 			}
 		}
-	}
+	}*/
 
 	TMap<int32, FMatrix> InverseBindMatricesMap;
 	int64 inverseBindMatricesIndex;
@@ -794,45 +856,49 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 		CollidingIndex = Modifier.FindBoneIndex(BoneName);
 	}
 
-	FTransform Transform = Node.Transform;
+	FTransform Transform = FTransform(Basis.Inverse() * FMatrix::Identity * Basis);// Node.Transform;
 	if (InverseBindMatricesMap.Contains(Node.Index))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Using Bind matrix for %d"), Node.Index);
-		//FMatrix PoseMatrix = Transform.ToMatrixWithScale();
+		UE_LOG(LogTemp, Warning, TEXT("Using Bind matrix for %d %s"), Node.Index, *Node.Name);
+
 		FMatrix M = InverseBindMatricesMap[Node.Index].Inverse();
 		if (Node.ParentIndex != INDEX_NONE && Joints.Contains(Node.ParentIndex))
 		{
-			M = M * InverseBindMatricesMap[Node.ParentIndex];
+			M *= InverseBindMatricesMap[Node.ParentIndex];
 		}
+	
 		UE_LOG(LogTemp, Error, TEXT("***** %d *****"), Node.Index);
 		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[0][0], M.M[0][1], M.M[0][2], M.M[0][3]);
 		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[1][0], M.M[1][1], M.M[1][2], M.M[1][3]);
 		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[2][0], M.M[2][1], M.M[2][2], M.M[2][3]);
 		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[3][0], M.M[3][1], M.M[3][2], M.M[3][3]);
-		//Transform.ScaleTranslation(1.0f / Scale);
-		//FTransform BindMatrix = FTransform(InverseBindMatricesMap[Node->Index]);
-		//FMatrix CleanedUpPose = BindMatrix;
-		//Transform = FTransform(CleanedUpPose);
-		//Transform.ScaleTranslation(Scale);
-		//Transform = BindMatrix;// .Inverse();// *Transform;
-		//Transform.ScaleTranslation(Scale);
 
-
-		//BindTransform.SetScale3D(FVector(1));
 
 		M.ScaleTranslation(FVector(Scale, Scale, Scale));
+		//Transform = FTransform(M);
 		Transform = FTransform(Basis.Inverse() * M * Basis);
-
-		//Transform = BindTransform * Transform;
-		//Transform.SetScale3D(FVector(1));
 	}
 	else
 	{
 		UE_LOG(LogTemp, Error, TEXT("No bind transform for node %d"), Node.Index);
 	}
 
-	if (Parent == INDEX_NONE && bHasRoot && !Joints.Contains(Node.Index))
-		RootTransform = Node.Transform;
+	/*if (Parent == INDEX_NONE && !bHasRoot)
+	{
+		FglTFRuntimeNode RootNode = Node;
+		while (RootNode.ParentIndex != INDEX_NONE)
+		{
+			if (!LoadNode(RootNode.ParentIndex, RootNode))
+				return false;
+			Transform *= RootNode.Transform.Inverse();
+		}
+		//RootTransform = Node.Transform;
+	}*/
+
+	if (Parent == INDEX_NONE && !bHasRoot)
+	{
+		//Transform *= RootTransform;
+	}
 
 	Modifier.Add(FMeshBoneInfo(BoneName, Node.Name, Parent), Transform);
 
@@ -1359,20 +1425,86 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 		return nullptr;
 	}
 
+	TArray<FglTFRuntimePrimitive> Primitives;
+	if (!LoadPrimitives(JsonPrimitives, Primitives))
+		return nullptr;
+
 	UStaticMesh* StaticMesh = NewObject<UStaticMesh>();
 
 	UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
 
 	StaticMaterials.Empty();
 
-	for (TSharedPtr<FJsonValue> JsonPrimitive : *JsonPrimitives)
+	for (FglTFRuntimePrimitive& Primitive : Primitives)
 	{
-		TSharedPtr<FJsonObject> JsonPrimitiveObject = JsonPrimitive->AsObject();
-		if (!JsonPrimitiveObject)
-			return nullptr;
+		FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
 
-		if (!BuildPrimitive(MeshDescription, JsonPrimitiveObject.ToSharedRef()))
-			return nullptr;
+		TPolygonGroupAttributesRef<FName> PolygonGroupMaterialSlotNames = MeshDescription->GetPolygonGroupMaterialSlotNames();
+		PolygonGroupMaterialSlotNames[PolygonGroupID] = Primitive.Material->GetFName();
+		FStaticMaterial StaticMaterial(Primitive.Material, Primitive.Material->GetFName());
+		StaticMaterial.UVChannelData.bInitialized = true;
+		StaticMaterials.Add(StaticMaterial);
+
+		TVertexAttributesRef<FVector> PositionsAttributesRef = MeshDescription->GetVertexPositions();
+		TVertexInstanceAttributesRef<FVector> NormalsInstanceAttributesRef = MeshDescription->GetVertexInstanceNormals();
+
+		TArray<FVertexInstanceID> VertexInstancesIDs;
+		TArray<FVertexID> VerticesIDs;
+		TArray<FVertexID> TriangleVerticesIDs;
+
+
+		for (FVector& Position : Primitive.Positions)
+		{
+			FVertexID VertexID = MeshDescription->CreateVertex();
+			PositionsAttributesRef[VertexID] = Position;
+			VerticesIDs.Add(VertexID);
+		}
+
+		for (uint32 VertexIndex : Primitive.Indices)
+		{
+			if (VertexIndex >= (uint32)VerticesIDs.Num())
+				return false;
+
+			FVertexInstanceID NewVertexInstanceID = MeshDescription->CreateVertexInstance(VerticesIDs[VertexIndex]);
+			if (Primitive.Normals.Num() > 0)
+			{
+				if (VertexIndex >= (uint32)Primitive.Normals.Num())
+				{
+					NormalsInstanceAttributesRef[NewVertexInstanceID] = FVector::ZeroVector;
+				}
+				else
+				{
+					NormalsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Normals[VertexIndex];
+				}
+			}
+
+			VertexInstancesIDs.Add(NewVertexInstanceID);
+			TriangleVerticesIDs.Add(VerticesIDs[VertexIndex]);
+
+			if (VertexInstancesIDs.Num() == 3)
+			{
+				// degenerate ?
+				if (TriangleVerticesIDs[0] == TriangleVerticesIDs[1] ||
+					TriangleVerticesIDs[1] == TriangleVerticesIDs[2] ||
+					TriangleVerticesIDs[0] == TriangleVerticesIDs[2])
+				{
+					VertexInstancesIDs.Empty();
+					TriangleVerticesIDs.Empty();
+					continue;
+				}
+
+				TArray<FEdgeID> Edges;
+				// fix winding
+				//VertexInstancesIDs.Swap(1, 2);
+				FTriangleID TriangleID = MeshDescription->CreateTriangle(PolygonGroupID, VertexInstancesIDs, Edges);
+				if (TriangleID == FTriangleID::Invalid)
+				{
+					return false;
+				}
+				VertexInstancesIDs.Empty();
+				TriangleVerticesIDs.Empty();
+			}
+		}
 
 	}
 

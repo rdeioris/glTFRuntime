@@ -127,7 +127,7 @@ public:
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 Index, FglTFRuntimeScene& Scene);
 
-	USkeletalMesh* LoadSkeletalMesh(int32 Index, int32 SkinIndex);
+	USkeletalMesh* LoadSkeletalMesh(int32 Index, int32 SkinIndex, int32 NodeIndex);
 
 	bool BuildPrimitive(UStaticMeshDescription* MeshDescription, TSharedRef<FJsonObject> JsonPrimitiveObject);
 
@@ -231,12 +231,15 @@ protected:
 	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
 
 	USkeletalMesh* _LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject);
-	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject);
+	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, FTransform& RootTransform);
 
 	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, FTransform& RootTransform);
 	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, FTransform& RootTransform, const bool bHasRoot);
 
 	void FixNodeParent(FglTFRuntimeNode& Node);
+
+	int32 FindCommonRoot(TArray<int32> Indices);
+	bool HasRoot(int32 Index, int32 RootIndex);
 
 	FMatrix Basis;
 	float Scale;

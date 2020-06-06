@@ -46,10 +46,16 @@ bool UglTFRuntimeAsset::GetNode(int32 Index, FglTFRuntimeNode& Node)
 
 UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(int32 MeshIndex)
 {
-	return nullptr;
+	if (!Parser)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
+		return false;
+	}
+
+	return Parser->LoadStaticMesh(MeshIndex);
 }
 
-USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(int32 MeshIndex, int32 SkinIndex)
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(int32 MeshIndex, int32 SkinIndex, int32 NodeIndex)
 {
 	if (!Parser)
 	{
@@ -57,5 +63,5 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(int32 MeshIndex, int32 SkinIn
 		return false;
 	}
 
-	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex);
+	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, NodeIndex);
 }
