@@ -22,6 +22,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool GetNode(int32 Index, FglTFRuntimeNode& Node);
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetNodeByName(FString Name, FglTFRuntimeNode& Node);
+
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	UStaticMesh* LoadStaticMesh(int32 MeshIndex);
 

@@ -9,6 +9,7 @@
 #include "Rendering/SkeletalMeshLODRenderData.h"
 #include "Rendering/SkeletalMeshVertexBuffer.h"
 #include "IMeshBuilderModule.h"
+#include "LODUtilities.h"
 #include "MeshUtilities.h"
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(FString Filename)
@@ -209,6 +210,27 @@ bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 
 	Node = AllNodesCache[Index];
 	return true;
+}
+
+bool FglTFRuntimeParser::LoadNodeByName(FString Name, FglTFRuntimeNode& Node)
+{
+	// a bit hacky, but allows zero-copy for cached values
+	if (!bAllNodesCached)
+	{
+		if (!LoadNodes())
+			return false;
+	}
+
+	for (FglTFRuntimeNode& NodeRef : AllNodesCache)
+	{
+		if (NodeRef.Name == Name)
+		{
+			Node = NodeRef;
+			return true;
+		}
+	}
+
+	return false;
 }
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
@@ -564,13 +586,24 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	TArray<int32> PointToRawMap;
 
 	int32 MatIndex = 0;
+	TMap<int32, int32> BonesCache;
+	int32 Counter = 0;
 	for (FglTFRuntimePrimitive& Primitive : Primitives)
 	{
-		int32 Base = Points.Num();
-		/*for (FVector Point : Primitive.Positions)
+		if (Counter != 14)
 		{
-			Points.Add(RootTransform.TransformPosition(Point));
-		}*/
+			Counter++;
+			//continue;
+		}
+		else
+		{
+			Counter++;
+		}
+		int32 Base = Points.Num();
+		//for (FVector Point : Primitive.Positions)
+		//{
+		//	Points.Add(RootTransform.TransformPosition(Point));
+		//}
 		Points.Append(Primitive.Positions);
 
 		int32 TriangleIndex = 0;
@@ -581,6 +614,10 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 
 			SkeletalMeshImportData::FVertex Wedge;
 			Wedge.VertexIndex = Base + Index;
+			if (Primitive.UVs.Num() > 0)
+			{
+				Wedge.UVs[0] = Primitive.UVs[0][Index];
+			}
 
 			int32 WedgeIndex = Wedges.Add(Wedge);
 
@@ -589,23 +626,45 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 				FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
 				FVector4 Weights = Primitive.Weights[JointsIndex][Index];
 
-
+				float TotalWeight = 0;
 				for (int32 j = 0; j < 4; j++)
 				{
 					if (BoneMap.Contains(Joints[j]))
 					{
 						SkeletalMeshImportData::FRawBoneInfluence Influence;
 						Influence.VertexIndex = Wedge.VertexIndex;
-						Influence.BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMap[Joints[j]]);
+						int32 BoneIndex = INDEX_NONE;
+						if (BonesCache.Contains(Joints[j]))
+							BoneIndex = BonesCache[Joints[j]];
+						else
+						{
+							BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMap[Joints[j]]);
+							BonesCache.Add(Joints[j], BoneIndex);
+						}
+						Influence.BoneIndex = BoneIndex;
 						Influence.Weight = Weights[j];
-						Influences.Add(Influence);
+						//if (Influence.Weight > 0 && Influence.BoneIndex > INDEX_NONE)
+						{
+							Influences.Add(Influence);
+							TotalWeight += Influence.Weight;
+							//UE_LOG(LogTemp, Error, TEXT("[%d] Influence: %d %d %f"), j, Influence.VertexIndex, Influence.BoneIndex, Influence.Weight);
+						}
+						//else
+						{
+							//UE_LOG(LogTemp, Warning, TEXT("[%d] Influence: %d %d %f"), j, Influence.VertexIndex, Influence.BoneIndex, Influence.Weight);
+						}
 						//if (j == 1 && Influence.Weight != 0)
-						//	UE_LOG(LogTemp, Error, TEXT("Influence: %d %d %f"), Influence.VertexIndex, Influence.BoneIndex, Influence.Weight);
+
 					}
 					else
 					{
 						UE_LOG(LogTemp, Error, TEXT("Unable to find map for bone %u"), Joints[j]);
 					}
+				}
+
+				if (TotalWeight < 0.5f)
+				{
+					UE_LOG(LogTemp, Error, TEXT("Found non normalized skin data: %f"), TotalWeight);
 				}
 			}
 
@@ -640,6 +699,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	for (int32 i = 0; i < Points.Num(); i++)
 		PointToRawMap.Add(i);
 
+	FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences);
+
 	ImportData.bHasNormals = true;
 	ImportData.bHasVertexColors = false;
 	ImportData.bHasTangents = false;
@@ -667,11 +728,17 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 
 	SkeletalMesh->CalculateInvRefMatrices();
 
-	SkeletalMesh->SetImportedBounds(FBoxSphereBounds(Points.GetData(), Points.Num()));
+	FBox BoundingBox(Points.GetData(), Points.Num());
+	FBox Temp = BoundingBox;
+	FVector MidMesh = 0.5f * (Temp.Min + Temp.Max);
+	BoundingBox.Min = Temp.Min + 1.0f * (Temp.Min - MidMesh);
+	BoundingBox.Max = Temp.Max + 1.0f * (Temp.Max - MidMesh);
+	BoundingBox.Min[2] = Temp.Min[2] + 0.1f * (Temp.Min[2] - MidMesh[2]);
+
+	SkeletalMesh->SetImportedBounds(FBoxSphereBounds(BoundingBox));
 
 	SkeletalMesh->bHasVertexColors = false;
 	SkeletalMesh->VertexColorGuid = SkeletalMesh->bHasVertexColors ? FGuid::NewGuid() : FGuid();
-
 
 	for (MatIndex = 0; MatIndex < Primitives.Num(); MatIndex++)
 	{
@@ -687,7 +754,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	SkeletalMesh->Build();
 
 	SkeletalMesh->Skeleton = NewObject<USkeleton>();
-	SkeletalMesh->Skeleton->RecreateBoneTree(SkeletalMesh);
+	//SkeletalMesh->Skeleton->RecreateBoneTree(SkeletalMesh);
 	SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
 
 	return SkeletalMesh;
@@ -711,6 +778,20 @@ bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)
 	}
 
 	return false;
+}
+
+int32 FglTFRuntimeParser::FindTopRoot(int32 Index)
+{
+	FglTFRuntimeNode Node;
+	if (!LoadNode(Index, Node))
+		return INDEX_NONE;
+	while (Node.ParentIndex != INDEX_NONE)
+	{
+		if (!LoadNode(Node.ParentIndex, Node))
+			return INDEX_NONE;
+	}
+
+	return Node.Index;
 }
 
 int32 FglTFRuntimeParser::FindCommonRoot(TArray<int32> Indices)
@@ -768,19 +849,34 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	// fill the root bone
 	FglTFRuntimeNode RootNode;
 	int64 RootBoneIndex;
-	if (!JsonSkinObject->TryGetNumberField("skeleton", RootBoneIndex))
+	//if (!JsonSkinObject->TryGetNumberField("skeleton", RootBoneIndex))
 	{
 		RootBoneIndex = FindCommonRoot(Joints);
+		//RootBoneIndex = FindTopRoot(Joints[0]);
 		if (RootBoneIndex == INDEX_NONE)
 			return false;
 		bHasRoot = false;
 	}
+	/*if (!JsonSkinObject->TryGetNumberField("skeleton", RootBoneIndex))
+	{
+		RootBoneIndex = Joints[0];
+		bHasRoot = false;
+	}*/
+
+
+	/*RootBoneIndex = FindTopRoot(RootBoneIndex);
+	if (RootBoneIndex == INDEX_NONE)
+		return false;*/
 
 	if (!LoadNode(RootBoneIndex, RootNode))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Unable to load joint node"));
 		return false;
 	}
+
+	//RootTransform = RootNode.Transform;// .Inverse();
+
+	RootTransform = FTransform::Identity;
 
 	/*if (!bHasRoot)
 	{
@@ -856,7 +952,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 		CollidingIndex = Modifier.FindBoneIndex(BoneName);
 	}
 
-	FTransform Transform = FTransform(Basis.Inverse() * FMatrix::Identity * Basis);// Node.Transform;
+	FTransform Transform = Node.Transform;// FTransform(Basis.Inverse() * FMatrix::Identity * Basis);// Node.Transform;
 	if (InverseBindMatricesMap.Contains(Node.Index))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Using Bind matrix for %d %s"), Node.Index, *Node.Name);
@@ -865,6 +961,35 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 		if (Node.ParentIndex != INDEX_NONE && Joints.Contains(Node.ParentIndex))
 		{
 			M *= InverseBindMatricesMap[Node.ParentIndex];
+		}
+		else if (Node.ParentIndex != INDEX_NONE)
+		{
+			/*FglTFRuntimeNode ParentNode = Node;
+			while (ParentNode.ParentIndex != INDEX_NONE)
+			{
+				if (!LoadNode(Node.ParentIndex, ParentNode))
+					return false;
+				FMatrix ParentMatrix = ParentNode.Transform.ToMatrixWithScale();
+				ParentMatrix.ScaleTranslation(FVector(1.0f / Scale, 1.0f / Scale, 1.0f / Scale));
+				FMatrix CleanParent = Basis * ParentMatrix * Basis.Inverse();
+				M *= CleanParent.Inverse();
+			}*/
+			/*FglTFRuntimeNode ParentNode;
+
+			UE_LOG(LogTemp, Error, TEXT("Loaded Node %s"), *ParentNode.Name);
+
+			while (ParentNode.ParentIndex != INDEX_NONE)
+			{
+				if (!LoadNode(ParentNode.ParentIndex, ParentNode))
+					return false;
+				UE_LOG(LogTemp, Error, TEXT("Loaded Node %s"), *ParentNode.Name);
+				ParentMatrix = ParentNode.Transform.ToMatrixWithScale();
+				ParentMatrix.ScaleTranslation(FVector(1.0f / Scale, 1.0f / Scale, 1.0f / Scale));
+				CleanParent = Basis * ParentMatrix * Basis.Inverse();
+				M *= CleanParent.Inverse();
+
+			}*/
+			UE_LOG(LogTemp, Error, TEXT("bind matrix not found for %s"), *Node.Name);
 		}
 
 		UE_LOG(LogTemp, Error, TEXT("***** %d *****"), Node.Index);
@@ -880,7 +1005,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("No bind transform for node %d"), Node.Index);
+		UE_LOG(LogTemp, Error, TEXT("No bind transform for node %d %s"), Node.Index, *Node.Name);
 	}
 
 	/*if (Parent == INDEX_NONE && !bHasRoot)
@@ -895,10 +1020,10 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 		//RootTransform = Node.Transform;
 	}*/
 
-	if (Parent == INDEX_NONE && !bHasRoot)
-	{
+	//if (Parent == INDEX_NONE && !bHasRoot)
+	//{
 		//Transform *= RootTransform;
-	}
+	//}
 
 	Modifier.Add(FMeshBoneInfo(BoneName, Node.Name, Parent), Transform);
 
@@ -1410,7 +1535,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
 	}
 
-	UE_LOG(LogTemp, Error, TEXT("Primitive with indices: %d %d %d %d %d"), Primitive.Indices.Num(), Primitive.Positions.Num(), Primitive.Normals.Num(), Primitive.Joints[0].Num(), Primitive.Weights[0].Num());
+	UE_LOG(LogTemp, Error, TEXT("Primitive with indices: %d %d %d %d %d %d %d"), Primitive.Indices.Num(), Primitive.Positions.Num(), Primitive.Normals.Num(), Primitive.Joints[0].Num(), Primitive.Weights[0].Num(), Primitive.Joints.Num(), Primitive.Weights.Num());
 
 	return true;
 }

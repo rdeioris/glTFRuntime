@@ -44,6 +44,17 @@ bool UglTFRuntimeAsset::GetNode(int32 Index, FglTFRuntimeNode& Node)
 	return Parser->LoadNode(Index, Node);
 }
 
+bool UglTFRuntimeAsset::GetNodeByName(FString Name, FglTFRuntimeNode& Node)
+{
+	if (!Parser)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
+		return false;
+	}
+
+	return Parser->LoadNodeByName(Name, Node);
+}
+
 UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(int32 MeshIndex)
 {
 	if (!Parser)

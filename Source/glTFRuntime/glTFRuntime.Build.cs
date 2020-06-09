@@ -41,6 +41,7 @@ public class glTFRuntime : ModuleRules
 				"StaticMeshDescription",
 				"RenderCore",
 				"RHI",
+				"SkeletalMeshUtilitiesCommon"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

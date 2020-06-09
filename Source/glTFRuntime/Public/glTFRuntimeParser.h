@@ -123,6 +123,7 @@ public:
 
 	bool LoadNodes();
 	bool LoadNode(int32 Index, FglTFRuntimeNode& Node);
+	bool LoadNodeByName(FString Name, FglTFRuntimeNode& Node);
 
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 Index, FglTFRuntimeScene& Scene);
@@ -175,7 +176,7 @@ public:
 				uint8* Ptr = (uint8*)&(Bytes[Index]);
 				for (int32 i = 0; i < Elements; i++)
 				{
-					Value[i] = bNormalized ? ((float)Ptr[i]) / 0xff : Ptr[i];
+					Value[i] = bNormalized ? ((float)Ptr[i]) / 255.f : Ptr[i];
 				}
 			}
 			// UNSIGNED_SHORT
@@ -184,7 +185,7 @@ public:
 				uint16* Ptr = (uint16*)&(Bytes[Index]);
 				for (int32 i = 0; i < Elements; i++)
 				{
-					Value[i] = bNormalized ? ((float)Ptr[i]) / 0xffff : Ptr[i];
+					Value[i] = bNormalized ? ((float)Ptr[i]) / 65535.f : Ptr[i];
 				}
 			}
 			else
@@ -235,6 +236,7 @@ protected:
 	void FixNodeParent(FglTFRuntimeNode& Node);
 
 	int32 FindCommonRoot(TArray<int32> Indices);
+	int32 FindTopRoot(int32 Index);
 	bool HasRoot(int32 Index, int32 RootIndex);
 
 	FMatrix Basis;
