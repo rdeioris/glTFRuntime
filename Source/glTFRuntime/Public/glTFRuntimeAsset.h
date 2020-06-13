@@ -31,6 +31,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	USkeletalMesh* LoadSkeletalMesh(int32 MeshIndex, int32 SkinIndex, int32 NodeIndex=-1);
 
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	UAnimSequence* LoadSkeletalAnimation(USkeleton* Skelton, int32 AnimationIndex);
+
 	bool LoadFromFilename(const FString Filename);
 
 protected:
