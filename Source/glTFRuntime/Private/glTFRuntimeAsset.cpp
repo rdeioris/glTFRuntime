@@ -77,7 +77,13 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(int32 MeshIndex, int32 SkinIn
 	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, NodeIndex);
 }
 
-UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeleton* Skelton, int32 AnimationIndex)
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex)
 {
-	return nullptr;
+	if (!Parser)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
+		return false;
+	}
+
+	return Parser->LoadSkeletalAnimation(SkeletalMesh, AnimationIndex);
 }

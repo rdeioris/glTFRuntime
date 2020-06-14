@@ -91,7 +91,7 @@ struct FglTFRuntimeUInt16Vector4
 		default:
 			return W;
 		}
-;
+		;
 	}
 };
 
@@ -129,6 +129,7 @@ public:
 	bool LoadScene(int32 Index, FglTFRuntimeScene& Scene);
 
 	USkeletalMesh* LoadSkeletalMesh(int32 Index, int32 SkinIndex, int32 NodeIndex);
+	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex);
 
 	bool GetBuffer(int32 Index, TArray<uint8>& Bytes);
 	bool GetBufferView(int32 Index, TArray<uint8>& Bytes, int64& Stride);
@@ -140,10 +141,10 @@ public:
 	int64 GetTypeSize(const FString Type) const;
 
 	template<typename T, typename Callback>
-	bool BuildPrimitiveAttribute(TSharedRef<FJsonObject> JsonAttributesObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedElements, const TArray<int64> SupportedTypes, const bool bNormalized, Callback Filter)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedElements, const TArray<int64> SupportedTypes, const bool bNormalized, Callback Filter)
 	{
 		int64 AccessorIndex;
-		if (!JsonAttributesObject->TryGetNumberField(Name, AccessorIndex))
+		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
 			return false;
 
 		TArray<uint8> Bytes;
@@ -170,6 +171,16 @@ public:
 					Value[i] = Ptr[i];
 				}
 			}
+			// BYTE
+			else if (ComponentType == 5120)
+			{
+				int8* Ptr = (int8*)&(Bytes[Index]);
+				for (int32 i = 0; i < Elements; i++)
+				{
+					Value[i] = bNormalized ? FMath::Max(((float)Ptr[i]) / 127.f, -1.f) : Ptr[i];
+				}
+
+			}
 			// UNSIGNED_BYTE
 			else if (ComponentType == 5121)
 			{
@@ -177,6 +188,15 @@ public:
 				for (int32 i = 0; i < Elements; i++)
 				{
 					Value[i] = bNormalized ? ((float)Ptr[i]) / 255.f : Ptr[i];
+				}
+			}
+			// SHORT
+			else if (ComponentType == 5122)
+			{
+				int16* Ptr = (int16*)&(Bytes[Index]);
+				for (int32 i = 0; i < Elements; i++)
+				{
+					Value[i] = bNormalized ? FMath::Max(((float)Ptr[i]) / 32767.f, -1.f) : Ptr[i];
 				}
 			}
 			// UNSIGNED_SHORT
@@ -199,10 +219,81 @@ public:
 		return true;
 	}
 
-	template<typename T>
-	bool BuildPrimitiveAttribute(TSharedRef<FJsonObject> JsonAttributesObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedElements, const TArray<int64> SupportedTypes, const bool bNormalized)
+	template<typename T, typename Callback>
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedTypes, const bool bNormalized, Callback Filter)
 	{
-		return BuildPrimitiveAttribute(JsonAttributesObject, Name, Data, SupportedElements, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue;});
+		int64 AccessorIndex;
+		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
+			return false;
+
+		TArray<uint8> Bytes;
+		int64 ComponentType, Stride, Elements, ElementSize, Count;
+		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, Bytes))
+			return false;
+
+		if (Elements != 1)
+			return false;
+
+		if (!SupportedTypes.Contains(ComponentType))
+			return false;
+
+		for (int64 ElementIndex = 0; ElementIndex < Count; ElementIndex++)
+		{
+			int64 Index = ElementIndex * Stride;
+			T Value;
+			// FLOAT
+			if (ComponentType == 5126)
+			{
+				float* Ptr = (float*)&(Bytes[Index]);
+				Value = *Ptr;
+			}
+			// BYTE
+			else if (ComponentType == 5120)
+			{
+				int8* Ptr = (int8*)&(Bytes[Index]);
+				Value = bNormalized ? FMath::Max(((float)(*Ptr)) / 127.f, -1.f) : *Ptr;
+
+			}
+			// UNSIGNED_BYTE
+			else if (ComponentType == 5121)
+			{
+				uint8* Ptr = (uint8*)&(Bytes[Index]);
+				Value = bNormalized ? ((float)(*Ptr)) / 255.f : *Ptr;
+
+			}
+			// SHORT
+			else if (ComponentType == 5122)
+			{
+				int16* Ptr = (int16*)&(Bytes[Index]);
+				Value = bNormalized ? FMath::Max(((float)(*Ptr)) / 32767.f, -1.f) : *Ptr;
+			}
+			// UNSIGNED_SHORT
+			else if (ComponentType == 5123)
+			{
+				uint16* Ptr = (uint16*)&(Bytes[Index]);
+				Value = bNormalized ? ((float)(*Ptr)) / 65535.f : *Ptr;
+			}
+			else
+			{
+				return false;
+			}
+
+			Data.Add(Filter(Value));
+		}
+
+		return true;
+	}
+
+	template<typename T>
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedElements, const TArray<int64> SupportedTypes, const bool bNormalized)
+	{
+		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; });
+	}
+
+	template<typename T>
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedTypes, const bool bNormalized)
+	{
+		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; });
 	}
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
@@ -228,6 +319,7 @@ protected:
 	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
 
 	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, FTransform& RootTransform);
+	bool LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames);
 
 	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, FTransform& RootTransform);
 	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, FTransform& RootTransform, const bool bHasRoot);
@@ -237,6 +329,8 @@ protected:
 	int32 FindCommonRoot(TArray<int32> Indices);
 	int32 FindTopRoot(int32 Index);
 	bool HasRoot(int32 Index, int32 RootIndex);
+
+	float FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex);
 
 	FMatrix Basis;
 	float Scale;

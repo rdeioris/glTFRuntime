@@ -14,6 +14,8 @@
 #include "MeshUtilities.h"
 #endif
 
+#include "glTfAnimBoneCompressionCodec.h"
+
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(FString Filename)
 {
 	FString JsonData;
@@ -762,7 +764,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
 
 			InWeights[TotalVertexIndex].InfluenceWeights[0] = 255;
-			InWeights[TotalVertexIndex].InfluenceBones[0] = 0;
+			InWeights[TotalVertexIndex].InfluenceBones[0] = 1;
 
 			TotalVertexIndex++;
 		}
@@ -834,6 +836,264 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 #endif
 
 	return SkeletalMesh;
+}
+
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex)
+{
+	if (!SkeletalMesh)
+	{
+		return nullptr;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
+	if (!Root->TryGetArrayField("animations", JsonAnimations))
+	{
+		return nullptr;
+	}
+
+	if (AnimationIndex >= JsonAnimations->Num())
+		return nullptr;
+
+	TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[AnimationIndex]->AsObject();
+	if (!JsonAnimationObject)
+		return nullptr;
+
+	float Duration;
+	int32 NumFrames;
+
+	TMap<FString, FRawAnimSequenceTrack> Tracks;
+	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration, NumFrames))
+		return nullptr;
+
+	UAnimSequence* AnimSequence = NewObject<UAnimSequence>();
+	AnimSequence->SetSkeleton(SkeletalMesh->Skeleton);
+	AnimSequence->SetPreviewMesh(SkeletalMesh);
+	AnimSequence->SetRawNumberOfFrame(NumFrames);
+	AnimSequence->SequenceLength = Duration;
+	AnimSequence->bEnableRootMotion = false;
+
+	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
+
+	for (TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
+	{
+		FName BoneName = FName(Pair.Key);
+		int32 BoneIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(BoneName);
+		if (BoneIndex == INDEX_NONE)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Unable to find bone %s"), *Pair.Key);
+			continue;
+		}
+		
+		if (Pair.Value.PosKeys.Num() == 0)
+			Pair.Value.PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
+
+		AnimSequence->AddNewRawTrack(BoneName, &Pair.Value);
+	}
+
+	AnimSequence->PostProcessSequence();
+
+
+#if !WITH_EDITOR
+	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
+	AnimSequence->PostLoad();
+
+	AnimSequence->CompressedData.BoneCompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
+	//AnimSequence->CompressedData.CompressedByteStream.AddUninitialized(1);
+	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.Add(FTrackToSkeletonMap(1));
+	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.Add(FTrackToSkeletonMap(0));
+	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.Add(FTrackToSkeletonMap(2));
+
+	UE_LOG(LogTemp, Warning, TEXT("Curves: %d"), AnimSequence->RawCurveData.FloatCurves.Num());
+	UE_LOG(LogTemp, Warning, TEXT("Compression: %p %d"), AnimSequence->CompressedData.BoneCompressionCodec, AnimSequence->CompressedData.CompressedCurveNames.Num());
+
+	for (int32 i = 0; i < AnimSequence->RawCurveData.FloatCurves.Num(); i++)
+	{
+		FFloatCurve& Curve = AnimSequence->RawCurveData.FloatCurves[i];
+		UE_LOG(LogTemp, Warning, TEXT("Curve: %s"), *Curve.Name.DisplayName.ToString());
+	}
+#endif
+
+	return AnimSequence;
+}
+
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames)
+{
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
+	if (!JsonAnimationObject->TryGetArrayField("samplers", JsonSamplers))
+	{
+		return false;
+	}
+
+	Duration = 0.f;
+
+	TArray<TPair<TArray<float>, TArray<FVector4>>> Samplers;
+
+	for (int32 SamplerIndex = 0; SamplerIndex < JsonSamplers->Num(); SamplerIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonSamplerObject = (*JsonSamplers)[SamplerIndex]->AsObject();
+		if (!JsonSamplerObject)
+			return false;
+
+		TArray<float> Timeline;
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", Timeline, { 5126 }, false))
+		{
+			UE_LOG(LogTemp, Error, TEXT("unable to retrieve \"input\" from sampler"));
+			return false;
+		}
+
+		TArray<FVector4> Values;
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", Values, { 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, true))
+		{
+			UE_LOG(LogTemp, Error, TEXT("unable to retrieve \"output\" from sampler"));
+			return false;
+		}
+
+		FString SamplerInterpolation;
+		if (!JsonSamplerObject->TryGetStringField("interpolation", SamplerInterpolation))
+		{
+			SamplerInterpolation = "LINEAR";
+		}
+
+		//UE_LOG(LogTemp, Error, TEXT("Found sample with %d keyframes and %d values"), Timeline.Num(), Values.Num());
+
+		if (Timeline.Num() != Values.Num())
+			return false;
+
+		// get animation valid duration
+		for (float Time : Timeline)
+		{
+			if (Time > Duration)
+			{
+				Duration = Time;
+			}
+		}
+
+		Samplers.Add(TPair<TArray<float>, TArray<FVector4>>(Timeline, Values));
+	}
+
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonChannels;
+	if (!JsonAnimationObject->TryGetArrayField("channels", JsonChannels))
+	{
+		return false;
+	}
+
+	for (int32 ChannelIndex = 0; ChannelIndex < JsonChannels->Num(); ChannelIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonChannelObject = (*JsonChannels)[ChannelIndex]->AsObject();
+		if (!JsonChannelObject)
+			return false;
+
+		int32 Sampler;
+		if (!JsonChannelObject->TryGetNumberField("sampler", Sampler))
+			return false;
+
+		if (Sampler >= Samplers.Num())
+			return false;
+
+		const TSharedPtr<FJsonObject>* JsonTargetObject;
+		if (!JsonChannelObject->TryGetObjectField("target", JsonTargetObject))
+		{
+			return false;
+		}
+
+		int64 NodeIndex;
+		if (!(*JsonTargetObject)->TryGetNumberField("node", NodeIndex))
+		{
+			return false;
+		}
+
+		FglTFRuntimeNode Node;
+		if (!LoadNode(NodeIndex, Node))
+			return false;
+
+		FString Path;
+		if (!(*JsonTargetObject)->TryGetStringField("path", Path))
+		{
+			return false;
+		}
+
+		NumFrames = Duration * 30;
+		float FrameDelta = 1.f / 30;
+
+		if (Path == "rotation")
+		{
+			if (!Tracks.Contains(Node.Name))
+			{
+				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+			}
+
+			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+
+			float FrameBase = 0.f;
+			for (int32 Frame = 0; Frame < NumFrames; Frame++)
+			{
+				int32 FirstIndex;
+				int32 SecondIndex;
+				float Alpha = FindBestFrames(Samplers[Sampler].Key, FrameBase, FirstIndex, SecondIndex);
+				FVector4 FirstQuatV = Samplers[Sampler].Value[FirstIndex];
+				FVector4 SecondQuatV = Samplers[Sampler].Value[SecondIndex];
+				FQuat FirstQuat = { FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W };
+				FQuat SecondQuat = { SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W };
+				FMatrix FirstMatrix = Basis.Inverse() * FRotationMatrix(FirstQuat.Rotator()) * Basis;
+				FMatrix SecondMatrix = Basis.Inverse() * FRotationMatrix(SecondQuat.Rotator()) * Basis;
+				FirstQuat = FirstMatrix.ToQuat();
+				SecondQuat = SecondMatrix.ToQuat();
+				FQuat Quat = FMath::Lerp(FirstQuat, SecondQuat, Alpha);
+				Track.RotKeys.Add(Quat);
+				FrameBase += FrameDelta;
+			}
+		}
+		else if (Path == "translation")
+		{
+			if (!Tracks.Contains(Node.Name))
+			{
+				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+			}
+
+			//UE_LOG(LogTemp, Error, TEXT("Found translation for %s"), *Node.Name);
+
+			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+
+			float FrameBase = 0.f;
+			for (int32 Frame = 0; Frame < NumFrames; Frame++)
+			{
+				int32 FirstIndex;
+				int32 SecondIndex;
+				float Alpha = FindBestFrames(Samplers[Sampler].Key, FrameBase, FirstIndex, SecondIndex);
+				FVector4 First = Samplers[Sampler].Value[FirstIndex];
+				FVector4 Second = Samplers[Sampler].Value[SecondIndex];
+				Track.PosKeys.Add(Basis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * Scale);
+				FrameBase += FrameDelta;
+			}
+		}
+		else if (Path == "scale")
+		{
+			if (!Tracks.Contains(Node.Name))
+			{
+				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+			}
+
+			//UE_LOG(LogTemp, Error, TEXT("Found translation for %s"), *Node.Name);
+
+			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+
+			float FrameBase = 0.f;
+			for (int32 Frame = 0; Frame < NumFrames; Frame++)
+			{
+				int32 FirstIndex;
+				int32 SecondIndex;
+				float Alpha = FindBestFrames(Samplers[Sampler].Key, FrameBase, FirstIndex, SecondIndex);
+				FVector4 First = Samplers[Sampler].Value[FirstIndex];
+				FVector4 Second = Samplers[Sampler].Value[SecondIndex];
+				Track.ScaleKeys.Add(FMath::Lerp(First, Second, Alpha));
+				FrameBase += FrameDelta;
+			}
+		}
+	}
+
+	return true;
 }
 
 bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)
@@ -1170,13 +1430,13 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		return false;
 	}
 
-	if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "POSITION", Primitive.Positions,
+	if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "POSITION", Primitive.Positions,
 		{ 3 }, { 5126 }, false, [&](FVector Value) -> FVector {return Basis.TransformPosition(Value) * Scale; }))
 		return false;
 
 	if ((*JsonAttributesObject)->HasField("NORMAL"))
 	{
-		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "NORMAL", Primitive.Normals,
+		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "NORMAL", Primitive.Normals,
 			{ 3 }, { 5126 }, false, [&](FVector Value) -> FVector { return Basis.TransformVector(Value); }))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Error loading normals"));
@@ -1188,7 +1448,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("TEXCOORD_0"))
 	{
 		TArray<FVector2D> UV;
-		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "TEXCOORD_0", UV,
+		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TEXCOORD_0", UV,
 			{ 2 }, { 5126, 5121, 5123 }, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, 1 - Value.Y); }))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Error loading uvs 0"));
@@ -1201,7 +1461,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("TEXCOORD_1"))
 	{
 		TArray<FVector2D> UV;
-		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "TEXCOORD_1", UV,
+		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TEXCOORD_1", UV,
 			{ 2 }, { 5126, 5121, 5123 }, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, 1 - Value.Y); }))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Error loading uvs 1"));
@@ -1214,7 +1474,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("JOINTS_0"))
 	{
 		TArray<FglTFRuntimeUInt16Vector4> Joints;
-		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "JOINTS_0", Joints,
+		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_0", Joints,
 			{ 4 }, { 5121, 5123 }, false))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Error loading joints 0"));
@@ -1227,7 +1487,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("WEIGHTS_0"))
 	{
 		TArray<FVector4> Weights;
-		if (!BuildPrimitiveAttribute(JsonAttributesObject->ToSharedRef(), "WEIGHTS_0", Weights,
+		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_0", Weights,
 			{ 4 }, { 5126, 5121, 5123 }, true))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Error loading weights 0"));
@@ -1643,4 +1903,35 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(MaterialsCache);
 	Collector.AddReferencedObjects(SkeletonsCache);
 	Collector.AddReferencedObjects(SkeletalMeshesCache);
+}
+
+float FglTFRuntimeParser::FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)
+{
+	SecondIndex = INDEX_NONE;
+	// first search for second (higher value)
+	for (int32 i = 0; i < FramesTimes.Num(); i++)
+	{
+		float TimeValue = FramesTimes[i];
+		if (TimeValue >= WantedTime)
+		{
+			SecondIndex = i;
+			break;
+		}
+	}
+
+	// not found ? use the last value
+	if (SecondIndex == INDEX_NONE)
+	{
+		SecondIndex = FramesTimes.Num() - 1;
+	}
+
+	if (SecondIndex == 0)
+	{
+		FirstIndex = 0;
+		return 1.f;
+	}
+
+	FirstIndex = SecondIndex - 1;
+
+	return (WantedTime - FramesTimes[FirstIndex]) / FramesTimes[SecondIndex];
 }
