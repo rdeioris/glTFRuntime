@@ -617,6 +617,7 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject)
 {
 	UMaterialInterface* BaseMaterial = (UMaterialInterface*)StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, TEXT("/glTFRuntime/M_glTFRuntimeBase"));
+	//UMaterialInterface* BaseMaterial = (UMaterialInterface*)StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, TEXT("/glTFRuntime/M_glTFRuntimeTranslucent_Inst"));
 	if (!BaseMaterial)
 		return nullptr;
 
@@ -951,7 +952,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			if (BoneIndex > INDEX_NONE)
 			{
 				MeshSection.BoneMap.Add(BoneIndex);
-}
+			}
 		}
 	}
 
@@ -1012,7 +1013,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 #endif
 
 	return SkeletalMesh;
-	}
+}
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex)
 {
@@ -1090,7 +1091,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-		}
+}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames)
 {
@@ -1775,6 +1776,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 
 		TVertexAttributesRef<FVector> PositionsAttributesRef = MeshDescription->GetVertexPositions();
 		TVertexInstanceAttributesRef<FVector> NormalsInstanceAttributesRef = MeshDescription->GetVertexInstanceNormals();
+		TVertexInstanceAttributesRef<FVector2D> UVsInstanceAttributesRef = MeshDescription->GetVertexInstanceUVs();
 
 		TArray<FVertexInstanceID> VertexInstancesIDs;
 		TArray<FVertexID> VerticesIDs;
@@ -1803,6 +1805,18 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 				else
 				{
 					NormalsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Normals[VertexIndex];
+				}
+			}
+
+			for (int32 UVIndex = 0; UVIndex < Primitive.UVs.Num(); UVIndex++)
+			{
+				if (VertexIndex >= (uint32)Primitive.UVs[UVIndex].Num())
+				{
+					UVsInstanceAttributesRef.Set(NewVertexInstanceID, UVIndex, FVector2D::ZeroVector);
+				}
+				else
+				{
+					UVsInstanceAttributesRef.Set(NewVertexInstanceID, UVIndex, Primitive.UVs[UVIndex][VertexIndex]);
 				}
 			}
 
