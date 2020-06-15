@@ -15,6 +15,8 @@
 #endif
 
 #include "glTfAnimBoneCompressionCodec.h"
+#include "IImageWrapperModule.h"
+#include "IImageWrapper.h"
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(FString Filename)
 {
@@ -237,6 +239,106 @@ bool FglTFRuntimeParser::LoadNodeByName(FString Name, FglTFRuntimeNode& Node)
 	return false;
 }
 
+UTexture2D* FglTFRuntimeParser::LoadImage(int32 Index)
+{
+	if (Index < 0)
+		return nullptr;
+
+	// first check cache
+	if (TexturesCache.Contains(Index))
+	{
+		return TexturesCache[Index];
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonImages;
+
+	// no materials ?
+	if (!Root->TryGetArrayField("images", JsonImages))
+	{
+		return nullptr;
+	}
+
+	if (Index >= JsonImages->Num())
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> JsonImageObject = (*JsonImages)[Index]->AsObject();
+	if (!JsonImageObject)
+		return nullptr;
+
+	TArray<uint8> Bytes;
+	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
+
+	FString Uri;
+	if (JsonImageObject->TryGetStringField("uri", Uri))
+	{
+		if (!ParseBase64Uri(Uri, Bytes))
+		{
+			return nullptr;
+		}
+	}
+	else
+	{
+		int64 BufferViewIndex;
+		if (JsonImageObject->TryGetNumberField("bufferView", BufferViewIndex))
+		{
+			int64 Stride;
+			if (!GetBufferView(BufferViewIndex, Bytes, Stride))
+			{
+				return nullptr;
+			}
+		}
+	}
+
+	if (Bytes.Num() == 0)
+		return nullptr;
+
+	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Bytes.GetData(), Bytes.Num());
+	if (ImageFormat == EImageFormat::Invalid)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Unable to detect image format"));
+		return nullptr;
+	}
+
+	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
+	if (!ImageWrapper.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Unable to create ImageWrapper"));
+		return nullptr;
+	}
+	if (!ImageWrapper->SetCompressed(Bytes.GetData(), Bytes.Num()))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Unable to parse image data"));
+		return nullptr;
+	}
+
+	TArray<uint8> UncompressedBytes;
+	if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Unable to get raw image data"));
+		return nullptr;
+	}
+
+	EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
+	int32 Width = ImageWrapper->GetWidth();
+	int32 Height = ImageWrapper->GetHeight();
+
+	UTexture2D* Texture = UTexture2D::CreateTransient(Width, Height, PixelFormat);
+	if (!Texture)
+		return nullptr;
+
+	FTexture2DMipMap& Mip = Texture->PlatformData->Mips[0];
+	void* Data = Mip.BulkData.Lock(LOCK_READ_WRITE);
+	FMemory::Memcpy(Data, UncompressedBytes.GetData(), UncompressedBytes.Num());
+	Mip.BulkData.Unlock();
+	Texture->UpdateResource();
+
+	TexturesCache.Add(Index, Texture);
+
+	return Texture;
+}
+
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
 {
 	if (Index < 0)
@@ -274,7 +376,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
 	return Material;
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index, int32 SkinIndex, int32 NodeIndex)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index, int32 SkinIndex)
 {
 	if (Index < 0)
 		return nullptr;
@@ -318,21 +420,21 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index, int32 SkinIndex
 		return nullptr;
 
 	FTransform RootTransform = FTransform::Identity;
-	if (NodeIndex > INDEX_NONE)
-	{
-		FglTFRuntimeNode Node;
-		if (!LoadNode(NodeIndex, Node))
-			return nullptr;
-		RootTransform = Node.Transform;
-		while (Node.ParentIndex != INDEX_NONE)
+	/*	if (NodeIndex > INDEX_NONE)
 		{
-			if (!LoadNode(Node.ParentIndex, Node))
+			FglTFRuntimeNode Node;
+			if (!LoadNode(NodeIndex, Node))
 				return nullptr;
-			RootTransform *= Node.Transform;
-		}
+			RootTransform = Node.Transform;
+			while (Node.ParentIndex != INDEX_NONE)
+			{
+				if (!LoadNode(Node.ParentIndex, Node))
+					return nullptr;
+				RootTransform *= Node.Transform;
+			}
 
-		RootTransform = RootTransform.Inverse();
-	}
+			RootTransform = RootTransform.Inverse();
+		}*/
 
 	USkeletalMesh* SkeletalMesh = LoadSkeletalMesh_Internal(JsonMeshObject.ToSharedRef(), JsonSkinObject.ToSharedRef(), RootTransform);
 	if (!SkeletalMesh)
@@ -543,6 +645,21 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 
 			Material->SetVectorParameterValue("baseColorFactor", FLinearColor(R, G, B, A));
 		}
+
+		const TSharedPtr<FJsonObject>* JsonBaseColorTextureObject;
+		if ((*JsonPBRObject)->TryGetObjectField("baseColorTexture", JsonBaseColorTextureObject))
+		{
+			int64 TextureIndex;
+			if (!(*JsonBaseColorTextureObject)->TryGetNumberField("index", TextureIndex))
+				return nullptr;
+
+			UTexture2D* Texture = LoadImage(TextureIndex);
+			if (!Texture)
+				return nullptr;
+
+			Material->SetTextureParameterValue("baseColorTexture", Texture);
+		}
+
 		double metallicFactor;
 		if ((*JsonPBRObject)->TryGetNumberField("metallicFactor", metallicFactor))
 		{
@@ -553,6 +670,65 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		{
 			Material->SetScalarParameterValue("roughnessFactor", roughnessFactor);
 		}
+
+		const TSharedPtr<FJsonObject>* JsonMetallicRoughnessTextureObject;
+		if ((*JsonPBRObject)->TryGetObjectField("metallicRoughnessTexture", JsonMetallicRoughnessTextureObject))
+		{
+			int64 TextureIndex;
+			if (!(*JsonMetallicRoughnessTextureObject)->TryGetNumberField("index", TextureIndex))
+				return nullptr;
+
+			UTexture2D* Texture = LoadImage(TextureIndex);
+			if (!Texture)
+				return nullptr;
+
+			Material->SetTextureParameterValue("metallicRoughnessTexture", Texture);
+		}
+	}
+
+	const TSharedPtr<FJsonObject>* JsonNormalTextureObject;
+	if (JsonMaterialObject->TryGetObjectField("normalTexture", JsonNormalTextureObject))
+	{
+		int64 TextureIndex;
+		if (!(*JsonNormalTextureObject)->TryGetNumberField("index", TextureIndex))
+			return nullptr;
+
+		UTexture2D* Texture = LoadImage(TextureIndex);
+		if (!Texture)
+			return nullptr;
+
+		Material->SetTextureParameterValue("normalTexture", Texture);
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* emissiveFactorValues;
+	if (JsonMaterialObject->TryGetArrayField("emissiveFactor", emissiveFactorValues))
+	{
+		if (emissiveFactorValues->Num() != 3)
+			return nullptr;
+
+		double R, G, B;
+		if (!(*emissiveFactorValues)[0]->TryGetNumber(R))
+			return nullptr;
+		if (!(*emissiveFactorValues)[1]->TryGetNumber(G))
+			return nullptr;
+		if (!(*emissiveFactorValues)[2]->TryGetNumber(B))
+			return nullptr;
+
+		Material->SetVectorParameterValue("emissiveFactor", FLinearColor(R, G, B));
+	}
+
+	const TSharedPtr<FJsonObject>* JsonEmissiveTextureObject;
+	if (JsonMaterialObject->TryGetObjectField("emissiveTexture", JsonEmissiveTextureObject))
+	{
+		int64 TextureIndex;
+		if (!(*JsonEmissiveTextureObject)->TryGetNumberField("index", TextureIndex))
+			return nullptr;
+
+		UTexture2D* Texture = LoadImage(TextureIndex);
+		if (!Texture)
+			return nullptr;
+
+		Material->SetTextureParameterValue("emissiveTexture", Texture);
 	}
 
 	return Material;
@@ -775,7 +951,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			if (BoneIndex > INDEX_NONE)
 			{
 				MeshSection.BoneMap.Add(BoneIndex);
-			}
+}
 		}
 	}
 
@@ -836,7 +1012,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 #endif
 
 	return SkeletalMesh;
-}
+	}
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex)
 {
@@ -883,7 +1059,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 			UE_LOG(LogTemp, Error, TEXT("Unable to find bone %s"), *Pair.Key);
 			continue;
 		}
-		
+
 		if (Pair.Value.PosKeys.Num() == 0)
 			Pair.Value.PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
 
@@ -914,7 +1090,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-}
+		}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames)
 {
@@ -1449,7 +1625,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FVector2D> UV;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TEXCOORD_0", UV,
-			{ 2 }, { 5126, 5121, 5123 }, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, 1 - Value.Y); }))
+			{ 2 }, { 5126, 5121, 5123 }, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, Value.Y); }))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Error loading uvs 0"));
 			return false;
@@ -1462,7 +1638,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FVector2D> UV;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TEXCOORD_1", UV,
-			{ 2 }, { 5126, 5121, 5123 }, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, 1 - Value.Y); }))
+			{ 2 }, { 5126, 5121, 5123 }, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, Value.Y); }))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Error loading uvs 1"));
 			return false;
@@ -1562,7 +1738,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
 	}
 
-	UE_LOG(LogTemp, Error, TEXT("Primitive with indices: %d %d %d %d %d %d %d"), Primitive.Indices.Num(), Primitive.Positions.Num(), Primitive.Normals.Num(), Primitive.Joints[0].Num(), Primitive.Weights[0].Num(), Primitive.Joints.Num(), Primitive.Weights.Num());
+	//UE_LOG(LogTemp, Error, TEXT("Primitive with indices: %d %d %d %d %d %d %d"), Primitive.Indices.Num(), Primitive.Positions.Num(), Primitive.Normals.Num(), Primitive.Joints[0].Num(), Primitive.Weights[0].Num(), Primitive.Joints.Num(), Primitive.Weights.Num());
 
 	return true;
 }
@@ -1705,6 +1881,17 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray<uint8>& Bytes)
 	if (!JsonBufferObject->TryGetStringField("uri", Uri))
 		return false;
 
+	if (ParseBase64Uri(Uri, Bytes))
+	{
+		BuffersCache.Add(Index, Bytes);
+		return true;
+	}
+
+	return false;
+}
+
+bool FglTFRuntimeParser::ParseBase64Uri(const FString Uri, TArray<uint8>& Bytes)
+{
 	// check it is a valid base64 data uri
 	if (!Uri.StartsWith("data:"))
 		return false;
@@ -1718,13 +1905,7 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray<uint8>& Bytes)
 
 	StringIndex += Base64Signature.Len();
 
-	if (FBase64::Decode(Uri.Mid(StringIndex), Bytes))
-	{
-		BuffersCache.Add(Index, Bytes);
-		return true;
-	}
-
-	return false;
+	return FBase64::Decode(Uri.Mid(StringIndex), Bytes);
 }
 
 bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray<uint8>& Bytes, int64& Stride)
@@ -1903,6 +2084,7 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(MaterialsCache);
 	Collector.AddReferencedObjects(SkeletonsCache);
 	Collector.AddReferencedObjects(SkeletalMeshesCache);
+	Collector.AddReferencedObjects(TexturesCache);
 }
 
 float FglTFRuntimeParser::FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)

@@ -120,6 +120,7 @@ public:
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes);
 
 	UMaterialInterface* LoadMaterial(int32 Index);
+	UTexture2D* LoadImage(int32 Index);
 
 	bool LoadNodes();
 	bool LoadNode(int32 Index, FglTFRuntimeNode& Node);
@@ -128,7 +129,7 @@ public:
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 Index, FglTFRuntimeScene& Scene);
 
-	USkeletalMesh* LoadSkeletalMesh(int32 Index, int32 SkinIndex, int32 NodeIndex);
+	USkeletalMesh* LoadSkeletalMesh(int32 Index, int32 SkinIndex);
 	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex);
 
 	bool GetBuffer(int32 Index, TArray<uint8>& Bytes);
@@ -139,6 +140,8 @@ public:
 
 	int64 GetComponentTypeSize(const int64 ComponentType) const;
 	int64 GetTypeSize(const FString Type) const;
+
+	bool ParseBase64Uri(const FString Uri, TArray<uint8>& Bytes);
 
 	template<typename T, typename Callback>
 	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedElements, const TArray<int64> SupportedTypes, const bool bNormalized, Callback Filter)
@@ -308,6 +311,7 @@ protected:
 	TMap<int32, UMaterialInterface*> MaterialsCache;
 	TMap<int32, USkeleton*> SkeletonsCache;
 	TMap<int32, USkeletalMesh*> SkeletalMeshesCache;
+	TMap<int32, UTexture2D*> TexturesCache;
 
 	TMap<int32, TArray<uint8>> BuffersCache;
 

@@ -20,7 +20,10 @@ public:
 	TArray<FglTFRuntimeScene> GetScenes();
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	bool GetNode(int32 Index, FglTFRuntimeNode& Node);
+	TArray<FglTFRuntimeNode> GetNodes();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetNode(int32 NodeIndex, FglTFRuntimeNode& Node);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool GetNodeByName(FString Name, FglTFRuntimeNode& Node);
@@ -29,10 +32,13 @@ public:
 	UStaticMesh* LoadStaticMesh(int32 MeshIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
-	USkeletalMesh* LoadSkeletalMesh(int32 MeshIndex, int32 SkinIndex, int32 NodeIndex=-1);
+	USkeletalMesh* LoadSkeletalMesh(int32 MeshIndex, int32 SkinIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool BuildTransformFromNodeBackward(int32 NodeIndex, FTransform& Transform);
 
 	bool LoadFromFilename(const FString Filename);
 

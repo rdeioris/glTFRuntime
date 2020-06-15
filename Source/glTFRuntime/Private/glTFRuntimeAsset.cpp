@@ -33,7 +33,24 @@ TArray<FglTFRuntimeScene> UglTFRuntimeAsset::GetScenes()
 	return Scenes;
 }
 
-bool UglTFRuntimeAsset::GetNode(int32 Index, FglTFRuntimeNode& Node)
+TArray<FglTFRuntimeNode> UglTFRuntimeAsset::GetNodes()
+{
+	if (!Parser)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
+		return TArray<FglTFRuntimeNode>();
+	}
+
+	TArray<FglTFRuntimeNode> Nodes;
+	if (!Parser->GetAllNodes(Nodes))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Unable to retrieve Nodes from glTF Asset."));
+		return TArray<FglTFRuntimeNode>();
+	}
+	return Nodes;
+}
+
+bool UglTFRuntimeAsset::GetNode(int32 NodeIndex, FglTFRuntimeNode& Node)
 {
 	if (!Parser)
 	{
@@ -41,7 +58,7 @@ bool UglTFRuntimeAsset::GetNode(int32 Index, FglTFRuntimeNode& Node)
 		return false;
 	}
 
-	return Parser->LoadNode(Index, Node);
+	return Parser->LoadNode(NodeIndex, Node);
 }
 
 bool UglTFRuntimeAsset::GetNodeByName(FString Name, FglTFRuntimeNode& Node)
@@ -66,7 +83,7 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(int32 MeshIndex)
 	return Parser->LoadStaticMesh(MeshIndex);
 }
 
-USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(int32 MeshIndex, int32 SkinIndex, int32 NodeIndex)
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(int32 MeshIndex, int32 SkinIndex)
 {
 	if (!Parser)
 	{
@@ -74,7 +91,7 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(int32 MeshIndex, int32 SkinIn
 		return false;
 	}
 
-	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, NodeIndex);
+	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex);
 }
 
 UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex)
@@ -86,4 +103,27 @@ UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalM
 	}
 
 	return Parser->LoadSkeletalAnimation(SkeletalMesh, AnimationIndex);
+}
+
+bool UglTFRuntimeAsset::BuildTransformFromNodeBackward(int32 NodeIndex, FTransform& Transform)
+{
+	if (!Parser)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
+		return false;
+	}
+
+	Transform = FTransform::Identity;
+
+	FglTFRuntimeNode Node;
+	Node.ParentIndex = NodeIndex;
+
+	while (Node.ParentIndex != INDEX_NONE)
+	{
+		if (!Parser->LoadNode(Node.ParentIndex, Node))
+			return false;
+		Transform *= Node.Transform;
+	}
+
+	return true;
 }
