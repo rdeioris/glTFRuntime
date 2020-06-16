@@ -3,6 +3,12 @@
 
 #include "glTFRuntimeAsset.h"
 
+#define GLTF_CHECK_PARSER(RetValue) if (!Parser)\
+	{\
+		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));\
+		return RetValue;\
+	}\
+
 bool UglTFRuntimeAsset::LoadFromFilename(const FString Filename)
 {
 	// asset already loaded ?
@@ -18,11 +24,7 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString Filename)
 
 TArray<FglTFRuntimeScene> UglTFRuntimeAsset::GetScenes()
 {
-	if (!Parser)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
-		return TArray<FglTFRuntimeScene>();
-	}
+	GLTF_CHECK_PARSER(TArray<FglTFRuntimeScene>());
 
 	TArray<FglTFRuntimeScene> Scenes;
 	if (!Parser->LoadScenes(Scenes))
@@ -35,12 +37,8 @@ TArray<FglTFRuntimeScene> UglTFRuntimeAsset::GetScenes()
 
 TArray<FglTFRuntimeNode> UglTFRuntimeAsset::GetNodes()
 {
-	if (!Parser)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
-		return TArray<FglTFRuntimeNode>();
-	}
-
+	GLTF_CHECK_PARSER(TArray<FglTFRuntimeNode>());
+	
 	TArray<FglTFRuntimeNode> Nodes;
 	if (!Parser->GetAllNodes(Nodes))
 	{
@@ -50,51 +48,42 @@ TArray<FglTFRuntimeNode> UglTFRuntimeAsset::GetNodes()
 	return Nodes;
 }
 
-bool UglTFRuntimeAsset::GetNode(int32 NodeIndex, FglTFRuntimeNode& Node)
+bool UglTFRuntimeAsset::GetNode(const int32 NodeIndex, FglTFRuntimeNode& Node)
 {
-	if (!Parser)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
-		return false;
-	}
+	GLTF_CHECK_PARSER(false);
 
 	return Parser->LoadNode(NodeIndex, Node);
 }
 
-bool UglTFRuntimeAsset::GetNodeByName(FString Name, FglTFRuntimeNode& Node)
+bool UglTFRuntimeAsset::GetNodeByName(const FString NodeName, FglTFRuntimeNode& Node)
 {
-	if (!Parser)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
-		return false;
-	}
+	GLTF_CHECK_PARSER(false);
 
-	return Parser->LoadNodeByName(Name, Node);
+	return Parser->LoadNodeByName(NodeName, Node);
 }
 
-UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(int32 MeshIndex)
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(const int32 MeshIndex)
 {
-	if (!Parser)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
-		return false;
-	}
+	GLTF_CHECK_PARSER(false);
 
 	return Parser->LoadStaticMesh(MeshIndex);
 }
 
-USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(int32 MeshIndex, int32 SkinIndex)
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString MeshName)
 {
-	if (!Parser)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));
-		return false;
-	}
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->LoadStaticMeshByName(MeshName);
+}
+
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex)
+{
+	GLTF_CHECK_PARSER(false);
 
 	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex);
 }
 
-UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex)
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex)
 {
 	if (!Parser)
 	{
@@ -105,7 +94,7 @@ UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalM
 	return Parser->LoadSkeletalAnimation(SkeletalMesh, AnimationIndex);
 }
 
-bool UglTFRuntimeAsset::BuildTransformFromNodeBackward(int32 NodeIndex, FTransform& Transform)
+bool UglTFRuntimeAsset::BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform)
 {
 	if (!Parser)
 	{

@@ -52,6 +52,7 @@ struct FglTFRuntimeNode
 
 	FglTFRuntimeNode()
 	{
+		Index = INDEX_NONE;
 		Transform = FTransform::Identity;
 		ParentIndex = INDEX_NONE;
 		MeshIndex = INDEX_NONE;
@@ -118,6 +119,8 @@ public:
 
 	UStaticMesh* LoadStaticMesh(int32 Index);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes);
+
+	UStaticMesh* LoadStaticMeshByName(const FString Name);
 
 	UMaterialInterface* LoadMaterial(int32 Index);
 	UTexture2D* LoadTexture(int32 Index);
@@ -335,6 +338,9 @@ protected:
 	bool HasRoot(int32 Index, int32 RootIndex);
 
 	float FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex);
+
+	void NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton);
+	void NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FVector BoneScale);
 
 	FMatrix Basis;
 	float Scale;
