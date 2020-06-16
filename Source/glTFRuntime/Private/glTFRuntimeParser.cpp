@@ -239,8 +239,9 @@ bool FglTFRuntimeParser::LoadNodeByName(FString Name, FglTFRuntimeNode& Node)
 	return false;
 }
 
-UTexture2D* FglTFRuntimeParser::LoadImage(int32 Index)
+UTexture2D* FglTFRuntimeParser::LoadTexture(int32 Index)
 {
+	UE_LOG(LogTemp, Error, TEXT("attempting to load image: %d"), Index);
 	if (Index < 0)
 		return nullptr;
 
@@ -250,20 +251,42 @@ UTexture2D* FglTFRuntimeParser::LoadImage(int32 Index)
 		return TexturesCache[Index];
 	}
 
-	const TArray<TSharedPtr<FJsonValue>>* JsonImages;
+	const TArray<TSharedPtr<FJsonValue>>* JsonTextures;
+	// no images ?
+	if (!Root->TryGetArrayField("textures", JsonTextures))
+	{
+		return nullptr;
+	}
 
-	// no materials ?
+	if (Index >= JsonTextures->Num())
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> JsonTextureObject = (*JsonTextures)[Index]->AsObject();
+	if (!JsonTextureObject)
+		return nullptr;
+
+	int64 ImageIndex;
+	if (!JsonTextureObject->TryGetNumberField("source", ImageIndex))
+		return nullptr;
+
+	if (ImageIndex < 0)
+		return nullptr;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonImages;
+	// no images ?
 	if (!Root->TryGetArrayField("images", JsonImages))
 	{
 		return nullptr;
 	}
 
-	if (Index >= JsonImages->Num())
+	if (ImageIndex >= JsonImages->Num())
 	{
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonObject> JsonImageObject = (*JsonImages)[Index]->AsObject();
+	TSharedPtr<FJsonObject> JsonImageObject = (*JsonImages)[ImageIndex]->AsObject();
 	if (!JsonImageObject)
 		return nullptr;
 
@@ -286,10 +309,13 @@ UTexture2D* FglTFRuntimeParser::LoadImage(int32 Index)
 			int64 Stride;
 			if (!GetBufferView(BufferViewIndex, Bytes, Stride))
 			{
+				UE_LOG(LogTemp, Error, TEXT("unable to get bufferView: %d"), BufferViewIndex);
 				return nullptr;
 			}
 		}
 	}
+
+	UE_LOG(LogTemp, Error, TEXT("detected image bytes: %d"), Bytes.Num());
 
 	if (Bytes.Num() == 0)
 		return nullptr;
@@ -396,6 +422,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index, int32 SkinIndex
 
 	if (Index >= JsonMeshes->Num())
 	{
+		UE_LOG(LogTemp, Error, TEXT("unable to find mesh %d"), Index);
 		return nullptr;
 	}
 
@@ -403,10 +430,11 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(int32 Index, int32 SkinIndex
 	// no skins ?
 	if (!Root->TryGetArrayField("skins", JsonSkins))
 	{
+		UE_LOG(LogTemp, Error, TEXT("unable to find skin %d"), Index);
 		return nullptr;
 	}
 
-	if (Index >= JsonSkins->Num())
+	if (SkinIndex >= JsonSkins->Num())
 	{
 		return nullptr;
 	}
@@ -654,7 +682,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			if (!(*JsonBaseColorTextureObject)->TryGetNumberField("index", TextureIndex))
 				return nullptr;
 
-			UTexture2D* Texture = LoadImage(TextureIndex);
+			UTexture2D* Texture = LoadTexture(TextureIndex);
 			if (!Texture)
 				return nullptr;
 
@@ -679,7 +707,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			if (!(*JsonMetallicRoughnessTextureObject)->TryGetNumberField("index", TextureIndex))
 				return nullptr;
 
-			UTexture2D* Texture = LoadImage(TextureIndex);
+			UTexture2D* Texture = LoadTexture(TextureIndex);
 			if (!Texture)
 				return nullptr;
 
@@ -694,7 +722,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonNormalTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadImage(TextureIndex);
+		UTexture2D* Texture = LoadTexture(TextureIndex);
 		if (!Texture)
 			return nullptr;
 
@@ -725,7 +753,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonEmissiveTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadImage(TextureIndex);
+		UTexture2D* Texture = LoadTexture(TextureIndex);
 		if (!Texture)
 			return nullptr;
 
@@ -750,7 +778,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	if (!LoadPrimitives(JsonPrimitives, Primitives))
 		return nullptr;
 
-	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>();
+	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
 
 	TMap<int32, FName> BoneMap;
 
@@ -933,15 +961,55 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			FModelVertex ModelVertex;
 			ModelVertex.Position = Primitive.Positions[Index];
 			ModelVertex.TangentX = FVector::ZeroVector;
-			ModelVertex.TangentZ = Primitive.Normals[Index];
-			ModelVertex.TexCoord = Primitive.UVs[0][Index];
+			ModelVertex.TangentZ = FVector::ZeroVector;
+			if (Index < Primitive.Normals.Num())
+			{
+				ModelVertex.TangentZ = Primitive.Normals[Index];
+			}
+			if (Primitive.UVs.Num() > 0 && Index < Primitive.UVs[0].Num())
+			{
+				ModelVertex.TexCoord = Primitive.UVs[0][Index];
+			}
+			else
+			{
+				ModelVertex.TexCoord = FVector2D::ZeroVector;
+			}
 
 			LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
 			LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, ModelVertex.GetTangentY(), ModelVertex.TangentZ);
 			LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
 
-			InWeights[TotalVertexIndex].InfluenceWeights[0] = 255;
-			InWeights[TotalVertexIndex].InfluenceBones[0] = 1;
+			for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
+			{
+				FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
+				FVector4 Weights = Primitive.Weights[JointsIndex][Index];
+
+				for (int32 j = 0; j < 4; j++)
+				{
+					if (BoneMap.Contains(Joints[j]))
+					{
+						int32 BoneIndex = INDEX_NONE;
+						if (BonesCache.Contains(Joints[j]))
+						{
+							BoneIndex = BonesCache[Joints[j]];
+						}
+						else
+						{
+							BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMap[Joints[j]]);
+							BonesCache.Add(Joints[j], BoneIndex);
+						}
+						InWeights[TotalVertexIndex].InfluenceWeights[j] = Weights[j] * 255;
+						InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
+					}
+					else
+					{
+						UE_LOG(LogTemp, Error, TEXT("Unable to find map for bone %u"), Joints[j]);
+						return nullptr;
+					}
+				}
+			}
+
+
 
 			TotalVertexIndex++;
 		}
@@ -977,12 +1045,6 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	SkeletalMesh->CalculateInvRefMatrices();
 
 	FBox BoundingBox(Points.GetData(), Points.Num());
-	FBox Temp = BoundingBox;
-	FVector MidMesh = 0.5f * (Temp.Min + Temp.Max);
-	BoundingBox.Min = Temp.Min + 1.0f * (Temp.Min - MidMesh);
-	BoundingBox.Max = Temp.Max + 1.0f * (Temp.Max - MidMesh);
-	BoundingBox.Min[2] = Temp.Min[2] + 0.1f * (Temp.Min[2] - MidMesh[2]);
-
 	SkeletalMesh->SetImportedBounds(FBoxSphereBounds(BoundingBox));
 
 	SkeletalMesh->bHasVertexColors = false;
@@ -1005,7 +1067,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	SkeletalMesh->Build();
 #endif
 
-	SkeletalMesh->Skeleton = NewObject<USkeleton>();
+	SkeletalMesh->Skeleton = NewObject<USkeleton>(GetTransientPackage(), NAME_None, RF_Public);
 	SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
 
 #if !WITH_EDITOR
@@ -1042,7 +1104,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration, NumFrames))
 		return nullptr;
 
-	UAnimSequence* AnimSequence = NewObject<UAnimSequence>();
+	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 	AnimSequence->SetSkeleton(SkeletalMesh->Skeleton);
 	AnimSequence->SetPreviewMesh(SkeletalMesh);
 	AnimSequence->SetRawNumberOfFrame(NumFrames);
@@ -1050,6 +1112,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	AnimSequence->bEnableRootMotion = false;
 
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
+
+#if !WITH_EDITOR
+	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
+	CompressionCodec->Tracks.AddDefaulted(Tracks.Num());
+#endif
 
 	for (TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
 	{
@@ -1063,31 +1130,20 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 
 		if (Pair.Value.PosKeys.Num() == 0)
 			Pair.Value.PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
-
+#if WITH_EDITOR
 		AnimSequence->AddNewRawTrack(BoneName, &Pair.Value);
+#else
+		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
+		AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.Add(FTrackToSkeletonMap(BoneIndex));
+#endif
 	}
 
+#if WITH_EDITOR
 	AnimSequence->PostProcessSequence();
-
-
-#if !WITH_EDITOR
+#else
 	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
+	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
 	AnimSequence->PostLoad();
-
-	AnimSequence->CompressedData.BoneCompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
-	//AnimSequence->CompressedData.CompressedByteStream.AddUninitialized(1);
-	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.Add(FTrackToSkeletonMap(1));
-	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.Add(FTrackToSkeletonMap(0));
-	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.Add(FTrackToSkeletonMap(2));
-
-	UE_LOG(LogTemp, Warning, TEXT("Curves: %d"), AnimSequence->RawCurveData.FloatCurves.Num());
-	UE_LOG(LogTemp, Warning, TEXT("Compression: %p %d"), AnimSequence->CompressedData.BoneCompressionCodec, AnimSequence->CompressedData.CompressedCurveNames.Num());
-
-	for (int32 i = 0; i < AnimSequence->RawCurveData.FloatCurves.Num(); i++)
-	{
-		FFloatCurve& Curve = AnimSequence->RawCurveData.FloatCurves[i];
-		UE_LOG(LogTemp, Warning, TEXT("Curve: %s"), *Curve.Name.DisplayName.ToString());
-	}
 #endif
 
 	return AnimSequence;
@@ -1758,7 +1814,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	if (!LoadPrimitives(JsonPrimitives, Primitives))
 		return nullptr;
 
-	UStaticMesh* StaticMesh = NewObject<UStaticMesh>();
+	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(GetTransientPackage(), NAME_None, RF_Public);
 
 	UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
 

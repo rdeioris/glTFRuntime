@@ -18,6 +18,8 @@ public:
 	virtual void DecompressBone(FAnimSequenceDecompressionContext& DecompContext, int32 TrackIndex, FTransform& OutAtom) const;
 	virtual void DecompressPose(FAnimSequenceDecompressionContext& DecompContext, const BoneTrackArray& RotationPairs, const BoneTrackArray& TranslationPairs, const BoneTrackArray& ScalePairs, TArrayView<FTransform>& OutAtoms) const;
 	
+	TArray<FRawAnimSequenceTrack> Tracks;
+
 protected:
 	float TimeToIndex(
 		float SequenceLength,

@@ -5,26 +5,43 @@
 
 void UglTFAnimBoneCompressionCodec::DecompressBone(FAnimSequenceDecompressionContext& DecompContext, int32 TrackIndex, FTransform& OutAtom) const
 {
-	UE_LOG(LogTemp, Error, TEXT("Decompress!!! %d Bone %f %f"), TrackIndex, DecompContext.Time, DecompContext.SequenceLength);
 
-	OutAtom = FTransform(FRotator(0, 90, 0));
+	if (TrackIndex >= Tracks.Num())
+	{
+		return;
+	}
+
+	int32 FrameA = 0;
+	int32 FrameB = 0;
+
+	if (Tracks[TrackIndex].PosKeys.Num() > 0)
+	{
+		float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].PosKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+		FVector Location = FMath::Lerp(Tracks[TrackIndex].PosKeys[FrameA], Tracks[TrackIndex].PosKeys[FrameB], Alpha);
+		OutAtom.SetLocation(Location);
+	}
+
+	if (Tracks[TrackIndex].RotKeys.Num() > 0)
+	{
+		float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].RotKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+		FQuat Rotation = FMath::Lerp(Tracks[TrackIndex].RotKeys[FrameA], Tracks[TrackIndex].RotKeys[FrameB], Alpha);
+		OutAtom.SetRotation(Rotation);
+	}
+
+	if (Tracks[TrackIndex].ScaleKeys.Num() > 0)
+	{
+		float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].ScaleKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+		FVector Scale = FMath::Lerp(Tracks[TrackIndex].ScaleKeys[FrameA], Tracks[TrackIndex].ScaleKeys[FrameB], Alpha);
+		OutAtom.SetScale3D(Scale);
+	}
 }
 
 void UglTFAnimBoneCompressionCodec::DecompressPose(FAnimSequenceDecompressionContext& DecompContext, const BoneTrackArray& RotationPairs, const BoneTrackArray& TranslationPairs, const BoneTrackArray& ScalePairs, TArrayView<FTransform>& OutAtoms) const
 {
-	UE_LOG(LogTemp, Error, TEXT("Decompress!!! Pose %d"), OutAtoms.Num());
-
-	TArray<FRotator> Rotations = { {0, 110, 0}, { 0, -90, 0} };
-
-	//for (int32 i = 0; i < OutAtoms.Num(); i++)
-	//{
-		//AEF.GetPoseRotations(OutAtoms, RotationPairs, DecompContext);
-	int32 A = 0;
-	int32 B = 0;
-	float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Rotations.Num(), DecompContext.Interpolation, A, B);
-	OutAtoms[1] = FTransform(FMath::Lerp(Rotations[A], Rotations[B], Alpha));
-
-	//}
+	for (int32 TrackIndex = 0; TrackIndex < OutAtoms.Num(); TrackIndex++)
+	{
+		DecompressBone(DecompContext, TrackIndex, OutAtoms[TrackIndex]);
+	}
 }
 
 float UglTFAnimBoneCompressionCodec::TimeToIndex(

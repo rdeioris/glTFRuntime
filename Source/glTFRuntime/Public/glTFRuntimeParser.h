@@ -120,7 +120,7 @@ public:
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes);
 
 	UMaterialInterface* LoadMaterial(int32 Index);
-	UTexture2D* LoadImage(int32 Index);
+	UTexture2D* LoadTexture(int32 Index);
 
 	bool LoadNodes();
 	bool LoadNode(int32 Index, FglTFRuntimeNode& Node);
