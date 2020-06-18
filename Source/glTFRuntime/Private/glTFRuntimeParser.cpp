@@ -44,6 +44,30 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(FString Filename
 FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, FMatrix InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
 {
 	bAllNodesCached = false;
+
+	UMaterialInterface* OpaqueMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeBase"));
+	if (OpaqueMaterial)
+	{
+		MaterialsMap.Add(EglTFRuntimeMaterialType::Opaque, OpaqueMaterial);
+	}
+
+	UMaterialInterface* TranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeTranslucent_Inst"));
+	if (OpaqueMaterial)
+	{
+		MaterialsMap.Add(EglTFRuntimeMaterialType::Translucent, TranslucentMaterial);
+	}
+
+	UMaterialInterface* TwoSidedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeTwoSided_Inst"));
+	if (TwoSidedMaterial)
+	{
+		MaterialsMap.Add(EglTFRuntimeMaterialType::TwoSided, TwoSidedMaterial);
+	}
+
+	UMaterialInterface* TwoSidedTranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeTwoSidedTranslucent_Inst"));
+	if (TwoSidedTranslucentMaterial)
+	{
+		MaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, TwoSidedTranslucentMaterial);
+	}
 }
 
 FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject) : FglTFRuntimeParser(JsonObject, FBasisVectorMatrix(FVector(0, 0, -1), FVector(1, 0, 0), FVector(0, 1, 0), FVector::ZeroVector), 100)
@@ -240,11 +264,17 @@ bool FglTFRuntimeParser::LoadNodeByName(FString Name, FglTFRuntimeNode& Node)
 	return false;
 }
 
-UTexture2D* FglTFRuntimeParser::LoadTexture(int32 Index)
+UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	UE_LOG(LogTemp, Error, TEXT("attempting to load image: %d"), Index);
 	if (Index < 0)
 		return nullptr;
+
+	if (MaterialsConfig.TexturesOverrideMap.Contains(Index))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Found overriden texture for %d"), Index);
+		return MaterialsConfig.TexturesOverrideMap[Index];
+	}
 
 	// first check cache
 	if (TexturesCache.Contains(Index))
@@ -285,6 +315,12 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(int32 Index)
 	if (ImageIndex >= JsonImages->Num())
 	{
 		return nullptr;
+	}
+
+	if (MaterialsConfig.ImagesOverrideMap.Contains(ImageIndex))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Found overriden image for %d"), ImageIndex);
+		return MaterialsConfig.ImagesOverrideMap[ImageIndex];
 	}
 
 	TSharedPtr<FJsonObject> JsonImageObject = (*JsonImages)[ImageIndex]->AsObject();
@@ -366,7 +402,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(int32 Index)
 	return Texture;
 }
 
-UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
+UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	if (Index < 0)
 		return nullptr;
@@ -394,7 +430,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(int32 Index)
 	if (!JsonMaterialObject)
 		return nullptr;
 
-	UMaterialInterface* Material = LoadMaterial_Internal(JsonMaterialObject.ToSharedRef());
+	UMaterialInterface* Material = LoadMaterial_Internal(JsonMaterialObject.ToSharedRef(), MaterialsConfig);
 	if (!Material)
 		return nullptr;
 
@@ -486,11 +522,15 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(int32 Index)
 
 	TSharedPtr<FJsonObject> JsonMeshObject = (*JsonMeshes)[Index]->AsObject();
 	if (!JsonMeshObject)
+	{
 		return nullptr;
+	}
 
 	UStaticMesh* StaticMesh = LoadStaticMesh_Internal(JsonMeshObject.ToSharedRef());
 	if (!StaticMesh)
+	{
 		return nullptr;
+	}
 
 	StaticMeshesCache.Add(Index, StaticMesh);
 
@@ -654,16 +694,78 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	return true;
 }
 
-UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject)
+UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
-	UMaterialInterface* BaseMaterial = (UMaterialInterface*)StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, TEXT("/glTFRuntime/M_glTFRuntimeBase"));
-	//UMaterialInterface* BaseMaterial = (UMaterialInterface*)StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, TEXT("/glTFRuntime/M_glTFRuntimeTranslucent_Inst"));
-	if (!BaseMaterial)
+	bool bTwoSided = false;
+	bool bTranslucent = false;
+	float AlphaCutoff = 0;
+
+	EglTFRuntimeMaterialType MaterialType = EglTFRuntimeMaterialType::Opaque;
+
+	if (!JsonMaterialObject->TryGetBoolField("doubleSided", bTwoSided))
+	{
+		bTwoSided = false;
+	}
+
+	FString AlphaMode;
+	if (!JsonMaterialObject->TryGetStringField("alphaMode", AlphaMode))
+	{
+		AlphaMode = "OPAQUE";
+	}
+
+	if (AlphaMode == "BLEND")
+	{
+		bTranslucent = true;
+	}
+	else if (AlphaMode == "MASK")
+	{
+		bTranslucent = true;
+		double AlphaCutoffDouble;
+		if (!JsonMaterialObject->TryGetNumberField("alphaCutoff", AlphaCutoffDouble))
+		{
+			AlphaCutoff = 0.5f;
+		}
+		else
+		{
+			AlphaCutoff = AlphaCutoffDouble;
+		}
+	}
+	else if (AlphaMode != "OPAQUE")
+	{
+		UE_LOG(LogTemp, Error, TEXT("Unsupported alphaMode"));
 		return nullptr;
+	}
+
+	if (bTranslucent && bTwoSided)
+	{
+		MaterialType = EglTFRuntimeMaterialType::TwoSidedTranslucent;
+	}
+	else if (bTranslucent)
+	{
+		MaterialType = EglTFRuntimeMaterialType::Translucent;
+	}
+	else if (bTwoSided)
+	{
+		MaterialType = EglTFRuntimeMaterialType::TwoSided;
+	}
+
+
+	if (!MaterialsMap.Contains(MaterialType))
+	{
+		return nullptr;
+	}
+
+	UMaterialInterface* BaseMaterial = MaterialsMap[MaterialType];
+	if (!BaseMaterial)
+	{
+		return nullptr;
+	}
 
 	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
 	if (!Material)
 		return nullptr;
+
+	Material->SetScalarParameterValue("alphaCutoff", AlphaCutoff);
 
 	const TSharedPtr<FJsonObject>* JsonPBRObject;
 	if (JsonMaterialObject->TryGetObjectField("pbrMetallicRoughness", JsonPBRObject))
@@ -694,7 +796,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			if (!(*JsonBaseColorTextureObject)->TryGetNumberField("index", TextureIndex))
 				return nullptr;
 
-			UTexture2D* Texture = LoadTexture(TextureIndex);
+			UTexture2D* Texture = LoadTexture(TextureIndex, MaterialsConfig);
 			if (!Texture)
 				return nullptr;
 
@@ -719,7 +821,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			if (!(*JsonMetallicRoughnessTextureObject)->TryGetNumberField("index", TextureIndex))
 				return nullptr;
 
-			UTexture2D* Texture = LoadTexture(TextureIndex);
+			UTexture2D* Texture = LoadTexture(TextureIndex, MaterialsConfig);
 			if (!Texture)
 				return nullptr;
 
@@ -734,7 +836,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonNormalTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadTexture(TextureIndex);
+		UTexture2D* Texture = LoadTexture(TextureIndex, MaterialsConfig);
 		if (!Texture)
 			return nullptr;
 
@@ -765,7 +867,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonEmissiveTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadTexture(TextureIndex);
+		UTexture2D* Texture = LoadTexture(TextureIndex, MaterialsConfig);
 		if (!Texture)
 			return nullptr;
 
@@ -815,7 +917,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	}
 
 	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonPrimitives, Primitives))
+	if (!LoadPrimitives(JsonPrimitives, Primitives, SkeletalMeshConfig.MaterialsConfig))
 		return nullptr;
 
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
@@ -1189,7 +1291,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
 
-
+	/*
 	bool bTrueRootFound = false;
 
 	for (TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
@@ -1217,8 +1319,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		RootTrack.ScaleKeys.Add(FVector(1, 1, 1));
 
 		Tracks["Hips"].PosKeys[FrameIndex] = Tracks["Hips"].PosKeys[0];
-	}
-	Tracks.Add("Root", RootTrack);
+	}*/
+	//Tracks.Add("Root", RootTrack);
 
 #if !WITH_EDITOR
 	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
@@ -1238,26 +1340,36 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 
 		UE_LOG(LogTemp, Warning, TEXT("Found %s at %d"), *BoneName.ToString(), BoneIndex);
 
-		if (BoneIndex == 1 && AnimationConfig.RootNodeIndex > INDEX_NONE)
+		if (BoneIndex == 0)
 		{
-			FglTFRuntimeNode AnimRootNode;
-			if (!LoadNode(AnimationConfig.RootNodeIndex, AnimRootNode))
+			if (AnimationConfig.RootNodeIndex > INDEX_NONE)
 			{
-				return nullptr;
+				FglTFRuntimeNode AnimRootNode;
+				if (!LoadNode(AnimationConfig.RootNodeIndex, AnimRootNode))
+				{
+					return nullptr;
+				}
+				for (int32 FrameIndex = 0; FrameIndex < Pair.Value.RotKeys.Num(); FrameIndex++)
+				{
+					FVector Pos = Pair.Value.PosKeys[FrameIndex];
+					FQuat Quat = Pair.Value.RotKeys[FrameIndex];
+					FVector Scale = Pair.Value.ScaleKeys[FrameIndex];
+
+					FTransform FrameTransform = FTransform(Quat, Pos, Scale) * AnimRootNode.Transform;
+
+					Pair.Value.PosKeys[FrameIndex] = FrameTransform.GetLocation();
+					Pair.Value.RotKeys[FrameIndex] = FrameTransform.GetRotation();
+					Pair.Value.ScaleKeys[FrameIndex] = FrameTransform.GetScale3D();
+				}
 			}
-			for (int32 FrameIndex = 0; FrameIndex < Pair.Value.RotKeys.Num(); FrameIndex++)
+
+			if (AnimationConfig.bRemoveRootMotion)
 			{
-				FVector Pos = Pair.Value.PosKeys[FrameIndex];
-				FQuat Quat = Pair.Value.RotKeys[FrameIndex];
-				FVector Scale = Pair.Value.ScaleKeys[FrameIndex];
-
-				FTransform FrameTransform = FTransform(Quat, Pos, Scale) * AnimRootNode.Transform;
-
-				Pair.Value.PosKeys[FrameIndex] = FrameTransform.GetLocation();
-				Pair.Value.RotKeys[FrameIndex] = FrameTransform.GetRotation();
-				Pair.Value.ScaleKeys[FrameIndex] = FrameTransform.GetScale3D();
+				for (int32 FrameIndex = 0; FrameIndex < Pair.Value.RotKeys.Num(); FrameIndex++)
+				{
+					Pair.Value.PosKeys[FrameIndex] = Pair.Value.PosKeys[0];
+				}
 			}
-
 		}
 
 #if WITH_EDITOR
@@ -1610,11 +1722,11 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap)
 {
 	// add fake root bone
-	if (Parent == INDEX_NONE)
+	/*if (Parent == INDEX_NONE)
 	{
 		Modifier.Add(FMeshBoneInfo("Root", "Root", INDEX_NONE), FTransform::Identity);
 		Parent = 0;
-	}
+	}*/
 
 	FName BoneName = FName(*Node.Name);
 
@@ -1675,7 +1787,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives)
+bool FglTFRuntimeParser::LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	for (TSharedPtr<FJsonValue> JsonPrimitive : *JsonPrimitives)
 	{
@@ -1684,7 +1796,7 @@ bool FglTFRuntimeParser::LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* Js
 			return false;
 
 		FglTFRuntimePrimitive Primitive;
-		if (!LoadPrimitive(JsonPrimitiveObject.ToSharedRef(), Primitive))
+		if (!LoadPrimitive(JsonPrimitiveObject.ToSharedRef(), Primitive, MaterialsConfig))
 			return false;
 
 		Primitives.Add(Primitive);
@@ -1692,7 +1804,7 @@ bool FglTFRuntimeParser::LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* Js
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive)
+bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	const TSharedPtr<FJsonObject>* JsonAttributesObject;
 	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
@@ -1859,7 +1971,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	int64 MaterialIndex;
 	if (JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
 	{
-		Primitive.Material = LoadMaterial(MaterialIndex);
+		Primitive.Material = LoadMaterial(MaterialIndex, MaterialsConfig);
 		if (!Primitive.Material)
 		{
 			UE_LOG(LogTemp, Error, TEXT("unable to load material %lld"), MaterialIndex);
@@ -1884,8 +1996,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 		return nullptr;
 	}
 
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
+
 	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonPrimitives, Primitives))
+	if (!LoadPrimitives(JsonPrimitives, Primitives, MaterialsConfig))
 		return nullptr;
 
 	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(GetTransientPackage(), NAME_None, RF_Public);
@@ -2253,6 +2367,7 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(SkeletonsCache);
 	Collector.AddReferencedObjects(SkeletalMeshesCache);
 	Collector.AddReferencedObjects(TexturesCache);
+	Collector.AddReferencedObjects(MaterialsMap);
 }
 
 float FglTFRuntimeParser::FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)

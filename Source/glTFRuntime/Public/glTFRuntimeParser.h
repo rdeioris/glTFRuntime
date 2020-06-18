@@ -60,6 +60,15 @@ struct FglTFRuntimeNode
 	}
 };
 
+UENUM()
+enum class EglTFRuntimeMaterialType : uint8
+{
+	Opaque,
+	Translucent,
+	TwoSided,
+	TwoSidedTranslucent,
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSocket
 {
@@ -70,6 +79,21 @@ struct FglTFRuntimeSocket
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FTransform Transform;
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeMaterialsConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<int32, UMaterialInterface*> MaterialsOverrideMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<int32, UTexture2D*> TexturesOverrideMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<int32, UTexture2D*> ImagesOverrideMap;
 };
 
 USTRUCT(BlueprintType)
@@ -85,6 +109,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<FString, FglTFRuntimeSocket> Sockets;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
 
 	FglTFRuntimeSkeletalMeshConfig()
 	{
@@ -102,6 +129,9 @@ struct FglTFRuntimeSkeletalAnimationConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bRootMotion;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRemoveRootMotion;
 
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
@@ -171,8 +201,8 @@ public:
 
 	UStaticMesh* LoadStaticMeshByName(const FString Name);
 
-	UMaterialInterface* LoadMaterial(int32 Index);
-	UTexture2D* LoadTexture(int32 Index);
+	UMaterialInterface* LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UTexture2D* LoadTexture(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	bool LoadNodes();
 	bool LoadNode(int32 Index, FglTFRuntimeNode& Node);
@@ -353,8 +383,8 @@ public:
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
 
-	bool LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives);
-	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive);
+	bool LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 protected:
 	TSharedRef<FJsonObject> Root;
@@ -371,7 +401,7 @@ protected:
 	bool bAllNodesCached;
 
 	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject);
-	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject);
+	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
 
 	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
@@ -393,4 +423,6 @@ protected:
 
 	FMatrix SceneBasis;
 	float SceneScale;
+
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;
 };

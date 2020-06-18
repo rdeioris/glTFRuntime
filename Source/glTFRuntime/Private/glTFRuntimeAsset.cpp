@@ -9,6 +9,7 @@
 		return RetValue;\
 	}\
 
+
 bool UglTFRuntimeAsset::LoadFromFilename(const FString Filename)
 {
 	// asset already loaded ?

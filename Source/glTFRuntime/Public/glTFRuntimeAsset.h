@@ -16,6 +16,7 @@ class GLTFRUNTIME_API UglTFRuntimeAsset : public UObject
 	GENERATED_BODY()
 
 public:
+
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FglTFRuntimeScene> GetScenes();
 
@@ -50,6 +51,9 @@ public:
 	bool BuildTransformFromNodeForward(const int32 NodeIndex, const int32 LastNodeIndex, FTransform& Transform);
 
 	bool LoadFromFilename(const FString Filename);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;
 
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
