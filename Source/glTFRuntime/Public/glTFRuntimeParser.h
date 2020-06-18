@@ -60,7 +60,55 @@ struct FglTFRuntimeNode
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSocket
+{
+	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString BoneName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FTransform Transform;
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletalMeshConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 RootNodeIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FString, FTransform> CustomSkeleton;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FString, FglTFRuntimeSocket> Sockets;
+
+	FglTFRuntimeSkeletalMeshConfig()
+	{
+		RootNodeIndex = INDEX_NONE;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletalAnimationConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 RootNodeIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRootMotion;
+
+	FglTFRuntimeSkeletalAnimationConfig()
+	{
+		RootNodeIndex = INDEX_NONE;
+		bRootMotion = false;
+	}
+};
 
 struct FglTFRuntimeUInt16Vector4
 {
@@ -100,6 +148,7 @@ struct FglTFRuntimePrimitive
 {
 	TArray<FVector> Positions;
 	TArray<FVector> Normals;
+	TArray<FVector4> Tangents;
 	TArray<TArray<FVector2D>> UVs;
 	TArray<uint32> Indices;
 	UMaterialInterface* Material;
@@ -113,7 +162,7 @@ struct FglTFRuntimePrimitive
 class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject
 {
 public:
-	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, FMatrix InBasis, float Scale);
+	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, FMatrix InSceneBasis, float InSceneScale);
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject);
 	static TSharedPtr<FglTFRuntimeParser> FromFilename(FString Filename);
 
@@ -132,8 +181,8 @@ public:
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 Index, FglTFRuntimeScene& Scene);
 
-	USkeletalMesh* LoadSkeletalMesh(int32 Index, int32 SkinIndex);
-	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, int32 AnimationIndex);
+	USkeletalMesh* LoadSkeletalMesh(const int32 Index, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig);
 
 	bool GetBuffer(int32 Index, TArray<uint8>& Bytes);
 	bool GetBufferView(int32 Index, TArray<uint8>& Bytes, int64& Stride);
@@ -325,11 +374,11 @@ protected:
 	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject);
 	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
 
-	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, FTransform& RootTransform);
+	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	bool LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames);
 
-	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, FTransform& RootTransform);
-	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, FTransform& RootTransform, const bool bHasRoot);
+	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap);
 
 	void FixNodeParent(FglTFRuntimeNode& Node);
 
@@ -342,6 +391,6 @@ protected:
 	void NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton);
 	void NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FVector BoneScale);
 
-	FMatrix Basis;
-	float Scale;
+	FMatrix SceneBasis;
+	float SceneScale;
 };

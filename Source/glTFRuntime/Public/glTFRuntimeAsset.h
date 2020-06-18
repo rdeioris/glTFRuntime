@@ -35,13 +35,19 @@ public:
 	UStaticMesh* LoadStaticMeshByName(const FString MeshName);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
-	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex);
+	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig);
 
-	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
-	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex);
+	UFUNCTION(BlueprintCallable, meta=(AdvancedDisplay = "AnimationConfig"), Category = "glTFRuntime")
+	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig AnimationConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "AnimationConfig"), Category = "glTFRuntime")
+	UAnimMontage* LoadSkeletalAnimationAsMontage(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FString SlotNodeName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool BuildTransformFromNodeForward(const int32 NodeIndex, const int32 LastNodeIndex, FTransform& Transform);
 
 	bool LoadFromFilename(const FString Filename);
 
