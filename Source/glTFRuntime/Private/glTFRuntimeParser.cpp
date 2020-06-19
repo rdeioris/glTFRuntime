@@ -190,7 +190,7 @@ bool FglTFRuntimeParser::LoadScene(int32 Index, FglTFRuntimeScene& Scene)
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes)
+bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;
@@ -203,7 +203,7 @@ bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes)
 
 	for (int32 Index = 0; Index < JsonMeshes->Num(); Index++)
 	{
-		UStaticMesh* StaticMesh = LoadStaticMesh(Index);
+		UStaticMesh* StaticMesh = LoadStaticMesh(Index, StaticMeshConfig);
 		if (!StaticMesh)
 		{
 			return false;
@@ -496,15 +496,15 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 Index, const int
 	return SkeletalMesh;
 }
 
-UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(int32 Index)
+UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
-	if (Index < 0)
+	if (MeshIndex < 0)
 		return nullptr;
 
 	// first check cache
-	if (StaticMeshesCache.Contains(Index))
+	if (StaticMeshesCache.Contains(MeshIndex))
 	{
-		return StaticMeshesCache[Index];
+		return StaticMeshesCache[MeshIndex];
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;
@@ -515,29 +515,29 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(int32 Index)
 		return nullptr;
 	}
 
-	if (Index >= JsonMeshes->Num())
+	if (MeshIndex >= JsonMeshes->Num())
 	{
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonObject> JsonMeshObject = (*JsonMeshes)[Index]->AsObject();
+	TSharedPtr<FJsonObject> JsonMeshObject = (*JsonMeshes)[MeshIndex]->AsObject();
 	if (!JsonMeshObject)
 	{
 		return nullptr;
 	}
 
-	UStaticMesh* StaticMesh = LoadStaticMesh_Internal(JsonMeshObject.ToSharedRef());
+	UStaticMesh* StaticMesh = LoadStaticMesh_Internal(JsonMeshObject.ToSharedRef(), StaticMeshConfig);
 	if (!StaticMesh)
 	{
 		return nullptr;
 	}
 
-	StaticMeshesCache.Add(Index, StaticMesh);
+	StaticMeshesCache.Add(MeshIndex, StaticMesh);
 
 	return StaticMesh;
 }
 
-UStaticMesh* FglTFRuntimeParser::LoadStaticMeshByName(const FString Name)
+UStaticMesh* FglTFRuntimeParser::LoadStaticMeshByName(const FString Name, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;
 
@@ -559,7 +559,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshByName(const FString Name)
 		{
 			if (MeshName == Name)
 			{
-				return LoadStaticMesh(MeshIndex);
+				return LoadStaticMesh(MeshIndex, StaticMeshConfig);
 			}
 		}
 	}
@@ -694,6 +694,24 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	return true;
 }
 
+bool FglTFRuntimeParser::AssignTexCoord(TSharedPtr<FJsonObject> JsonTextureObject, UMaterialInstanceDynamic* Material, const FName MaterialParam)
+{
+	int64 TexCoord;
+	if (!JsonTextureObject->TryGetNumberField("texCoord", TexCoord))
+	{
+		TexCoord = 0;
+	}
+	if (TexCoord < 0 || TexCoord > 3)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Invalid UV Set for %s: %lld"), *MaterialParam.ToString(), TexCoord);
+		return false;
+	}
+	FVector4 UVSet = FVector4(0, 0, 0, 0);
+	UVSet[TexCoord] = 1;
+	Material->SetVectorParameterValue(MaterialParam, FLinearColor(UVSet));
+	return true;
+}
+
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	bool bTwoSided = false;
@@ -801,6 +819,10 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 				return nullptr;
 
 			Material->SetTextureParameterValue("baseColorTexture", Texture);
+			if (!AssignTexCoord(*JsonBaseColorTextureObject, Material, "baseColorTexCoord"))
+			{
+				return nullptr;
+			}
 		}
 
 		double metallicFactor;
@@ -826,6 +848,10 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 				return nullptr;
 
 			Material->SetTextureParameterValue("metallicRoughnessTexture", Texture);
+			if (!AssignTexCoord(*JsonMetallicRoughnessTextureObject, Material, "metallicRoughnessTexCoord"))
+			{
+				return nullptr;
+			}
 		}
 	}
 
@@ -841,6 +867,10 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			return nullptr;
 
 		Material->SetTextureParameterValue("normalTexture", Texture);
+		if (!AssignTexCoord(*JsonNormalTextureObject, Material, "normalTexCoord"))
+		{
+			return nullptr;
+		}
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* emissiveFactorValues;
@@ -872,6 +902,10 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			return nullptr;
 
 		Material->SetTextureParameterValue("emissiveTexture", Texture);
+		if (!AssignTexCoord(*JsonEmissiveTextureObject, Material, "emissiveTexCoord"))
+		{
+			return nullptr;
+		}
 	}
 
 	return Material;
@@ -1424,7 +1458,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-				}
+}
 
 bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, int32& NumFrames, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
 {
@@ -2097,7 +2131,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	return true;
 }
 
-UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject)
+UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	// get primitives
 	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
@@ -2232,7 +2266,45 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	StaticMesh->StaticMaterials = StaticMaterials;
 
 	TArray<UStaticMeshDescription*> MeshDescriptions = { MeshDescription };
-	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, false);
+	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, StaticMeshConfig.bBuildSimpleCollision);
+
+	StaticMesh->ComplexCollisionMesh = StaticMeshConfig.ComplexCollisionMesh;
+
+	bool bRebuildPhysicsMeshes = false;
+
+	for (const FBox& Box : StaticMeshConfig.BoxCollisions)
+	{
+		if (!StaticMesh->BodySetup)
+		{
+			StaticMesh->CreateBodySetup();
+		}
+		FKBoxElem BoxElem;
+		BoxElem.Center = Box.GetCenter();
+		FVector BoxSize = Box.GetSize();
+		BoxElem.X = BoxSize.X;
+		BoxElem.Y = BoxSize.Y;
+		BoxElem.Z = BoxSize.Z;
+		StaticMesh->BodySetup->AggGeom.BoxElems.Add(BoxElem);
+		bRebuildPhysicsMeshes = true;
+	}
+
+	for (const FVector4 Sphere : StaticMeshConfig.SphereCollisions)
+	{
+		if (!StaticMesh->BodySetup)
+		{
+			StaticMesh->CreateBodySetup();
+		}
+		FKSphereElem SphereElem;
+		SphereElem.Center = Sphere;
+		SphereElem.Radius = Sphere.W;
+		StaticMesh->BodySetup->AggGeom.SphereElems.Add(SphereElem);
+		bRebuildPhysicsMeshes = true;
+	}
+
+	if (bRebuildPhysicsMeshes)
+	{
+		StaticMesh->BodySetup->CreatePhysicsMeshes();
+	}
 
 	return StaticMesh;
 }

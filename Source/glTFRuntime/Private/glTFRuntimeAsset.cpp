@@ -63,18 +63,18 @@ bool UglTFRuntimeAsset::GetNodeByName(const FString NodeName, FglTFRuntimeNode& 
 	return Parser->LoadNodeByName(NodeName, Node);
 }
 
-UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(const int32 MeshIndex)
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
-	return Parser->LoadStaticMesh(MeshIndex);
+	return Parser->LoadStaticMesh(MeshIndex, StaticMeshConfig);
 }
 
-UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString MeshName)
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
-	return Parser->LoadStaticMeshByName(MeshName);
+	return Parser->LoadStaticMeshByName(MeshName, StaticMeshConfig);
 }
 
 USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
@@ -179,4 +179,23 @@ UglTFRuntimeAnimationCurve* UglTFRuntimeAsset::LoadNodeAnimationCurve(const int3
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadNodeAnimationCurve(NodeIndex);
+}
+
+bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32> NodeIndices, const FString NodeName, FglTFRuntimeNode& Node)
+{
+	GLTF_CHECK_PARSER(false);
+
+	for (int32 NodeIndex : NodeIndices)
+	{
+		FglTFRuntimeNode CurrentNode;
+		if (Parser->LoadNode(NodeIndex, CurrentNode))
+		{
+			if (CurrentNode.Name == NodeName)
+			{
+				Node = CurrentNode;
+				return true;
+			}
+		}
+	}
+	return false;
 }

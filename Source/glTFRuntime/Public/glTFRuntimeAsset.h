@@ -29,22 +29,25 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool GetNodeByName(const FString NodeName, FglTFRuntimeNode& Node);
 
-	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
-	UStaticMesh* LoadStaticMesh(const int32 MeshIndex);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool FindNodeByNameInArray(const TArray<int32> NodeIndices, const FString NodeName, FglTFRuntimeNode& Node);
 
-	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
-	UStaticMesh* LoadStaticMeshByName(const FString MeshName);
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "StaticMeshConfig"), Category = "glTFRuntime")
+	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
-	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "StaticMeshConfig"), Category = "glTFRuntime")
+	UStaticMesh* LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalMeshConfig"), Category = "glTFRuntime")
 	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig);
 
-	UFUNCTION(BlueprintCallable, meta=(AdvancedDisplay = "AnimationConfig"), Category = "glTFRuntime")
-	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig AnimationConfig);
+	UFUNCTION(BlueprintCallable, meta=(AdvancedDisplay = "SkeletalAnimationConfig"), Category = "glTFRuntime")
+	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
 
-	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "AnimationConfig"), Category = "glTFRuntime")
-	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig AnimationConfig);
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig"), Category = "glTFRuntime")
+	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
 
-	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "AnimationConfig"), Category = "glTFRuntime")
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig"), Category = "glTFRuntime")
 	UAnimMontage* LoadSkeletalAnimationAsMontage(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FString SlotNodeName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")

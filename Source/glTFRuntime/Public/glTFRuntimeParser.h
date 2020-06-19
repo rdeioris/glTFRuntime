@@ -98,6 +98,27 @@ struct FglTFRuntimeMaterialsConfig
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeStaticMeshConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bBuildSimpleCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FBox> BoxCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FVector4> SphereCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UStaticMesh* ComplexCollisionMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalMeshConfig
 {
 	GENERATED_BODY()
@@ -197,10 +218,10 @@ public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject);
 	static TSharedPtr<FglTFRuntimeParser> FromFilename(FString Filename);
 
-	UStaticMesh* LoadStaticMesh(int32 Index);
-	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes);
+	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
-	UStaticMesh* LoadStaticMeshByName(const FString Name);
+	UStaticMesh* LoadStaticMeshByName(const FString Name, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UMaterialInterface* LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	UTexture2D* LoadTexture(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
@@ -404,7 +425,7 @@ protected:
 	TArray<FglTFRuntimeNode> AllNodesCache;
 	bool bAllNodesCached;
 
-	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject);
+	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
 
@@ -426,6 +447,8 @@ protected:
 
 	void NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton);
 	void NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FVector BoneScale);
+
+	bool AssignTexCoord(TSharedPtr<FJsonObject> JsonTextureObject, UMaterialInstanceDynamic* Material, const FName MaterialParam);
 
 	FMatrix SceneBasis;
 	float SceneScale;
