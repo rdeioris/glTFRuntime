@@ -65,30 +65,37 @@ bool UglTFRuntimeAsset::GetNodeByName(const FString NodeName, FglTFRuntimeNode& 
 
 UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(const int32 MeshIndex)
 {
-	GLTF_CHECK_PARSER(false);
+	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadStaticMesh(MeshIndex);
 }
 
 UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString MeshName)
 {
-	GLTF_CHECK_PARSER(false);
+	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadStaticMeshByName(MeshName);
 }
 
 USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
 {
-	GLTF_CHECK_PARSER(false);
+	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, SkeletalMeshConfig);
 }
 
 UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
 {
-	GLTF_CHECK_PARSER(false);
+	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, SkeletalAnimationConfig);
+}
+
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadSkeletalAnimationByName(SkeletalMesh, AnimationName, SkeletalAnimationConfig);
 }
 
 bool UglTFRuntimeAsset::BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform)

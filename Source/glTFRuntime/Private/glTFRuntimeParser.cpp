@@ -1249,6 +1249,40 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	return SkeletalMesh;
 }
 
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig)
+{
+	if (!SkeletalMesh)
+	{
+		return nullptr;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
+	if (!Root->TryGetArrayField("animations", JsonAnimations))
+	{
+		return nullptr;
+	}
+
+	for (int32 AnimationIndex = 0; AnimationIndex, JsonAnimations->Num(); AnimationIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[AnimationIndex]->AsObject();
+		if (!JsonAnimationObject)
+		{
+			return nullptr;
+		}
+
+		FString JsonAnimationName;
+		if (JsonAnimationObject->TryGetStringField("name", JsonAnimationName))
+		{
+			if (JsonAnimationName == AnimationName)
+			{
+				return LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, AnimationConfig);
+			}
+		}
+	}
+
+	return nullptr;
+}
+
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig)
 {
 	if (!SkeletalMesh)
@@ -1390,7 +1424,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-}
+				}
 
 bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, int32& NumFrames, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
 {
@@ -1540,7 +1574,7 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 		{
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
-				AnimationCurve->AddScaleValue(Timeline[TimeIndex], Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddScaleValue(Timeline[TimeIndex], (SceneBasis.Inverse() * FScaleMatrix(Values[TimeIndex]) * SceneBasis).ExtractScaling(), ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 	};
@@ -1641,7 +1675,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
 				FVector4 First = Values[FirstIndex];
 				FVector4 Second = Values[SecondIndex];
-				Track.ScaleKeys.Add(FMath::Lerp(First, Second, Alpha));
+				Track.ScaleKeys.Add((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling());
 				FrameBase += FrameDelta;
 			}
 		}
