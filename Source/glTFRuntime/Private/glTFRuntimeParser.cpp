@@ -1392,9 +1392,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	return AnimSequence;
 }
 
-bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames)
+bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, int32& NumFrames, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
 {
-
 	const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
 	if (!JsonAnimationObject->TryGetArrayField("samplers", JsonSamplers))
 	{
@@ -1484,13 +1483,91 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 		if (!LoadNode(NodeIndex, Node))
 			return false;
 
+		if (!NodeFilter(Node))
+		{
+			continue;
+		}
+
 		FString Path;
 		if (!(*JsonTargetObject)->TryGetStringField("path", Path))
 		{
 			return false;
 		}
 
+		Callback(Node, Path, Samplers[Sampler].Key, Samplers[Sampler].Value);
+	}
+
+	return true;
+}
+
+UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int32 NodeIndex)
+{
+	FglTFRuntimeNode Node;
+	if (!LoadNode(NodeIndex, Node))
+		return nullptr;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
+	if (!Root->TryGetArrayField("animations", JsonAnimations))
+	{
+		return nullptr;
+	}
+
+	UglTFRuntimeAnimationCurve* AnimationCurve = NewObject<UglTFRuntimeAnimationCurve>(GetTransientPackage(), NAME_None, RF_Public);
+
+	AnimationCurve->SetDefaultValues(Node.Transform.GetLocation(), Node.Transform.GetRotation(), Node.Transform.GetScale3D());
+
+	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
+	{
+		if (Path == "translation")
+		{
+			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			{
+				AnimationCurve->AddLocationValue(Timeline[TimeIndex], SceneBasis.TransformPosition(Values[TimeIndex]) * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+			}
+		}
+		else if (Path == "rotation")
+		{
+			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			{
+				FVector4 RotationValue = Values[TimeIndex];
+				FQuat BaseQuat = { RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W };
+				FMatrix RotationMatrix = SceneBasis.Inverse() * FRotationMatrix(BaseQuat.Rotator()) * SceneBasis;
+				FQuat Quat = RotationMatrix.ToQuat();
+				AnimationCurve->AddRotationValue(Timeline[TimeIndex], Quat, ERichCurveInterpMode::RCIM_Linear);
+			}
+		}
+		else if (Path == "scale")
+		{
+			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			{
+				AnimationCurve->AddScaleValue(Timeline[TimeIndex], Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
+			}
+		}
+	};
+
+	for (TSharedPtr<FJsonValue> JsonAnimation : *JsonAnimations)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = JsonAnimation->AsObject();
+		if (!JsonAnimationObject)
+			return false;
+		float Duration;
+		int32 NumFrames;
+		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, NumFrames, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }))
+		{
+			return nullptr;
+		}
+	}
+
+	return AnimationCurve;
+}
+
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames)
+{
+
+	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
+	{
 		NumFrames = Duration * 30;
+
 		float FrameDelta = 1.f / 30;
 
 		if (Path == "rotation")
@@ -1507,9 +1584,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			{
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Samplers[Sampler].Key, FrameBase, FirstIndex, SecondIndex);
-				FVector4 FirstQuatV = Samplers[Sampler].Value[FirstIndex];
-				FVector4 SecondQuatV = Samplers[Sampler].Value[SecondIndex];
+				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 FirstQuatV = Values[FirstIndex];
+				FVector4 SecondQuatV = Values[SecondIndex];
 				FQuat FirstQuat = { FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W };
 				FQuat SecondQuat = { SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W };
 				FMatrix FirstMatrix = SceneBasis.Inverse() * FRotationMatrix(FirstQuat.Rotator()) * SceneBasis;
@@ -1537,9 +1614,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			{
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Samplers[Sampler].Key, FrameBase, FirstIndex, SecondIndex);
-				FVector4 First = Samplers[Sampler].Value[FirstIndex];
-				FVector4 Second = Samplers[Sampler].Value[SecondIndex];
+				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 First = Values[FirstIndex];
+				FVector4 Second = Values[SecondIndex];
 				FVector AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
 				Track.PosKeys.Add(AnimLocation);
 				FrameBase += FrameDelta;
@@ -1561,16 +1638,16 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			{
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Samplers[Sampler].Key, FrameBase, FirstIndex, SecondIndex);
-				FVector4 First = Samplers[Sampler].Value[FirstIndex];
-				FVector4 Second = Samplers[Sampler].Value[SecondIndex];
+				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 First = Values[FirstIndex];
+				FVector4 Second = Values[SecondIndex];
 				Track.ScaleKeys.Add(FMath::Lerp(First, Second, Alpha));
 				FrameBase += FrameDelta;
 			}
 		}
-	}
+	};
 
-	return true;
+	return LoadAnimation_Internal(JsonAnimationObject, Duration, NumFrames, Callback, [](const FglTFRuntimeNode& Node) -> bool { return true; });
 }
 
 bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)

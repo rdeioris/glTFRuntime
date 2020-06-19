@@ -166,3 +166,10 @@ UAnimMontage* UglTFRuntimeAsset::LoadSkeletalAnimationAsMontage(USkeletalMesh* S
 
 	return AnimMontage;
 }
+
+UglTFRuntimeAnimationCurve* UglTFRuntimeAsset::LoadNodeAnimationCurve(const int32 NodeIndex)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadNodeAnimationCurve(NodeIndex);
+}

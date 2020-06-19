@@ -44,6 +44,9 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "AnimationConfig"), Category = "glTFRuntime")
 	UAnimMontage* LoadSkeletalAnimationAsMontage(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FString SlotNodeName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
 
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
+
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform);
 
