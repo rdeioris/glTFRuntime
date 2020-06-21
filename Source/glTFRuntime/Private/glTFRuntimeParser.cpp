@@ -3,13 +3,19 @@
 
 #include "glTFRuntimeParser.h"
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(FString Filename)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString Filename)
 {
 	FString JsonData;
-	// TODO: spit out errors
 	if (!FFileHelper::LoadFileToString(JsonData, *Filename))
+	{
 		return nullptr;
+	}
 
+	return FromString(JsonData);
+}
+
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString JsonData)
+{
 	TSharedPtr<FJsonValue> RootValue;
 
 	TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonData);
@@ -491,6 +497,8 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 
 	AnimationCurve->SetDefaultValues(Node.Transform.GetLocation(), Node.Transform.GetRotation(), Node.Transform.GetScale3D());
 
+	bool bAnimationFound = false;
+
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
 	{
 		if (Path == "translation")
@@ -518,6 +526,7 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 				AnimationCurve->AddScaleValue(Timeline[TimeIndex], (SceneBasis.Inverse() * FScaleMatrix(Values[TimeIndex]) * SceneBasis).ExtractScaling(), ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
+		bAnimationFound = true;
 	};
 
 	for (TSharedPtr<FJsonValue> JsonAnimation : *JsonAnimations)
@@ -531,9 +540,14 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 		{
 			return nullptr;
 		}
+		// stop at the first found animation
+		if (bAnimationFound)
+		{
+			return AnimationCurve;
+		}
 	}
 
-	return AnimationCurve;
+	return nullptr;
 }
 
 bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)

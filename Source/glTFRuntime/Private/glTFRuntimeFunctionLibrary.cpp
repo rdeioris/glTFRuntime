@@ -4,6 +4,9 @@
 #include "glTFRuntimeFunctionLibrary.h"
 #include "DesktopPlatformModule.h"
 #include "IDesktopPlatform.h"
+#include "HttpModule.h"
+#include "Interfaces/IHttpRequest.h"
+#include "Interfaces/IHttpResponse.h"
 
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString Filename)
 {
@@ -11,6 +14,17 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const 
 	if (!Asset)
 		return nullptr;
 	if (!Asset->LoadFromFilename(Filename))
+		return nullptr;
+
+	return Asset;
+}
+
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FString JsonData)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+		return nullptr;
+	if (!Asset->LoadFromString(JsonData))
 		return nullptr;
 
 	return Asset;
@@ -47,4 +61,26 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFileDialog(cons
 	}
 
 	return Asset;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString Url, TMap<FString, FString> Headers, FglTFRuntimeHttpResponse Completed)
+{
+	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
+	HttpRequest->SetURL(Url);
+	for (TPair<FString, FString> Header : Headers)
+	{
+		HttpRequest->AppendToHeader(Header.Key, Header.Value);
+	}
+
+	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed)
+	{
+		UglTFRuntimeAsset* Asset = nullptr;
+		if (bSuccess)
+		{
+			Asset = glTFLoadAssetFromString(ResponsePtr->GetContentAsString());
+		}
+		Completed.ExecuteIfBound(Asset);
+	}, Completed);
+
+	HttpRequest->ProcessRequest();
 }

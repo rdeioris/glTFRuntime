@@ -131,6 +131,14 @@ struct FglTFRuntimeStaticMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FglTFRuntimeMaterialsConfig MaterialsConfig;
+
+	FglTFRuntimeStaticMeshConfig()
+	{
+		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
+		bReverseWinding = false;
+		bBuildSimpleCollision = false;
+		ComplexCollisionMesh = nullptr;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -156,6 +164,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		RootNodeIndex = INDEX_NONE;
+		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
 	}
 };
 
@@ -180,6 +189,7 @@ struct FglTFRuntimeSkeletalAnimationConfig
 	{
 		RootNodeIndex = INDEX_NONE;
 		bRootMotion = false;
+		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
 	}
 };
 
@@ -237,7 +247,9 @@ class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject
 public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, FMatrix InSceneBasis, float InSceneScale);
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject);
-	static TSharedPtr<FglTFRuntimeParser> FromFilename(FString Filename);
+
+	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString Filename);
+	static TSharedPtr<FglTFRuntimeParser> FromString(const FString JsonData);
 
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
@@ -276,6 +288,7 @@ public:
 	bool LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
+	void AddError(const FString ErrorContext, const FString ErrorMessage);
 	void ClearErrors();
 
 protected:
@@ -329,8 +342,6 @@ protected:
 
 	bool CanReadFromCache(const EglTFRuntimeCacheMode CacheMode) { return CacheMode == EglTFRuntimeCacheMode::Read || CacheMode == EglTFRuntimeCacheMode::ReadWrite; }
 	bool CanWriteToCache(const EglTFRuntimeCacheMode CacheMode) { return CacheMode == EglTFRuntimeCacheMode::Write || CacheMode == EglTFRuntimeCacheMode::ReadWrite; }
-
-	void AddError(const FString ErrorContext, const FString ErrorMessage);
 
 	FMatrix SceneBasis;
 	float SceneScale;

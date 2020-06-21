@@ -14,13 +14,24 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString Filename)
 {
 	// asset already loaded ?
 	if (Parser)
+	{
 		return false;
+	}
 
 	Parser = FglTFRuntimeParser::FromFilename(Filename);
-	if (!Parser)
-		return false;
+	return Parser != nullptr;
+}
 
-	return true;
+bool UglTFRuntimeAsset::LoadFromString(const FString JsonData)
+{
+	// asset already loaded ?
+	if (Parser)
+	{
+		return false;
+	}
+
+	Parser = FglTFRuntimeParser::FromString(JsonData);
+	return Parser != nullptr;
 }
 
 TArray<FglTFRuntimeScene> UglTFRuntimeAsset::GetScenes()
@@ -30,7 +41,7 @@ TArray<FglTFRuntimeScene> UglTFRuntimeAsset::GetScenes()
 	TArray<FglTFRuntimeScene> Scenes;
 	if (!Parser->LoadScenes(Scenes))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to retrieve Scenes from glTF Asset."));
+		Parser->AddError("UglTFRuntimeAsset::GetScenes()", "Unable to retrieve Scenes from glTF Asset.");
 		return TArray<FglTFRuntimeScene>();
 	}
 	return Scenes;
@@ -43,7 +54,7 @@ TArray<FglTFRuntimeNode> UglTFRuntimeAsset::GetNodes()
 	TArray<FglTFRuntimeNode> Nodes;
 	if (!Parser->GetAllNodes(Nodes))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to retrieve Nodes from glTF Asset."));
+		Parser->AddError("UglTFRuntimeAsset::GetScenes()", "Unable to retrieve Nodes from glTF Asset.");
 		return TArray<FglTFRuntimeNode>();
 	}
 	return Nodes;

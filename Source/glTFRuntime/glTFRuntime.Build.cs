@@ -44,7 +44,8 @@ public class glTFRuntime : ModuleRules
                 "RenderCore",
                 "RHI",
                 "ApplicationCore",
-                "DesktopPlatform"
+                "DesktopPlatform",
+                "Http"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );
