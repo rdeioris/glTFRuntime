@@ -70,6 +70,15 @@ enum class EglTFRuntimeMaterialType : uint8
 	TwoSidedTranslucent,
 };
 
+UENUM()
+enum class EglTFRuntimeCacheMode : uint8
+{
+	ReadWrite,
+	None,
+	Read,
+	Write
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSocket
 {
@@ -103,6 +112,12 @@ struct FglTFRuntimeStaticMeshConfig
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EglTFRuntimeCacheMode CacheMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bReverseWinding;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bBuildSimpleCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -122,6 +137,9 @@ USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalMeshConfig
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EglTFRuntimeCacheMode CacheMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RootNodeIndex;
@@ -145,6 +163,9 @@ USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalAnimationConfig
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EglTFRuntimeCacheMode CacheMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RootNodeIndex;
@@ -221,27 +242,27 @@ public:
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
-	UStaticMesh* LoadStaticMeshByName(const FString Name, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	UStaticMesh* LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
-	UMaterialInterface* LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
-	UTexture2D* LoadTexture(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UMaterialInterface* LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UTexture2D* LoadTexture(const int32 TextureIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	bool LoadNodes();
-	bool LoadNode(int32 Index, FglTFRuntimeNode& Node);
-	bool LoadNodeByName(FString Name, FglTFRuntimeNode& Node);
+	bool LoadNode(int32 NodeIndex, FglTFRuntimeNode& Node);
+	bool LoadNodeByName(FString NodeName, FglTFRuntimeNode& Node);
 
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
-	bool LoadScene(int32 Index, FglTFRuntimeScene& Scene);
+	bool LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene);
 
-	USkeletalMesh* LoadSkeletalMesh(const int32 Index, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig);
 	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig);
 
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 
-	bool GetBuffer(int32 Index, TArray<uint8>& Bytes);
-	bool GetBufferView(int32 Index, TArray<uint8>& Bytes, int64& Stride);
-	bool GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray<uint8>& Bytes);
+	bool GetBuffer(int32 BufferIndex, TArray<uint8>& Bytes);
+	bool GetBufferView(int32 BufferViewIndex, TArray<uint8>& Bytes, int64& Stride);
+	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray<uint8>& Bytes);
 
 	bool GetAllNodes(TArray<FglTFRuntimeNode>& Nodes);
 
@@ -249,6 +270,74 @@ public:
 	int64 GetTypeSize(const FString Type) const;
 
 	bool ParseBase64Uri(const FString Uri, TArray<uint8>& Bytes);
+
+	void AddReferencedObjects(FReferenceCollector& Collector);
+
+	bool LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+
+	void ClearErrors();
+
+protected:
+	TSharedRef<FJsonObject> Root;
+
+	TMap<int32, UStaticMesh*> StaticMeshesCache;
+	TMap<int32, UMaterialInterface*> MaterialsCache;
+	TMap<int32, USkeleton*> SkeletonsCache;
+	TMap<int32, USkeletalMesh*> SkeletalMeshesCache;
+	TMap<int32, UTexture2D*> TexturesCache;
+
+	TMap<int32, TArray<uint8>> BuffersCache;
+
+	TArray<FglTFRuntimeNode> AllNodesCache;
+	bool bAllNodesCached;
+
+	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
+
+	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	bool LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames);
+
+	bool LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, int32& NumFrames, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter);
+
+	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap);
+
+	void FixNodeParent(FglTFRuntimeNode& Node);
+
+	int32 FindCommonRoot(TArray<int32> NodeIndices);
+	int32 FindTopRoot(int32 NodeIndex);
+	bool HasRoot(int32 NodeIndex, int32 RootIndex);
+
+	bool CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems);
+	bool CheckJsonRootIndex(const FString FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems) { return CheckJsonIndex(Root, FieldName, Index, JsonItems); }
+	TSharedPtr<FJsonObject> GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 Index);
+	TSharedPtr<FJsonObject> GetJsonObjectFromRootIndex(const FString FieldName, const int32 Index) { return GetJsonObjectFromIndex(Root, FieldName, Index); }
+
+	FString GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const FString DefaultValue);
+	int32 GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 DefaultValue);
+
+	bool FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues, FMatrix& Matrix);
+
+	float FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex);
+
+	void NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton);
+	void NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FVector BoneScale);
+
+	bool AssignTexCoord(TSharedPtr<FJsonObject> JsonTextureObject, UMaterialInstanceDynamic* Material, const FName MaterialParam);
+
+	bool CanReadFromCache(const EglTFRuntimeCacheMode CacheMode) { return CacheMode == EglTFRuntimeCacheMode::Read || CacheMode == EglTFRuntimeCacheMode::ReadWrite; }
+	bool CanWriteToCache(const EglTFRuntimeCacheMode CacheMode) { return CacheMode == EglTFRuntimeCacheMode::Write || CacheMode == EglTFRuntimeCacheMode::ReadWrite; }
+
+	void AddError(const FString ErrorContext, const FString ErrorMessage);
+
+	FMatrix SceneBasis;
+	float SceneScale;
+
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;
+
+	TArray<FString> Errors;
 
 	template<typename T, typename Callback>
 	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedElements, const TArray<int64> SupportedTypes, const bool bNormalized, Callback Filter)
@@ -406,52 +495,18 @@ public:
 		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; });
 	}
 
-	void AddReferencedObjects(FReferenceCollector& Collector);
+	template<int32 Num, typename T>
+	bool GetJsonVector(const TArray<TSharedPtr<FJsonValue>>* JsonValues, T& Value)
+	{
+		if (JsonValues->Num() != Num)
+			return false;
 
-	bool LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
-	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
-
-protected:
-	TSharedRef<FJsonObject> Root;
-
-	TMap<int32, UStaticMesh*> StaticMeshesCache;
-	TMap<int32, UMaterialInterface*> MaterialsCache;
-	TMap<int32, USkeleton*> SkeletonsCache;
-	TMap<int32, USkeletalMesh*> SkeletalMeshesCache;
-	TMap<int32, UTexture2D*> TexturesCache;
-
-	TMap<int32, TArray<uint8>> BuffersCache;
-
-	TArray<FglTFRuntimeNode> AllNodesCache;
-	bool bAllNodesCached;
-
-	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
-	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
-	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
-
-	USkeletalMesh* LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
-	bool LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames);
-
-	bool LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, int32& NumFrames, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter);
-
-	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
-	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap);
-
-	void FixNodeParent(FglTFRuntimeNode& Node);
-
-	int32 FindCommonRoot(TArray<int32> Indices);
-	int32 FindTopRoot(int32 Index);
-	bool HasRoot(int32 Index, int32 RootIndex);
-
-	float FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex);
-
-	void NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton);
-	void NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FVector BoneScale);
-
-	bool AssignTexCoord(TSharedPtr<FJsonObject> JsonTextureObject, UMaterialInstanceDynamic* Material, const FName MaterialParam);
-
-	FMatrix SceneBasis;
-	float SceneScale;
-
-	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;
+		for (int32 i = 0; i < Num; i++)
+		{
+			if (!(*JsonValues)[i]->TryGetNumber(Value[i]))
+				return false;
+		}
+		
+		return true;
+	}
 };
