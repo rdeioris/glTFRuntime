@@ -22,6 +22,8 @@ protected:
 
 	virtual void ProcessNode(USceneComponent* NodeParentComponent, FglTFRuntimeNode& Node);
 
+	TMap<USceneComponent*, float>  CurveBasedAnimationsTimeTracker;
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

@@ -19,7 +19,7 @@ class GLTFRUNTIME_API UglTFRuntimeFunctionLibrary : public UBlueprintFunctionLib
 
 public:
 	UFUNCTION(BlueprintCallable, meta=(DisplayName="glTF Load Asset from Filename"), Category="glTFRuntime")
-	static UglTFRuntimeAsset* glTFLoadAssetFromFilename(const FString Filename);
+	static UglTFRuntimeAsset* glTFLoadAssetFromFilename(const FString Filename, const bool bPathRelativeToContent);
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from String"), Category = "glTFRuntime")
 	static UglTFRuntimeAsset* glTFLoadAssetFromString(const FString JsonData);

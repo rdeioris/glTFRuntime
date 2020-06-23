@@ -7,7 +7,7 @@
 AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	AssetRoot = CreateDefaultSubobject<USceneComponent>(TEXT("AssetRoot"));
 	RootComponent = AssetRoot;
@@ -91,6 +91,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		if (AnimationCurve)
 		{
 			CurveBasedAnimations.Add(NewComponent, AnimationCurve);
+			CurveBasedAnimationsTimeTracker.Add(NewComponent, 0);
 		}
 	}
 
@@ -110,5 +111,25 @@ void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	for (TPair<USceneComponent*, UglTFRuntimeAnimationCurve*>& Pair : CurveBasedAnimations)
+	{
+		float MinTime;
+		float MaxTime;
+		Pair.Value->GetTimeRange(MinTime, MaxTime);
+
+		float CurrentTime = CurveBasedAnimationsTimeTracker[Pair.Key];
+		if (CurrentTime > Pair.Value->glTFCurveAnimationDuration)
+		{
+			CurveBasedAnimationsTimeTracker[Pair.Key] = 0;
+			CurrentTime = 0;
+		}
+
+		if (CurrentTime >= MinTime)
+		{	
+			FTransform FrameTransform = Pair.Value->GetTransformValue(CurveBasedAnimationsTimeTracker[Pair.Key]);
+			Pair.Key->SetRelativeTransform(FrameTransform);
+		}
+		CurveBasedAnimationsTimeTracker[Pair.Key] += DeltaTime;
+	}
 }
 

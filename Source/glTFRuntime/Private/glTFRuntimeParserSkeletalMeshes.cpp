@@ -503,10 +503,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	}
 
 	float Duration;
-	int32 NumFrames;
-
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
-	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration, NumFrames))
+	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration))
 	{
 		return nullptr;
 	}
@@ -514,7 +512,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 	AnimSequence->SetSkeleton(SkeletalMesh->Skeleton);
 	AnimSequence->SetPreviewMesh(SkeletalMesh);
-	AnimSequence->SetRawNumberOfFrame(NumFrames);
+	AnimSequence->SetRawNumberOfFrame(Duration / 30);
 	AnimSequence->SequenceLength = Duration;
 	AnimSequence->bEnableRootMotion = AnimationConfig.bRootMotion;
 
@@ -621,12 +619,12 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	return AnimSequence;
 }
 
-bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, int32& NumFrames)
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration)
 {
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
 	{
-		NumFrames = Duration * 30;
+		int32 NumFrames = Duration * 30;
 
 		float FrameDelta = 1.f / 30;
 
@@ -707,6 +705,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 		}
 	};
 
-	return LoadAnimation_Internal(JsonAnimationObject, Duration, NumFrames, Callback, [](const FglTFRuntimeNode& Node) -> bool { return true; });
+	FString IgnoredName;
+	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, [](const FglTFRuntimeNode& Node) -> bool { return true; });
 }
 

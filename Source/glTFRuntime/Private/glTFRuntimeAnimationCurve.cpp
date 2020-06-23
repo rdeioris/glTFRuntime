@@ -1,7 +1,13 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2020, Roberto De Ioris
 
 
 #include "glTFRuntimeAnimationCurve.h"
+
+UglTFRuntimeAnimationCurve::UglTFRuntimeAnimationCurve()
+{
+	glTFCurveAnimationIndex = INDEX_NONE;
+	glTFCurveAnimationDuration = 0;
+}
 
 FTransform UglTFRuntimeAnimationCurve::GetTransformValue(float InTime) const
 {

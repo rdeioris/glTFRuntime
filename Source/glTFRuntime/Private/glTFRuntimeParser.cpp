@@ -373,8 +373,10 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, int32& NumFrames, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
+bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
 {
+	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
+
 	const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
 	if (!JsonAnimationObject->TryGetArrayField("samplers", JsonSamplers))
 	{
@@ -424,6 +426,13 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 				Duration = Time;
 			}
 		}
+
+		UE_LOG(LogTemp, Error, TEXT("--- --- ---"));
+		for (int32 i = 0; i < Timeline.Num(); i++)
+		{
+			UE_LOG(LogTemp, Error, TEXT("%f = %f, %f, %f, %f"), Timeline[i], Values[i].X, Values[i].Y, Values[i].Z, Values[i].W);
+		}
+		UE_LOG(LogTemp, Error, TEXT("^^^ ^^^ ^^^"));
 
 		Samplers.Add(TPair<TArray<float>, TArray<FVector4>>(Timeline, Values));
 	}
@@ -529,20 +538,23 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 		bAnimationFound = true;
 	};
 
-	for (TSharedPtr<FJsonValue> JsonAnimation : *JsonAnimations)
+	for (int32 JsonAnimationIndex = 0; JsonAnimationIndex < JsonAnimations->Num(); JsonAnimationIndex++)
 	{
-		TSharedPtr<FJsonObject> JsonAnimationObject = JsonAnimation->AsObject();
+		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[JsonAnimationIndex]->AsObject();
 		if (!JsonAnimationObject)
 			return false;
 		float Duration;
-		int32 NumFrames;
-		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, NumFrames, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }))
+		FString Name;
+		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, Name, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }))
 		{
 			return nullptr;
 		}
 		// stop at the first found animation
 		if (bAnimationFound)
 		{
+			AnimationCurve->glTFCurveAnimationIndex = JsonAnimationIndex;
+			AnimationCurve->glTFCurveAnimationName = Name;
+			AnimationCurve->glTFCurveAnimationDuration = Duration;
 			return AnimationCurve;
 		}
 	}

@@ -8,12 +8,19 @@
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString Filename)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString Filename, const bool bPathRelativeToContent)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
 		return nullptr;
-	if (!Asset->LoadFromFilename(Filename))
+
+	FString TruePath = Filename;
+	if (bPathRelativeToContent)
+	{
+		TruePath = FPaths::Combine(FPaths::ProjectContentDir(), Filename);
+	}
+
+	if (!Asset->LoadFromFilename(TruePath))
 		return nullptr;
 
 	return Asset;
