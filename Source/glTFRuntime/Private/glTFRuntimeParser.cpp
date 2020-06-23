@@ -625,8 +625,6 @@ int32 FglTFRuntimeParser::FindCommonRoot(TArray<int32> Indices)
 
 bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
-	//RootTransform = FTransform::Identity;
-
 	// get the list of valid joints	
 	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
 	TArray<int32> Joints;
@@ -643,7 +641,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 	if (Joints.Num() == 0)
 	{
-		UE_LOG(LogTemp, Error, TEXT("No Joints available"));
+		AddError("FillReferenceSkeleton()", "No Joints available");
 		return false;
 	}
 
@@ -658,7 +656,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 	if (!LoadNode(RootBoneIndex, RootNode))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to load joint node"));
+		AddError("FillReferenceSkeleton()", "Unable to load joint node.");
 		return false;
 	}
 
@@ -670,7 +668,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		if (!GetAccessor(inverseBindMatricesIndex, ComponentType, Stride, Elements, ElementSize, Count, InverseBindMatricesBytes))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Unable to load accessor: %lld"), inverseBindMatricesIndex);
+			AddError("FillReferenceSkeleton()", FString::Printf(TEXT("Unable to load accessor: %lld."), inverseBindMatricesIndex));
 			return false;
 		}
 
@@ -1098,23 +1096,8 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray<uint8>& Bytes, int64&
 
 bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray<uint8>& Bytes)
 {
-	if (Index < 0)
-		return false;
 
-	const TArray<TSharedPtr<FJsonValue>>* JsonAccessors;
-
-	// no accessors ?
-	if (!Root->TryGetArrayField("accessors", JsonAccessors))
-	{
-		return false;
-	}
-
-	if (Index >= JsonAccessors->Num())
-	{
-		return false;
-	}
-
-	TSharedPtr<FJsonObject> JsonAccessorObject = (*JsonAccessors)[Index]->AsObject();
+	TSharedPtr<FJsonObject> JsonAccessorObject = GetJsonObjectFromRootIndex("accessors", Index);
 	if (!JsonAccessorObject)
 		return false;
 
@@ -1155,7 +1138,9 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 	}
 
 	if (!GetBufferView(BufferViewIndex, Bytes, Stride))
+	{
 		return false;
+	}
 
 	if (Stride == 0)
 	{
@@ -1171,7 +1156,142 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 		Bytes = OffsetBytes;
 	}
 
-	return (FinalSize <= Bytes.Num());
+	if (FinalSize > Bytes.Num())
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonSparseObject = nullptr;
+	if (!JsonAccessorObject->TryGetObjectField("sparse", JsonSparseObject))
+	{
+		return true;
+	}
+
+	int64 SparseCount;
+	if (!(*JsonSparseObject)->TryGetNumberField("count", SparseCount))
+	{
+		return false;
+	}
+
+	if (((uint64)SparseCount > FinalSize) || (SparseCount < 1))
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonSparseIndicesObject = nullptr;
+	if (!(*JsonSparseObject)->TryGetObjectField("indices", JsonSparseIndicesObject))
+	{
+		return true;
+	}
+
+	int32 SparseBufferViewIndex = GetJsonObjectIndex(JsonSparseIndicesObject->ToSharedRef(), "bufferView", INDEX_NONE);
+	if (SparseBufferViewIndex < 0)
+	{
+		return false;
+	}
+
+	int64 SparseByteOffset;
+	if (!(*JsonSparseIndicesObject)->TryGetNumberField("byteOffset", SparseByteOffset))
+	{
+		SparseByteOffset = 0;
+	}
+
+	int64 SparseComponentType;
+	if (!(*JsonSparseIndicesObject)->TryGetNumberField("componentType", SparseComponentType))
+	{
+		return false;
+	}
+
+	TArray<uint8> SparseBytesIndices;
+	int64 SparseBufferViewIndicesStride;
+	if (!GetBufferView(SparseBufferViewIndex, SparseBytesIndices, SparseBufferViewIndicesStride))
+	{
+		return false;
+	}
+	if (SparseBufferViewIndicesStride == 0)
+	{
+		SparseBufferViewIndicesStride = GetComponentTypeSize(SparseComponentType);
+	}
+
+
+	if (((SparseBytesIndices.Num() - SparseByteOffset) / SparseBufferViewIndicesStride) < SparseCount)
+	{
+		return false;
+	}
+
+	TArray<uint32> SparseIndices;
+	uint8* SparseIndicesBase = &SparseBytesIndices[SparseByteOffset];
+
+
+	for (int32 SparseIndexOffset = 0; SparseIndexOffset < SparseCount; SparseIndexOffset++)
+	{
+		// UNSIGNED_BYTE
+		if (SparseComponentType == 5121)
+		{
+			SparseIndices.Add(*SparseIndicesBase);
+		}
+		// UNSIGNED_SHORT
+		else if (SparseComponentType == 5123)
+		{
+			uint16* SparseIndicesBaseUint16 = (uint16*)SparseIndicesBase;
+			SparseIndices.Add(*SparseIndicesBaseUint16);
+		}
+		// UNSIGNED_INT
+		else if (SparseComponentType == 5125)
+		{
+			uint32* SparseIndicesBaseUint32 = (uint32*)SparseIndicesBase;
+			SparseIndices.Add(*SparseIndicesBaseUint32);
+		}
+		else
+		{
+			return false;
+		}
+		SparseIndicesBase += SparseBufferViewIndicesStride;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonSparseValuesObject = nullptr;
+	if (!(*JsonSparseObject)->TryGetObjectField("values", JsonSparseValuesObject))
+	{
+		return true;
+	}
+
+	int32 SparseValueBufferViewIndex = GetJsonObjectIndex(JsonSparseValuesObject->ToSharedRef(), "bufferView", INDEX_NONE);
+	if (SparseValueBufferViewIndex < 0)
+	{
+		return false;
+	}
+
+	int64 SparseValueByteOffset;
+	if (!(*JsonSparseValuesObject)->TryGetNumberField("byteOffset", SparseValueByteOffset))
+	{
+		SparseValueByteOffset = 0;
+	}
+
+	TArray<uint8> SparseBytesValues;
+	int64 SparseBufferViewValuesStride;
+	if (!GetBufferView(SparseValueBufferViewIndex, SparseBytesValues, SparseBufferViewValuesStride))
+	{
+		return false;
+	}
+	if (SparseBufferViewValuesStride == 0)
+	{
+		SparseBufferViewValuesStride = ElementSize * Elements;
+	}
+
+	for (int32 IndexToChange = 0; IndexToChange < SparseCount; IndexToChange++)
+	{
+		uint32 SparseIndexToChange = SparseIndices[IndexToChange];
+		if (SparseIndexToChange >= (Bytes.Num() / Stride))
+		{
+			return false;
+		}
+
+		uint8* OriginalValuePtr = (uint8*)(Bytes.GetData() + Stride * SparseIndexToChange);
+		uint8* NewValuePtr = (uint8*)(SparseBytesValues.GetData() + SparseBufferViewValuesStride * IndexToChange);
+		FMemory::Memcpy(OriginalValuePtr, NewValuePtr, SparseBufferViewValuesStride);
+	}
+
+	return true;
 }
 
 int64 FglTFRuntimeParser::GetComponentTypeSize(const int64 ComponentType) const
