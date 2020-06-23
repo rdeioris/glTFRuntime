@@ -504,7 +504,7 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 
 	UglTFRuntimeAnimationCurve* AnimationCurve = NewObject<UglTFRuntimeAnimationCurve>(GetTransientPackage(), NAME_None, RF_Public);
 
-	AnimationCurve->SetDefaultValues(Node.Transform.GetLocation(), Node.Transform.GetRotation(), Node.Transform.GetScale3D());
+	AnimationCurve->SetDefaultValues(Node.Transform.GetLocation(), Node.Transform.Rotator().Euler(), Node.Transform.GetScale3D());
 
 	bool bAnimationFound = false;
 
@@ -523,8 +523,8 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 			{
 				FVector4 RotationValue = Values[TimeIndex];
 				FQuat BaseQuat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
-				FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(BaseQuat.GetNormalized()) * SceneBasis;
-				AnimationCurve->AddRotationValue(Timeline[TimeIndex], RotationMatrix.ToQuat(), ERichCurveInterpMode::RCIM_Linear);
+				FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(BaseQuat) * SceneBasis;
+				AnimationCurve->AddRotationValue(Timeline[TimeIndex], RotationMatrix.Rotator().Euler(), ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "scale")

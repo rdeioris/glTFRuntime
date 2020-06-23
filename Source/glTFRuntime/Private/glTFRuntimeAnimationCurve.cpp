@@ -16,46 +16,43 @@ FTransform UglTFRuntimeAnimationCurve::GetTransformValue(float InTime) const
 	Location.Y = LocationCurves[1].Eval(InTime);
 	Location.Z = LocationCurves[2].Eval(InTime);
 
-	FQuat Rotation;
-	Rotation.X = RotationCurves[0].Eval(InTime);
-	Rotation.Y = RotationCurves[1].Eval(InTime);
-	Rotation.Z = RotationCurves[2].Eval(InTime);
-	Rotation.W = RotationCurves[3].Eval(InTime);
+	FVector EulerRotation;
+	EulerRotation.X = RotationCurves[0].Eval(InTime);
+	EulerRotation.Y = RotationCurves[1].Eval(InTime);
+	EulerRotation.Z = RotationCurves[2].Eval(InTime);
 
 	FVector Scale;
 	Scale.X = ScaleCurves[0].Eval(InTime);
 	Scale.Y = ScaleCurves[1].Eval(InTime);
 	Scale.Z = ScaleCurves[2].Eval(InTime);
 
-	return FTransform(Rotation, Location, Scale);
+	return FTransform(FRotator::MakeFromEuler(EulerRotation), Location, Scale);
 }
 
-void UglTFRuntimeAnimationCurve::SetDefaultValues(const FVector Location, const FQuat Rotation, const FVector Scale)
+void UglTFRuntimeAnimationCurve::SetDefaultValues(const FVector Location, const FVector EulerRotation, const FVector Scale)
 {
 	LocationCurves[0].DefaultValue = Location.X;
 	LocationCurves[1].DefaultValue = Location.Y;
 	LocationCurves[2].DefaultValue = Location.Z;
 
-	RotationCurves[0].DefaultValue = Rotation.X;
-	RotationCurves[1].DefaultValue = Rotation.Y;
-	RotationCurves[2].DefaultValue = Rotation.Z;
-	RotationCurves[3].DefaultValue = Rotation.W;
+	RotationCurves[0].DefaultValue = EulerRotation.X;
+	RotationCurves[1].DefaultValue = EulerRotation.Y;
+	RotationCurves[2].DefaultValue = EulerRotation.Z;
 
 	ScaleCurves[0].DefaultValue = Scale.X;
 	ScaleCurves[1].DefaultValue = Scale.Y;
 	ScaleCurves[2].DefaultValue = Scale.Z;
 }
 
-static const FName LocationXCurveName(TEXT("LocationX"));
-static const FName LocationYCurveName(TEXT("LocationY"));
-static const FName LocationZCurveName(TEXT("LocationZ"));
-static const FName RotationXCurveName(TEXT("RotationX"));
-static const FName RotationYCurveName(TEXT("RotationY"));
-static const FName RotationZCurveName(TEXT("RotationZ"));
-static const FName RotationWCurveName(TEXT("RotationW"));
-static const FName ScaleXCurveName(TEXT("ScaleX"));
-static const FName ScaleYCurveName(TEXT("ScaleY"));
-static const FName ScaleZCurveName(TEXT("ScaleZ"));
+static const FName LocationXCurveName(TEXT("Location X"));
+static const FName LocationYCurveName(TEXT("Location Y"));
+static const FName LocationZCurveName(TEXT("Location Z"));
+static const FName EulerRotationXCurveName(TEXT("EulerRotation X"));
+static const FName EulerRotationYCurveName(TEXT("EulerRotation Y"));
+static const FName EulerRotationZCurveName(TEXT("EulerRotation Z"));
+static const FName ScaleXCurveName(TEXT("Scale X"));
+static const FName ScaleYCurveName(TEXT("Scale Y"));
+static const FName ScaleZCurveName(TEXT("Scale Z"));
 
 TArray<FRichCurveEditInfoConst> UglTFRuntimeAnimationCurve::GetCurves() const
 {
@@ -63,10 +60,9 @@ TArray<FRichCurveEditInfoConst> UglTFRuntimeAnimationCurve::GetCurves() const
 	Curves.Add(FRichCurveEditInfoConst(&LocationCurves[0], LocationXCurveName));
 	Curves.Add(FRichCurveEditInfoConst(&LocationCurves[1], LocationYCurveName));
 	Curves.Add(FRichCurveEditInfoConst(&LocationCurves[2], LocationZCurveName));
-	Curves.Add(FRichCurveEditInfoConst(&RotationCurves[0], RotationXCurveName));
-	Curves.Add(FRichCurveEditInfoConst(&RotationCurves[1], RotationYCurveName));
-	Curves.Add(FRichCurveEditInfoConst(&RotationCurves[2], RotationZCurveName));
-	Curves.Add(FRichCurveEditInfoConst(&RotationCurves[3], RotationWCurveName));
+	Curves.Add(FRichCurveEditInfoConst(&RotationCurves[0], EulerRotationXCurveName));
+	Curves.Add(FRichCurveEditInfoConst(&RotationCurves[1], EulerRotationYCurveName));
+	Curves.Add(FRichCurveEditInfoConst(&RotationCurves[2], EulerRotationZCurveName));
 	Curves.Add(FRichCurveEditInfoConst(&ScaleCurves[0], ScaleXCurveName));
 	Curves.Add(FRichCurveEditInfoConst(&ScaleCurves[1], ScaleYCurveName));
 	Curves.Add(FRichCurveEditInfoConst(&ScaleCurves[2], ScaleZCurveName));
@@ -79,10 +75,9 @@ TArray<FRichCurveEditInfo> UglTFRuntimeAnimationCurve::GetCurves()
 	Curves.Add(FRichCurveEditInfo(&LocationCurves[0], LocationXCurveName));
 	Curves.Add(FRichCurveEditInfo(&LocationCurves[1], LocationYCurveName));
 	Curves.Add(FRichCurveEditInfo(&LocationCurves[2], LocationZCurveName));
-	Curves.Add(FRichCurveEditInfo(&RotationCurves[0], RotationXCurveName));
-	Curves.Add(FRichCurveEditInfo(&RotationCurves[1], RotationYCurveName));
-	Curves.Add(FRichCurveEditInfo(&RotationCurves[2], RotationZCurveName));
-	Curves.Add(FRichCurveEditInfo(&RotationCurves[3], RotationWCurveName));
+	Curves.Add(FRichCurveEditInfo(&RotationCurves[0], EulerRotationXCurveName));
+	Curves.Add(FRichCurveEditInfo(&RotationCurves[1], EulerRotationYCurveName));
+	Curves.Add(FRichCurveEditInfo(&RotationCurves[2], EulerRotationZCurveName));
 	Curves.Add(FRichCurveEditInfo(&ScaleCurves[0], ScaleXCurveName));
 	Curves.Add(FRichCurveEditInfo(&ScaleCurves[1], ScaleYCurveName));
 	Curves.Add(FRichCurveEditInfo(&ScaleCurves[2], ScaleZCurveName));
@@ -97,7 +92,6 @@ bool UglTFRuntimeAnimationCurve::operator==(const UglTFRuntimeAnimationCurve& Cu
 		(RotationCurves[0] == Curve.RotationCurves[0]) &&
 		(RotationCurves[1] == Curve.RotationCurves[1]) &&
 		(RotationCurves[2] == Curve.RotationCurves[2]) &&
-		(RotationCurves[3] == Curve.RotationCurves[3]) &&
 		(ScaleCurves[0] == Curve.ScaleCurves[0]) &&
 		(ScaleCurves[1] == Curve.ScaleCurves[1]) &&
 		(ScaleCurves[2] == Curve.ScaleCurves[2]);
@@ -111,7 +105,6 @@ bool UglTFRuntimeAnimationCurve::IsValidCurve(FRichCurveEditInfo CurveInfo)
 		CurveInfo.CurveToEdit == &RotationCurves[0] ||
 		CurveInfo.CurveToEdit == &RotationCurves[1] ||
 		CurveInfo.CurveToEdit == &RotationCurves[2] ||
-		CurveInfo.CurveToEdit == &RotationCurves[3] ||
 		CurveInfo.CurveToEdit == &ScaleCurves[1] ||
 		CurveInfo.CurveToEdit == &ScaleCurves[2] ||
 		CurveInfo.CurveToEdit == &ScaleCurves[3];
@@ -127,16 +120,14 @@ void UglTFRuntimeAnimationCurve::AddLocationValue(const float InTime, const FVec
 	LocationCurves[2].SetKeyInterpMode(LocationKey2, InterpolationMode);
 }
 
-void UglTFRuntimeAnimationCurve::AddRotationValue(const float InTime, const FQuat InRotation, const ERichCurveInterpMode InterpolationMode)
+void UglTFRuntimeAnimationCurve::AddRotationValue(const float InTime, const FVector InEulerRotation, const ERichCurveInterpMode InterpolationMode)
 {
-	FKeyHandle RotationKey0 = RotationCurves[0].AddKey(InTime, InRotation.X);
+	FKeyHandle RotationKey0 = RotationCurves[0].AddKey(InTime, InEulerRotation.X, true);
 	RotationCurves[0].SetKeyInterpMode(RotationKey0, InterpolationMode);
-	FKeyHandle RotationKey1 = RotationCurves[1].AddKey(InTime, InRotation.Y);
+	FKeyHandle RotationKey1 = RotationCurves[1].AddKey(InTime, InEulerRotation.Y, true);
 	RotationCurves[1].SetKeyInterpMode(RotationKey1, InterpolationMode);
-	FKeyHandle RotationKey2 = RotationCurves[2].AddKey(InTime, InRotation.Z);
+	FKeyHandle RotationKey2 = RotationCurves[2].AddKey(InTime, InEulerRotation.Z, true);
 	RotationCurves[2].SetKeyInterpMode(RotationKey2, InterpolationMode);
-	FKeyHandle RotationKey3 = RotationCurves[3].AddKey(InTime, InRotation.W);
-	RotationCurves[3].SetKeyInterpMode(RotationKey3, InterpolationMode);
 }
 
 void UglTFRuntimeAnimationCurve::AddScaleValue(const float InTime, const FVector InScale, const ERichCurveInterpMode InterpolationMode)
