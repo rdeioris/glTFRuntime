@@ -504,7 +504,9 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 
 	UglTFRuntimeAnimationCurve* AnimationCurve = NewObject<UglTFRuntimeAnimationCurve>(GetTransientPackage(), NAME_None, RF_Public);
 
-	AnimationCurve->SetDefaultValues(Node.Transform.GetLocation(), Node.Transform.Rotator().Euler(), Node.Transform.GetScale3D());
+	FTransform OriginalTransform = FTransform(SceneBasis * Node.Transform.ToMatrixWithScale() * SceneBasis.Inverse());
+
+	AnimationCurve->SetDefaultValues(OriginalTransform.GetLocation(), OriginalTransform.Rotator().Euler(), OriginalTransform.GetScale3D());
 
 	bool bAnimationFound = false;
 
@@ -514,7 +516,7 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 		{
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
-				AnimationCurve->AddLocationValue(Timeline[TimeIndex], SceneBasis.TransformPosition(Values[TimeIndex]) * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddLocationValue(Timeline[TimeIndex], Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "rotation")
@@ -522,16 +524,15 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
 				FVector4 RotationValue = Values[TimeIndex];
-				FQuat BaseQuat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
-				FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(BaseQuat) * SceneBasis;
-				AnimationCurve->AddRotationValue(Timeline[TimeIndex], RotationMatrix.Rotator().Euler(), ERichCurveInterpMode::RCIM_Linear);
+				FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
+				AnimationCurve->AddRotationValue(Timeline[TimeIndex], Quat.Euler(), ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "scale")
 		{
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
-				AnimationCurve->AddScaleValue(Timeline[TimeIndex], (SceneBasis.Inverse() * FScaleMatrix(Values[TimeIndex]) * SceneBasis).ExtractScaling(), ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddScaleValue(Timeline[TimeIndex], Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		bAnimationFound = true;
@@ -554,6 +555,7 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 			AnimationCurve->glTFCurveAnimationIndex = JsonAnimationIndex;
 			AnimationCurve->glTFCurveAnimationName = Name;
 			AnimationCurve->glTFCurveAnimationDuration = Duration;
+			AnimationCurve->BasisMatrix = SceneBasis;
 			return AnimationCurve;
 		}
 	}

@@ -44,6 +44,8 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "glTFRuntime|Curves")
     float glTFCurveAnimationDuration;
 
+    FMatrix BasisMatrix;
+
     /** Evaluate this float curve at the specified time */
     UFUNCTION(BlueprintCallable, Category = "glTFRuntime|Curves")
     FTransform GetTransformValue(float InTime) const;
