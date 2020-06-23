@@ -522,10 +522,9 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
 				FVector4 RotationValue = Values[TimeIndex];
-				FQuat BaseQuat = { RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W };
-				FMatrix RotationMatrix = SceneBasis.Inverse() * FRotationMatrix(BaseQuat.Rotator()) * SceneBasis;
-				FQuat Quat = RotationMatrix.ToQuat();
-				AnimationCurve->AddRotationValue(Timeline[TimeIndex], Quat, ERichCurveInterpMode::RCIM_Linear);
+				FQuat BaseQuat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
+				FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(BaseQuat.GetNormalized()) * SceneBasis;
+				AnimationCurve->AddRotationValue(Timeline[TimeIndex], RotationMatrix.ToQuat(), ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "scale")
