@@ -5,7 +5,6 @@
 
 void UglTFAnimBoneCompressionCodec::DecompressBone(FAnimSequenceDecompressionContext& DecompContext, int32 TrackIndex, FTransform& OutAtom) const
 {
-
 	if (TrackIndex >= Tracks.Num())
 	{
 		return;
@@ -24,7 +23,7 @@ void UglTFAnimBoneCompressionCodec::DecompressBone(FAnimSequenceDecompressionCon
 	if (Tracks[TrackIndex].RotKeys.Num() > 0)
 	{
 		float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].RotKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
-		FQuat Rotation = FMath::Lerp(Tracks[TrackIndex].RotKeys[FrameA], Tracks[TrackIndex].RotKeys[FrameB], Alpha);
+		FQuat Rotation = FQuat::Slerp(Tracks[TrackIndex].RotKeys[FrameA], Tracks[TrackIndex].RotKeys[FrameB], Alpha);
 		OutAtom.SetRotation(Rotation);
 	}
 
@@ -44,6 +43,7 @@ void UglTFAnimBoneCompressionCodec::DecompressPose(FAnimSequenceDecompressionCon
 	}
 }
 
+// Taken from official Unreal Engine code base.
 float UglTFAnimBoneCompressionCodec::TimeToIndex(
 	float SequenceLength,
 	float RelativePos,

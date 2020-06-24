@@ -94,6 +94,19 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 			CurveBasedAnimationsTimeTracker.Add(NewComponent, 0);
 		}
 	}
+	else
+	{
+		USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(NewComponent);
+		FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig;
+		UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+		if (SkeletalAnimation)
+		{
+			SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;
+			SkeletalMeshComponent->AnimationData.bSavedLooping = true;
+			SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
+			SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		}
+	}
 
 	for (int32 ChildIndex : Node.ChildrenIndices)
 	{
@@ -125,7 +138,7 @@ void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 		}
 
 		if (CurrentTime >= MinTime)
-		{	
+		{
 			FTransform FrameTransform = Pair.Value->GetTransformValue(CurveBasedAnimationsTimeTracker[Pair.Key]);
 			Pair.Key->SetRelativeTransform(FrameTransform);
 		}

@@ -74,7 +74,9 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 
 	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
 	if (!Material)
+	{
 		return nullptr;
+	}
 
 	Material->SetScalarParameterValue("alphaCutoff", AlphaCutoff);
 
@@ -224,7 +226,6 @@ bool FglTFRuntimeParser::AssignTexCoord(TSharedPtr<FJsonObject> JsonTextureObjec
 
 UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
-	UE_LOG(LogTemp, Error, TEXT("attempting to load image: %d"), Index);
 	if (Index < 0)
 		return nullptr;
 
@@ -310,10 +311,10 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 Index, const FglTFRuntim
 		}
 	}
 
-	UE_LOG(LogTemp, Error, TEXT("detected image bytes: %d"), Bytes.Num());
-
 	if (Bytes.Num() == 0)
+	{
 		return nullptr;
+	}
 
 	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Bytes.GetData(), Bytes.Num());
 	if (ImageFormat == EImageFormat::Invalid)

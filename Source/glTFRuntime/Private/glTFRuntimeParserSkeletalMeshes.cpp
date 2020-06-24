@@ -309,7 +309,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 					}
 					else
 					{
-						UE_LOG(LogTemp, Error, TEXT("Unable to find map for bone %u"), Joints[j]);
+						AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
 						return nullptr;
 					}
 				}
@@ -465,11 +465,46 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 	return nullptr;
 }
 
-UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig)
+UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
 {
+
 	if (!SkeletalMesh)
 	{
 		return nullptr;
+	}
+
+	FglTFRuntimeNode Node;
+	if (!LoadNode(NodeIndex, Node))
+	{
+		return nullptr;
+	}
+
+	if (Node.SkinIndex < 0)
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", Node.SkinIndex);
+	if (!JsonSkinObject)
+	{
+		return nullptr;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+	if (!JsonSkinObject->TryGetArrayField("joints", JsonJoints))
+	{
+		return nullptr;
+	}
+
+	TArray<int32> Joints;
+	for (TSharedPtr<FJsonValue> JsonJoint : (*JsonJoints))
+	{
+		int64 JointIndex;
+		if (!JsonJoint->TryGetNumber(JointIndex))
+		{
+			return false;
+		}
+		Joints.Add(JointIndex);
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
@@ -478,12 +513,43 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		return nullptr;
 	}
 
-	if (AnimationIndex >= JsonAnimations->Num())
+	for (int32 JsonAnimationIndex = 0; JsonAnimationIndex < JsonAnimations->Num(); JsonAnimationIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[JsonAnimationIndex]->AsObject();
+		if (!JsonAnimationObject)
+			return false;
+		float Duration;
+		TMap<FString, FRawAnimSequenceTrack> Tracks;
+		bool bAnimationFound = false;
+		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration, [Joints, &bAnimationFound](const FglTFRuntimeNode& Node) -> bool
+		{
+			bAnimationFound = Joints.Contains(Node.Index);
+			return bAnimationFound;
+		}))
+		{
+			return nullptr;
+		}
+
+		if (bAnimationFound)
+		{
+			// this is very inefficient as we parse the tracks twice
+			// TODO: refactor it
+			return LoadSkeletalAnimation(SkeletalMesh, JsonAnimationIndex, SkeletalAnimationConfig);
+		}
+	}
+
+	return nullptr;
+}
+
+
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig)
+{
+	if (!SkeletalMesh)
 	{
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[AnimationIndex]->AsObject();
+	TSharedPtr<FJsonObject> JsonAnimationObject = GetJsonObjectFromRootIndex("animations", AnimationIndex);
 	if (!JsonAnimationObject)
 	{
 		return nullptr;
@@ -491,7 +557,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 
 	float Duration;
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
-	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration))
+	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration, [](const FglTFRuntimeNode& Node) -> bool { return true; }))
 	{
 		return nullptr;
 	}
@@ -499,42 +565,12 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 	AnimSequence->SetSkeleton(SkeletalMesh->Skeleton);
 	AnimSequence->SetPreviewMesh(SkeletalMesh);
-	AnimSequence->SetRawNumberOfFrame(Duration / 30);
+	AnimSequence->SetRawNumberOfFrame(Duration * 30);
 	AnimSequence->SequenceLength = Duration;
 	AnimSequence->bEnableRootMotion = AnimationConfig.bRootMotion;
 
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
 
-	/*
-	bool bTrueRootFound = false;
-
-	for (TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
-	{
-		FName BoneName = FName(Pair.Key);
-		int32 BoneIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(BoneName);
-
-		if (BoneIndex == 1)
-		{
-			bTrueRootFound = true;
-			break;
-		}
-	}
-
-	if (!bTrueRootFound)
-	{
-		return nullptr;
-	}
-
-	FRawAnimSequenceTrack RootTrack;
-	for (int32 FrameIndex = 0; FrameIndex < Tracks["Hips"].RotKeys.Num(); FrameIndex++)
-	{
-		RootTrack.PosKeys.Add(Tracks["Hips"].PosKeys[FrameIndex]);
-		RootTrack.RotKeys.Add(FQuat::Identity);
-		RootTrack.ScaleKeys.Add(FVector(1, 1, 1));
-
-		Tracks["Hips"].PosKeys[FrameIndex] = Tracks["Hips"].PosKeys[0];
-	}*/
-	//Tracks.Add("Root", RootTrack);
 
 #if !WITH_EDITOR
 	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
@@ -548,11 +584,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		int32 BoneIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(BoneName);
 		if (BoneIndex == INDEX_NONE)
 		{
-			UE_LOG(LogTemp, Error, TEXT("Unable to find bone %s"), *Pair.Key);
+			AddError("LoadSkeletalAnimation()", FString::Printf(TEXT("Unable to find bone %s"), *Pair.Key));
 			continue;
 		}
-
-		UE_LOG(LogTemp, Warning, TEXT("Found %s at %d"), *BoneName.ToString(), BoneIndex);
 
 		if (BoneIndex == 0)
 		{
@@ -563,6 +597,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 				{
 					return nullptr;
 				}
+
 				for (int32 FrameIndex = 0; FrameIndex < Pair.Value.RotKeys.Num(); FrameIndex++)
 				{
 					FVector Pos = Pair.Value.PosKeys[FrameIndex];
@@ -606,7 +641,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	return AnimSequence;
 }
 
-bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration)
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
@@ -634,11 +669,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				FVector4 SecondQuatV = Values[SecondIndex];
 				FQuat FirstQuat = { FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W };
 				FQuat SecondQuat = { SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W };
-				FMatrix FirstMatrix = SceneBasis.Inverse() * FRotationMatrix(FirstQuat.Rotator()) * SceneBasis;
-				FMatrix SecondMatrix = SceneBasis.Inverse() * FRotationMatrix(SecondQuat.Rotator()) * SceneBasis;
+				FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+				FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
 				FirstQuat = FirstMatrix.ToQuat();
 				SecondQuat = SecondMatrix.ToQuat();
-				FQuat AnimQuat = FMath::Lerp(FirstQuat, SecondQuat, Alpha);
+				FQuat AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
 				Track.RotKeys.Add(AnimQuat);
 				FrameBase += FrameDelta;
 			}
@@ -649,8 +684,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			{
 				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
 			}
-
-			//UE_LOG(LogTemp, Error, TEXT("Found translation for %s"), *Node.Name);
 
 			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
 
@@ -674,8 +707,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
 			}
 
-			//UE_LOG(LogTemp, Error, TEXT("Found translation for %s"), *Node.Name);
-
 			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
 
 			float FrameBase = 0.f;
@@ -693,6 +724,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 	};
 
 	FString IgnoredName;
-	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, [](const FglTFRuntimeNode& Node) -> bool { return true; });
+	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter);
 }
 

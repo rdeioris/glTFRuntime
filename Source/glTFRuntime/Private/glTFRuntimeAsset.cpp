@@ -186,7 +186,6 @@ UAnimMontage* UglTFRuntimeAsset::LoadSkeletalAnimationAsMontage(USkeletalMesh* S
 		return nullptr;
 	}
 
-	AnimMontage->EnableRootMotionSettingFromMontage(AnimationConfig.bRootMotion, ERootMotionRootLock::RefPose);
 	AnimMontage->SetPreviewMesh(SkeletalMesh);
 
 	return AnimMontage;
@@ -197,6 +196,13 @@ UglTFRuntimeAnimationCurve* UglTFRuntimeAsset::LoadNodeAnimationCurve(const int3
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadNodeAnimationCurve(NodeIndex);
+}
+
+UAnimSequence* UglTFRuntimeAsset::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadNodeSkeletalAnimation(SkeletalMesh, NodeIndex, SkeletalAnimationConfig);
 }
 
 bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32> NodeIndices, const FString NodeName, FglTFRuntimeNode& Node)
