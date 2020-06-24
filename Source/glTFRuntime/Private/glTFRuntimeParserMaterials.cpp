@@ -1,3 +1,5 @@
+// Copyright 2020, Roberto De Ioris.
+
 #include "glTFRuntimeParser.h"
 
 #include "IImageWrapperModule.h"

@@ -1,3 +1,5 @@
+// Copyright 2020, Roberto De Ioris.
+
 #include "glTFRuntimeParser.h"
 #include "StaticMeshDescription.h"
 
@@ -135,13 +137,23 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	}
 
 	StaticMesh->StaticMaterials = StaticMaterials;
-
+	
 	TArray<UStaticMeshDescription*> MeshDescriptions = { MeshDescription };
 	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, StaticMeshConfig.bBuildSimpleCollision);
 
-	StaticMesh->ComplexCollisionMesh = StaticMeshConfig.ComplexCollisionMesh;
-
 	bool bRebuildPhysicsMeshes = false;
+
+#if WITH_EDITOR
+	StaticMesh->ComplexCollisionMesh = StaticMeshConfig.ComplexCollisionMesh;
+#else
+	if (StaticMeshConfig.ComplexCollisionMesh)
+	{
+		StaticMesh->RenderData->AllocateLODResources(2);
+		StaticMesh->RenderData->LODResources.Insert(&StaticMeshConfig.ComplexCollisionMesh->RenderData->LODResources[0], 1);
+		StaticMesh->LODForCollision = 1;
+		bRebuildPhysicsMeshes = true;
+	}
+#endif
 
 	for (const FBox& Box : StaticMeshConfig.BoxCollisions)
 	{

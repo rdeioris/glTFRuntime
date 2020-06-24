@@ -1,4 +1,4 @@
-// Copyright 2020, Roberto De Ioris
+// Copyright 2020, Roberto De Ioris.
 
 
 #include "glTFRuntimeFunctionLibrary.h"
