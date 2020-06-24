@@ -142,6 +142,40 @@ struct FglTFRuntimeStaticMeshConfig
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletonConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bAddRootBone;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString RootBoneName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FString, FString> BonesNameMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FString, FTransform> BonesTransformMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bNormalizeSkeletonScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 RootNodeIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FString, FglTFRuntimeSocket> Sockets;
+
+	FglTFRuntimeSkeletonConfig()
+	{
+		RootNodeIndex = INDEX_NONE;
+		bNormalizeSkeletonScale = false;
+		bAddRootBone = false;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalMeshConfig
 {
 	GENERATED_BODY()
@@ -150,21 +184,25 @@ struct FglTFRuntimeSkeletalMeshConfig
 	EglTFRuntimeCacheMode CacheMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 RootNodeIndex;
+	USkeleton* Skeleton;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverwriteRefSkeleton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<FString, FTransform> CustomSkeleton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<FString, FglTFRuntimeSocket> Sockets;
+	FglTFRuntimeSkeletonConfig SkeletonConfig;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FglTFRuntimeMaterialsConfig MaterialsConfig;
 
 	FglTFRuntimeSkeletalMeshConfig()
 	{
-		RootNodeIndex = INDEX_NONE;
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
+		bOverwriteRefSkeleton = false;
+		Skeleton = nullptr;
 	}
 };
 
@@ -269,6 +307,7 @@ public:
 	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig);
 	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig);
+	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 
@@ -314,8 +353,8 @@ protected:
 
 	bool LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter);
 
-	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
-	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap);
+	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
+	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
 	void FixNodeParent(FglTFRuntimeNode& Node);
 

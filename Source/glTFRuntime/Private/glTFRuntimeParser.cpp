@@ -266,7 +266,9 @@ bool FglTFRuntimeParser::LoadNodeByName(FString Name, FglTFRuntimeNode& Node)
 
 void FglTFRuntimeParser::AddError(const FString ErrorContext, const FString ErrorMessage)
 {
-	Errors.Add(ErrorContext + ": " + ErrorMessage);
+	FString FullMessage = ErrorContext + ": " + ErrorMessage;
+	Errors.Add(FullMessage);
+	UE_LOG(LogTemp, Error, TEXT("%s"), *FullMessage);
 }
 
 void FglTFRuntimeParser::ClearErrors()
@@ -413,8 +415,6 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			SamplerInterpolation = "LINEAR";
 		}
 
-		//UE_LOG(LogTemp, Error, TEXT("Found sample with %d keyframes and %d values"), Timeline.Num(), Values.Num());
-
 		if (Timeline.Num() != Values.Num())
 			return false;
 
@@ -426,13 +426,6 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 				Duration = Time;
 			}
 		}
-
-		UE_LOG(LogTemp, Error, TEXT("--- --- ---"));
-		for (int32 i = 0; i < Timeline.Num(); i++)
-		{
-			UE_LOG(LogTemp, Error, TEXT("%f = %f, %f, %f, %f"), Timeline[i], Values[i].X, Values[i].Y, Values[i].Z, Values[i].W);
-		}
-		UE_LOG(LogTemp, Error, TEXT("^^^ ^^^ ^^^"));
 
 		Samplers.Add(TPair<TArray<float>, TArray<FVector4>>(Timeline, Values));
 	}
@@ -623,7 +616,40 @@ int32 FglTFRuntimeParser::FindCommonRoot(TArray<int32> Indices)
 	return CurrentRootIndex;
 }
 
-bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+	if (!JsonSkinObject)
+		return nullptr;
+
+	TMap<int32, FName> BoneMap;
+
+	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
+	USkeleton* Skeleton = NewObject<USkeleton>(GetTransientPackage(), NAME_None, RF_Public);
+
+	if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), SkeletalMesh->RefSkeleton, BoneMap, SkeletonConfig))
+	{
+		AddError("FillReferenceSkeleton()", "Unable to fill RefSkeleton.");
+		return nullptr;
+	}
+
+	if (SkeletonConfig.bNormalizeSkeletonScale)
+	{
+		NormalizeSkeletonScale(SkeletalMesh->RefSkeleton);
+	}
+
+	Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
+
+	TArray<FTransform> Transforms = Skeleton->GetReferenceSkeleton().GetRefBonePose();
+	for (FTransform Transform : Transforms)
+	{
+		UE_LOG(LogTemp, Error, TEXT("%f, %f, %f"), Transform.GetLocation().X, Transform.GetLocation().Y, Transform.GetLocation().Z);
+	}
+
+	return Skeleton;
+}
+
+bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	// get the list of valid joints	
 	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
@@ -649,7 +675,14 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	FglTFRuntimeNode RootNode;
 	int64 RootBoneIndex;
 
-	RootBoneIndex = FindCommonRoot(Joints);
+	if (SkeletonConfig.RootNodeIndex > INDEX_NONE)
+	{
+		RootBoneIndex = SkeletonConfig.RootNodeIndex;
+	}
+	else
+	{
+		RootBoneIndex = FindCommonRoot(Joints);
+	}
 
 	if (RootBoneIndex == INDEX_NONE)
 		return false;
@@ -701,28 +734,43 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
 
 	// now traverse from the root and check if the node is in the "joints" list
-	if (!TraverseJoints(Modifier, INDEX_NONE, RootNode, Joints, BoneMap, InverseBindMatricesMap))
+	if (!TraverseJoints(Modifier, INDEX_NONE, RootNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
 		return false;
 
 	return true;
 }
 
-bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap)
+bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
-	// add fake root bone
-	/*if (Parent == INDEX_NONE)
+	// add fake root bone ?
+	if (Parent == INDEX_NONE && SkeletonConfig.bAddRootBone)
 	{
-		Modifier.Add(FMeshBoneInfo("Root", "Root", INDEX_NONE), FTransform::Identity);
+		FName RootBoneName = FName("root");
+		if (!SkeletonConfig.RootBoneName.IsEmpty())
+		{
+			RootBoneName = FName(SkeletonConfig.RootBoneName);
+		}
+		Modifier.Add(FMeshBoneInfo(RootBoneName, RootBoneName.ToString(), INDEX_NONE), FTransform::Identity);
 		Parent = 0;
-	}*/
+	}
 
 	FName BoneName = FName(*Node.Name);
+	if (SkeletonConfig.BonesNameMap.Contains(BoneName.ToString()))
+	{
+		FString BoneNameMapValue = SkeletonConfig.BonesNameMap[BoneName.ToString()];
+		if (BoneNameMapValue.IsEmpty())
+		{
+			AddError("TraverseJoints()", FString::Printf(TEXT("Invalid Bone Name Map for %s"), *BoneName.ToString()));
+			return false;
+		}
+		BoneName = FName(BoneNameMapValue);
+	}
 
-	// first check if a bone with the same name exists, on collision, append an underscore
+	// Check if a bone with the same name exists
 	int32 CollidingIndex = Modifier.FindBoneIndex(BoneName);
 	while (CollidingIndex != INDEX_NONE)
 	{
-		UE_LOG(LogTemp, Error, TEXT("bone %s already exists"), *BoneName.ToString());
+		AddError("TraverseJoints()", FString::Printf(TEXT("Bone %s already exists."), *BoneName.ToString()));
 		return false;
 	}
 
@@ -735,15 +783,9 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 			M *= InverseBindMatricesMap[Node.ParentIndex];
 		}
 
-		/*UE_LOG(LogTemp, Error, TEXT("***** %d *****"), Node.Index);
-		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[0][0], M.M[0][1], M.M[0][2], M.M[0][3]);
-		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[1][0], M.M[1][1], M.M[1][2], M.M[1][3]);
-		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[2][0], M.M[2][1], M.M[2][2], M.M[2][3]);
-		UE_LOG(LogTemp, Error, TEXT("%f %f %f %f"), M.M[3][0], M.M[3][1], M.M[3][2], M.M[3][3]);*/
-
-
 		M.ScaleTranslation(FVector(SceneScale, SceneScale, SceneScale));
-		Transform = FTransform(SceneBasis.Inverse() * M * SceneBasis);
+		FMatrix SkeletonBasis = SceneBasis;
+		Transform = FTransform(SkeletonBasis.Inverse() * M * SkeletonBasis);
 	}
 	else
 	{
@@ -768,7 +810,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 		if (!LoadNode(ChildIndex, ChildNode))
 			return false;
 
-		if (!TraverseJoints(Modifier, NewParentIndex, ChildNode, Joints, BoneMap, InverseBindMatricesMap))
+		if (!TraverseJoints(Modifier, NewParentIndex, ChildNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
 			return false;
 	}
 

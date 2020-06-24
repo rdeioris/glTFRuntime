@@ -59,13 +59,21 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 
 	TMap<int32, FName> BoneMap;
 
-	if (!FillReferenceSkeleton(JsonSkinObject, SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig))
+	if (!FillReferenceSkeleton(JsonSkinObject, SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to fill skeleton!"));
+		AddError("FillReferenceSkeleton()", "Unable to fill RefSkeleton.");
 		return nullptr;
 	}
 
-	//NormalizeSkeletonScale(SkeletalMesh->RefSkeleton);
+	if (SkeletalMeshConfig.SkeletonConfig.bNormalizeSkeletonScale)
+	{
+		NormalizeSkeletonScale(SkeletalMesh->RefSkeleton);
+	}
+
+	if (SkeletalMeshConfig.Skeleton && SkeletalMeshConfig.bOverwriteRefSkeleton)
+	{
+		SkeletalMesh->RefSkeleton = SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
+	}
 
 	TArray<FVector> Points;
 	TArray<int32> PointToRawMap;
@@ -361,21 +369,26 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	SkeletalMesh->Build();
 #endif
 
-	SkeletalMesh->Skeleton = NewObject<USkeleton>(GetTransientPackage(), NAME_None, RF_Public);
-	SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
-
-	for (const TPair<FString, FglTFRuntimeSocket>& Pair : SkeletalMeshConfig.Sockets)
+	if (SkeletalMeshConfig.Skeleton)
 	{
-		USkeletalMeshSocket* SkeletalSocket = NewObject<USkeletalMeshSocket>(SkeletalMesh->Skeleton);
-		SkeletalSocket->SocketName = FName(Pair.Key);
-		SkeletalSocket->BoneName = FName(Pair.Value.BoneName);
-		SkeletalSocket->RelativeLocation = Pair.Value.Transform.GetLocation();
-		SkeletalSocket->RelativeRotation = Pair.Value.Transform.GetRotation().Rotator();
-		SkeletalSocket->RelativeScale = Pair.Value.Transform.GetScale3D();
-		SkeletalMesh->Skeleton->Sockets.Add(SkeletalSocket);
+		SkeletalMesh->Skeleton = SkeletalMeshConfig.Skeleton;
 	}
+	else
+	{
+		SkeletalMesh->Skeleton = NewObject<USkeleton>(GetTransientPackage(), NAME_None, RF_Public);
+		SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
 
-
+		for (const TPair<FString, FglTFRuntimeSocket>& Pair : SkeletalMeshConfig.SkeletonConfig.Sockets)
+		{
+			USkeletalMeshSocket* SkeletalSocket = NewObject<USkeletalMeshSocket>(SkeletalMesh->Skeleton);
+			SkeletalSocket->SocketName = FName(Pair.Key);
+			SkeletalSocket->BoneName = FName(Pair.Value.BoneName);
+			SkeletalSocket->RelativeLocation = Pair.Value.Transform.GetLocation();
+			SkeletalSocket->RelativeRotation = Pair.Value.Transform.GetRotation().Rotator();
+			SkeletalSocket->RelativeScale = Pair.Value.Transform.GetScale3D();
+			SkeletalMesh->Skeleton->Sockets.Add(SkeletalSocket);
+		}
+	}
 
 #if !WITH_EDITOR
 	SkeletalMesh->PostLoad();
@@ -386,8 +399,6 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
-	if (MeshIndex < 0)
-		return nullptr;
 
 	// first check cache
 	if (CanReadFromCache(SkeletalMeshConfig.CacheMode) && SkeletalMeshesCache.Contains(MeshIndex))
@@ -395,44 +406,18 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 		return SkeletalMeshesCache[MeshIndex];
 	}
 
-	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;
-	// no meshes ?
-	if (!Root->TryGetArrayField("meshes", JsonMeshes))
-	{
-		return nullptr;
-	}
-
-	if (MeshIndex >= JsonMeshes->Num())
-	{
-		UE_LOG(LogTemp, Error, TEXT("unable to find mesh %d"), MeshIndex);
-		return nullptr;
-	}
-
-	const TArray<TSharedPtr<FJsonValue>>* JsonSkins;
-	// no skins ?
-	if (!Root->TryGetArrayField("skins", JsonSkins))
-	{
-		UE_LOG(LogTemp, Error, TEXT("unable to find skin %d"), MeshIndex);
-		return nullptr;
-	}
-
-	if (SkinIndex >= JsonSkins->Num())
-	{
-		return nullptr;
-	}
-
-	TSharedPtr<FJsonObject> JsonMeshObject = (*JsonMeshes)[MeshIndex]->AsObject();
+	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 	if (!JsonMeshObject)
 		return nullptr;
 
-	TSharedPtr<FJsonObject> JsonSkinObject = (*JsonSkins)[SkinIndex]->AsObject();
+	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
 	if (!JsonSkinObject)
 		return nullptr;
 
 	USkeletalMesh* SkeletalMesh = LoadSkeletalMesh_Internal(JsonMeshObject.ToSharedRef(), JsonSkinObject.ToSharedRef(), SkeletalMeshConfig);
 	if (!SkeletalMesh)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to load skeletal mesh"));
+		AddError("LoadSkeletalMesh()", "Unable to load SkeletalMesh.");
 		return nullptr;
 	}
 
