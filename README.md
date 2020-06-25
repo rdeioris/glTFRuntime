@@ -27,3 +27,5 @@ join the discord channel: https://discord.gg/DzS7MHy
 # Curve Animations
 
 # Commercial Support
+
+# Sponsors
