@@ -674,10 +674,16 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	// fill the root bone
 	FglTFRuntimeNode RootNode;
 	int64 RootBoneIndex;
+	bool bHasSpecificRoot = false;
 
 	if (SkeletonConfig.RootNodeIndex > INDEX_NONE)
 	{
 		RootBoneIndex = SkeletonConfig.RootNodeIndex;
+	}
+	else if (JsonSkinObject->TryGetNumberField("skeleton", RootBoneIndex))
+	{
+		// use the "skeleton" field as the root bone
+		bHasSpecificRoot = true;
 	}
 	else
 	{
@@ -691,6 +697,19 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	{
 		AddError("FillReferenceSkeleton()", "Unable to load joint node.");
 		return false;
+	}
+
+	if (bHasSpecificRoot && !Joints.Contains(RootBoneIndex))
+	{
+		FglTFRuntimeNode ParentNode = RootNode;
+		while (ParentNode.ParentIndex != INDEX_NONE)
+		{
+			if (!LoadNode(ParentNode.ParentIndex, ParentNode))
+			{
+				return false;
+			}
+			RootNode.Transform *= ParentNode.Transform;
+		}
 	}
 
 	TMap<int32, FMatrix> InverseBindMatricesMap;

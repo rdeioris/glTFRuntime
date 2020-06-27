@@ -289,7 +289,6 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			{
 				FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
 				FVector4 Weights = Primitive.Weights[JointsIndex][Index];
-
 				for (int32 j = 0; j < 4; j++)
 				{
 					if (BoneMap.Contains(Joints[j]))
@@ -304,7 +303,10 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 							BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMap[Joints[j]]);
 							BonesCache.Add(Joints[j], BoneIndex);
 						}
-						InWeights[TotalVertexIndex].InfluenceWeights[j] = Weights[j] * 255;
+
+						uint8 QuantizedWeight = FMath::Clamp((uint8)(Weights[j] * ((double)0xFF)), (uint8)0x00, (uint8)0xFF);
+
+						InWeights[TotalVertexIndex].InfluenceWeights[j] = QuantizedWeight;
 						InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
 					}
 					else
@@ -562,10 +564,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		return nullptr;
 	}
 
+	int32 NumFrames = Duration * 30;
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 	AnimSequence->SetSkeleton(SkeletalMesh->Skeleton);
 	AnimSequence->SetPreviewMesh(SkeletalMesh);
-	AnimSequence->SetRawNumberOfFrame(Duration * 30);
+	AnimSequence->SetRawNumberOfFrame(NumFrames);
 	AnimSequence->SequenceLength = Duration;
 	AnimSequence->bEnableRootMotion = AnimationConfig.bRootMotion;
 
@@ -574,10 +577,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 
 #if !WITH_EDITOR
 	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
-	CompressionCodec->Tracks.AddDefaulted(Tracks.Num());
+	CompressionCodec->Tracks.AddDefaulted(BonesPoses.Num());
 #endif
 
-	// tracks here will be already sanitized
+	TArray<FTransform> BonePoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
+
 	for (TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
 	{
 		FName BoneName = FName(Pair.Key);
@@ -587,6 +591,75 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 			AddError("LoadSkeletalAnimation()", FString::Printf(TEXT("Unable to find bone %s"), *Pair.Key));
 			continue;
 		}
+
+		UE_LOG(LogTemp, Error, TEXT("Bone: %s %d %d %d (%d)"), *BoneName.ToString(), Pair.Value.PosKeys.Num(), Pair.Value.RotKeys.Num(), Pair.Value.ScaleKeys.Num(), NumFrames);
+
+		// sanitize curves
+		// positions
+		if (Pair.Value.PosKeys.Num() == 0)
+		{
+			for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
+			{
+				Pair.Value.PosKeys.Add(BonePoses[BoneIndex].GetLocation());
+			}
+		}
+		else if (Pair.Value.PosKeys.Num() < NumFrames)
+		{
+			FVector LastValidPosition = Pair.Value.PosKeys.Last();
+			int32 FirstNewFrame = Pair.Value.PosKeys.Num();
+			for (int32 FrameIndex = FirstNewFrame; FrameIndex < NumFrames; FrameIndex++)
+			{
+				Pair.Value.PosKeys.Add(LastValidPosition);
+			}
+		}
+		else
+		{
+			Pair.Value.PosKeys.RemoveAt(NumFrames, Pair.Value.PosKeys.Num() - NumFrames, true);
+		}
+
+		// rotations
+		if (Pair.Value.RotKeys.Num() == 0)
+		{
+			for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
+			{
+				Pair.Value.RotKeys.Add(BonePoses[BoneIndex].GetRotation());
+			}
+		}
+		else if (Pair.Value.RotKeys.Num() < NumFrames)
+		{
+			FQuat LastValidRotation = Pair.Value.RotKeys.Last();
+			int32 FirstNewFrame = Pair.Value.RotKeys.Num();
+			for (int32 FrameIndex = FirstNewFrame; FrameIndex < NumFrames; FrameIndex++)
+			{
+				Pair.Value.RotKeys.Add(LastValidRotation);
+			}
+		}
+		else
+		{
+			Pair.Value.RotKeys.RemoveAt(NumFrames, Pair.Value.RotKeys.Num() - NumFrames, true);
+		}
+
+		if (Pair.Value.ScaleKeys.Num() == 0)
+		{
+			for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
+			{
+				Pair.Value.ScaleKeys.Add(BonePoses[BoneIndex].GetScale3D());
+			}
+		}
+		else if (Pair.Value.ScaleKeys.Num() < NumFrames)
+		{
+			FVector LastValidScale = Pair.Value.ScaleKeys.Last();
+			int32 FirstNewFrame = Pair.Value.ScaleKeys.Num();
+			for (int32 FrameIndex = FirstNewFrame; FrameIndex < NumFrames; FrameIndex++)
+			{
+				Pair.Value.ScaleKeys.Add(LastValidScale);
+			}
+		}
+		else
+		{
+			Pair.Value.ScaleKeys.RemoveAt(NumFrames, Pair.Value.ScaleKeys.Num() - NumFrames, true);
+		}
+
 
 		if (BoneIndex == 0)
 		{
