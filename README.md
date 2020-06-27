@@ -30,6 +30,8 @@ join the discord channel: https://discord.gg/DzS7MHy
 # TODO/WIP
 
 * LODs
+* Vertex Colors
+* Async Loading
 * Import Scenes as Sequencer Assets
 * Generate Physics Assets at runtime
 * Instancing Extension (https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Vendor/EXT_mesh_gpu_instancing/README.md)
