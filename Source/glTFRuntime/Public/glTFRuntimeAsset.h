@@ -60,6 +60,9 @@ public:
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool NodeIsBone(const int32 NodeIndex);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
@@ -68,8 +71,14 @@ public:
 	bool LoadFromFilename(const FString Filename);
 	bool LoadFromString(const FString JsonData);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;
+
+	UPROPERTY(BlueprintAssignable, Category = "glTFRuntime")
+	FglTFRuntimeError OnError;
+
+	UFUNCTION()
+	void OnErrorProxy(const FString ErrorContext, const FString ErrorMessage);
 
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;

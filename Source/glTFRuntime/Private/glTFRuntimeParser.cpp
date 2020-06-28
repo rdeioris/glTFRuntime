@@ -1,7 +1,8 @@
 // Copyright 2020, Roberto De Ioris.
 
-
 #include "glTFRuntimeParser.h"
+
+DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString Filename)
 {
@@ -249,7 +250,9 @@ bool FglTFRuntimeParser::LoadNodeByName(FString Name, FglTFRuntimeNode& Node)
 	if (!bAllNodesCached)
 	{
 		if (!LoadNodes())
+		{
 			return false;
+		}
 	}
 
 	for (FglTFRuntimeNode& NodeRef : AllNodesCache)
@@ -268,7 +271,11 @@ void FglTFRuntimeParser::AddError(const FString ErrorContext, const FString Erro
 {
 	FString FullMessage = ErrorContext + ": " + ErrorMessage;
 	Errors.Add(FullMessage);
-	UE_LOG(LogTemp, Error, TEXT("%s"), *FullMessage);
+	UE_LOG(LogGLTFRuntime, Error, TEXT("%s"), *FullMessage);
+	if (OnError.IsBound())
+	{
+		OnError.Broadcast(ErrorContext, ErrorMessage);
+	}
 }
 
 void FglTFRuntimeParser::ClearErrors()
@@ -640,13 +647,46 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 
 	Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
 
-	TArray<FTransform> Transforms = Skeleton->GetReferenceSkeleton().GetRefBonePose();
-	for (FTransform Transform : Transforms)
+	return Skeleton;
+}
+
+bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
+{
+	const TArray<TSharedPtr<FJsonValue>>* JsonSkins;
+	if (!Root->TryGetArrayField("skins", JsonSkins))
 	{
-		UE_LOG(LogTemp, Error, TEXT("%f, %f, %f"), Transform.GetLocation().X, Transform.GetLocation().Y, Transform.GetLocation().Z);
+		return false;
 	}
 
-	return Skeleton;
+	for (TSharedPtr<FJsonValue> JsonSkin : *JsonSkins)
+	{
+		TSharedPtr<FJsonObject> JsonSkinObject = JsonSkin->AsObject();
+		if (!JsonSkinObject)
+		{
+			continue;
+		}
+
+		const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+		if (!JsonSkinObject->TryGetArrayField("joints", JsonJoints))
+		{
+			continue;
+		}
+
+		for (TSharedPtr<FJsonValue> JsonJoint : *JsonJoints)
+		{
+			int64 JointIndex;
+			if (!JsonJoint->TryGetNumber(JointIndex))
+			{
+				continue;
+			}
+			if (JointIndex == NodeIndex)
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)

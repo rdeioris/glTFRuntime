@@ -44,6 +44,12 @@ void AglTFRuntimeAssetActor::BeginPlay()
 
 void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, FglTFRuntimeNode& Node)
 {
+	// skip bones/joints
+	if (Asset->NodeIsBone(Node.Index))
+	{
+		return;
+	}
+
 	USceneComponent* NewComponent = nullptr;
 	if (Node.MeshIndex < 0)
 	{

@@ -19,6 +19,12 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString Filename)
 	}
 
 	Parser = FglTFRuntimeParser::FromFilename(Filename);
+	if (Parser)
+	{
+		FScriptDelegate Delegate;
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnErrorProxy));
+		Parser->OnError.Add(Delegate);
+	}
 	return Parser != nullptr;
 }
 
@@ -31,7 +37,21 @@ bool UglTFRuntimeAsset::LoadFromString(const FString JsonData)
 	}
 
 	Parser = FglTFRuntimeParser::FromString(JsonData);
+	if (Parser)
+	{
+		FScriptDelegate Delegate;
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnErrorProxy));
+		Parser->OnError.Add(Delegate);
+	}
 	return Parser != nullptr;
+}
+
+void UglTFRuntimeAsset::OnErrorProxy(const FString ErrorContext, const FString ErrorMessage)
+{
+	if (OnError.IsBound())
+	{
+		OnError.Broadcast(ErrorContext, ErrorMessage);
+	}
 }
 
 TArray<FglTFRuntimeScene> UglTFRuntimeAsset::GetScenes()
@@ -133,6 +153,13 @@ bool UglTFRuntimeAsset::BuildTransformFromNodeBackward(const int32 NodeIndex, FT
 	}
 
 	return true;
+}
+
+bool UglTFRuntimeAsset::NodeIsBone(const int32 NodeIndex)
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->NodeIsBone(NodeIndex);
 }
 
 bool UglTFRuntimeAsset::BuildTransformFromNodeForward(const int32 NodeIndex, const int32 LastNodeIndex, FTransform& Transform)

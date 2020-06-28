@@ -47,9 +47,9 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 
 	// get primitives
 	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
-	// no meshes ?
 	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
 	{
+		AddError("LoadSkeletalMesh_Internal()", "No primitives defined in the asset.");
 		return nullptr;
 	}
 
@@ -63,7 +63,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 
 	if (!FillReferenceSkeleton(JsonSkinObject, SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
 	{
-		AddError("FillReferenceSkeleton()", "Unable to fill RefSkeleton.");
+		AddError("LoadSkeletalMesh_Internal()", "Unable to fill RefSkeleton.");
 		return nullptr;
 	}
 
@@ -143,7 +143,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 					}
 					else
 					{
-						UE_LOG(LogTemp, Error, TEXT("Unable to find map for bone %u"), Joints[JointPartIndex]);
+						AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[JointPartIndex]));
 						return nullptr;
 					}
 				}
@@ -311,7 +311,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 					}
 					else
 					{
-						AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
+						AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
 						return nullptr;
 					}
 				}
@@ -412,11 +412,17 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 	if (!JsonMeshObject)
+	{
+		AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
 		return nullptr;
+	}
 
 	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
 	if (!JsonSkinObject)
+	{
+		AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Skin with index %d"), SkinIndex));
 		return nullptr;
+	}
 
 	USkeletalMesh* SkeletalMesh = LoadSkeletalMesh_Internal(JsonMeshObject.ToSharedRef(), JsonSkinObject.ToSharedRef(), SkeletalMeshConfig);
 	if (!SkeletalMesh)
@@ -443,6 +449,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
 	if (!Root->TryGetArrayField("animations", JsonAnimations))
 	{
+		AddError("LoadSkeletalAnimationByName()", "No animations defined in the asset.");
 		return nullptr;
 	}
 
@@ -483,18 +490,21 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 
 	if (Node.SkinIndex < 0)
 	{
+		AddError("LoadNodeSkeletalAnimation()", FString::Printf(TEXT("No skin defined for node %d"), NodeIndex));
 		return nullptr;
 	}
 
 	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", Node.SkinIndex);
 	if (!JsonSkinObject)
 	{
+		AddError("LoadNodeSkeletalAnimation()", "No skins defined in the asset");
 		return nullptr;
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
 	if (!JsonSkinObject->TryGetArrayField("joints", JsonJoints))
 	{
+		AddError("LoadNodeSkeletalAnimation()", "No joints defined in the skin");
 		return nullptr;
 	}
 
@@ -512,6 +522,7 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
 	if (!Root->TryGetArrayField("animations", JsonAnimations))
 	{
+		AddError("LoadNodeSkeletalAnimation()", "No animations defined in the asset");
 		return nullptr;
 	}
 
@@ -554,6 +565,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	TSharedPtr<FJsonObject> JsonAnimationObject = GetJsonObjectFromRootIndex("animations", AnimationIndex);
 	if (!JsonAnimationObject)
 	{
+		AddError("LoadNodeSkeletalAnimation()", FString::Printf(TEXT("Unable to find animation %d"), AnimationIndex));
 		return nullptr;
 	}
 
@@ -592,9 +604,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 			continue;
 		}
 
-		UE_LOG(LogTemp, Error, TEXT("Bone: %s %d %d %d (%d)"), *BoneName.ToString(), Pair.Value.PosKeys.Num(), Pair.Value.RotKeys.Num(), Pair.Value.ScaleKeys.Num(), NumFrames);
-
 		// sanitize curves
+
 		// positions
 		if (Pair.Value.PosKeys.Num() == 0)
 		{
@@ -712,7 +723,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-}
+			}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {

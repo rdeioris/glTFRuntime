@@ -9,6 +9,10 @@
 
 #include "glTFRuntimeParser.generated.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeError, const FString, ErrorContext, const FString, ErrorMessage);
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeScene
 {
@@ -331,6 +335,10 @@ public:
 
 	void AddError(const FString ErrorContext, const FString ErrorMessage);
 	void ClearErrors();
+
+	bool NodeIsBone(const int32 NodeIndex);
+
+	FglTFRuntimeError OnError;
 
 protected:
 	TSharedRef<FJsonObject> Root;
