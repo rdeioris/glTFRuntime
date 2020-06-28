@@ -14,6 +14,7 @@ join the discord channel: https://discord.gg/DzS7MHy
 * Support for glTF 2.0 Sparse Accessors
 * Support for multiple texture coordinates/channels/uvs
 * Allows to define Static Meshes collisions (Spheres, Boxes, Complex Meshes) at runtime.
+* StaticMeshes/SkeletalMeshes merger (combine multiple meshes in a single one)
 
 # Quickstart
 
