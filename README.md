@@ -34,6 +34,7 @@ join the discord channel: https://discord.gg/DzS7MHy
 * Async Loading
 * Import Scenes as Sequencer Assets
 * Generate Physics Assets at runtime
+* Support for glTF binary files
 * Instancing Extension (https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Vendor/EXT_mesh_gpu_instancing/README.md)
 * MSFT_lod extension (https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Vendor/MSFT_lod/README.md)
 
