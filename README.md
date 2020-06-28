@@ -45,7 +45,8 @@ join the discord channel: https://discord.gg/DzS7MHy
 
 # Commercial Support
 
-Commercial support is offered by Unbit (Rome, Italy). Just enter the discord server and direct message the admin, or drop a mail to info at unbit dot it
+Commercial support is offered by Unbit (Rome, Italy).
+Just enter the discord server and direct message the admin, or drop a mail to info at unbit dot it
 
 # Thanks
 
