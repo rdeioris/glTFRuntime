@@ -24,9 +24,6 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from String"), Category = "glTFRuntime")
 	static UglTFRuntimeAsset* glTFLoadAssetFromString(const FString JsonData);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from File Dialog"), Category = "glTFRuntime")
-	static UglTFRuntimeAsset* glTFLoadAssetFromFileDialog(const FString Title);
-
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Url", AutoCreateRefTerm = "Headers"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromUrl(const FString Url, TMap<FString, FString> Headers, FglTFRuntimeHttpResponse Completed);
 	

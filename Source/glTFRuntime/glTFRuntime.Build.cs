@@ -28,7 +28,7 @@ public class glTFRuntime : ModuleRules
             {
                 "Core"
 				// ... add other public dependencies that you statically link with here ...
-			}
+            }
             );
 
 
@@ -37,14 +37,12 @@ public class glTFRuntime : ModuleRules
             {
                 "CoreUObject",
                 "Engine",
-                "SlateCore",
                 "JSON",
                 "MeshDescription",
                 "StaticMeshDescription",
                 "RenderCore",
                 "RHI",
                 "ApplicationCore",
-                "DesktopPlatform",
                 "Http"
 				// ... add private dependencies that you statically link with here ...	
 			}
