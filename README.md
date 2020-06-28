@@ -27,6 +27,8 @@ join the discord channel: https://discord.gg/DzS7MHy
 
 # Curve Animations
 
+# Errors Management
+
 # Integration with LuaMachine
 
 # TODO/WIP
