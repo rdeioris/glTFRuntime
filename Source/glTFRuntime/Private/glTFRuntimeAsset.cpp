@@ -5,7 +5,7 @@
 
 #define GLTF_CHECK_PARSER(RetValue) if (!Parser)\
 	{\
-		UE_LOG(LogTemp, Error, TEXT("No glTF Asset loaded."));\
+		UE_LOG(LogGLTFRuntime, Error, TEXT("No glTF Asset loaded."));\
 		return RetValue;\
 	}\
 
@@ -24,6 +24,10 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString Filename)
 		FScriptDelegate Delegate;
 		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnErrorProxy));
 		Parser->OnError.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnStaticMeshCreatedProxy));
+		Parser->OnStaticMeshCreated.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnSkeletalMeshCreatedProxy));
+		Parser->OnSkeletalMeshCreated.Add(Delegate);
 	}
 	return Parser != nullptr;
 }
@@ -42,6 +46,10 @@ bool UglTFRuntimeAsset::LoadFromString(const FString JsonData)
 		FScriptDelegate Delegate;
 		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnErrorProxy));
 		Parser->OnError.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnStaticMeshCreatedProxy));
+		Parser->OnStaticMeshCreated.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnSkeletalMeshCreatedProxy));
+		Parser->OnSkeletalMeshCreated.Add(Delegate);
 	}
 	return Parser != nullptr;
 }
@@ -51,6 +59,22 @@ void UglTFRuntimeAsset::OnErrorProxy(const FString ErrorContext, const FString E
 	if (OnError.IsBound())
 	{
 		OnError.Broadcast(ErrorContext, ErrorMessage);
+	}
+}
+
+void UglTFRuntimeAsset::OnStaticMeshCreatedProxy(UStaticMesh* StaticMesh)
+{
+	if (OnStaticMeshCreated.IsBound())
+	{
+		OnStaticMeshCreated.Broadcast(StaticMesh);
+	}
+}
+
+void UglTFRuntimeAsset::OnSkeletalMeshCreatedProxy(USkeletalMesh* SkeletalMesh)
+{
+	if (OnSkeletalMeshCreated.IsBound())
+	{
+		OnSkeletalMeshCreated.Broadcast(SkeletalMesh);
 	}
 }
 

@@ -13,6 +13,9 @@ DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeError, const FString, ErrorContext, const FString, ErrorMessage);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnStaticMeshCreated, UStaticMesh*, StaticMesh);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnSkeletalMeshCreated, USkeletalMesh*, SkeletalMesh);
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeScene
 {
@@ -131,7 +134,13 @@ struct FglTFRuntimeStaticMeshConfig
 	TArray<FVector4> SphereCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	UStaticMesh* ComplexCollisionMesh;
+	TEnumAsByte<ECollisionTraceFlag> CollisionComplexity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAllowCPUAccess;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Outer;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FglTFRuntimeMaterialsConfig MaterialsConfig;
@@ -141,7 +150,9 @@ struct FglTFRuntimeStaticMeshConfig
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
 		bReverseWinding = false;
 		bBuildSimpleCollision = false;
-		ComplexCollisionMesh = nullptr;
+		Outer = nullptr;
+		CollisionComplexity = ECollisionTraceFlag::CTF_UseDefault;
+		bAllowCPUAccess = true;
 	}
 };
 
@@ -300,7 +311,7 @@ public:
 	UStaticMesh* LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UMaterialInterface* LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
-	UTexture2D* LoadTexture(const int32 TextureIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UTexture2D* LoadTexture(UObject* Outer, const int32 TextureIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	bool LoadNodes();
 	bool LoadNode(int32 NodeIndex, FglTFRuntimeNode& Node);
@@ -339,6 +350,8 @@ public:
 	bool NodeIsBone(const int32 NodeIndex);
 
 	FglTFRuntimeError OnError;
+	FglTFRuntimeOnStaticMeshCreated OnStaticMeshCreated;
+	FglTFRuntimeOnSkeletalMeshCreated OnSkeletalMeshCreated;
 
 protected:
 	TSharedRef<FJsonObject> Root;

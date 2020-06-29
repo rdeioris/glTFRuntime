@@ -77,8 +77,20 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "glTFRuntime")
 	FglTFRuntimeError OnError;
 
+	UPROPERTY(BlueprintAssignable, Category = "glTFRuntime")
+	FglTFRuntimeOnStaticMeshCreated OnStaticMeshCreated;
+
+	UPROPERTY(BlueprintAssignable, Category = "glTFRuntime")
+	FglTFRuntimeOnSkeletalMeshCreated OnSkeletalMeshCreated;
+
 	UFUNCTION()
 	void OnErrorProxy(const FString ErrorContext, const FString ErrorMessage);
+
+	UFUNCTION()
+	void OnStaticMeshCreatedProxy(UStaticMesh* StaticMesh);
+
+	UFUNCTION()
+	void OnSkeletalMeshCreatedProxy(USkeletalMesh* SkeletalMesh);
 
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;

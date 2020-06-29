@@ -525,7 +525,8 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 			{
 				FVector4 RotationValue = Values[TimeIndex];
 				FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
-				AnimationCurve->AddRotationValue(Timeline[TimeIndex], Quat.Euler(), ERichCurveInterpMode::RCIM_Linear);
+				FVector Euler = Quat.Euler();
+				AnimationCurve->AddRotationValue(Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "scale")

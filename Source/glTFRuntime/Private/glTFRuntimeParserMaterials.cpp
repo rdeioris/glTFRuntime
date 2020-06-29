@@ -4,6 +4,8 @@
 
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
+#include "ImageUtils.h"
+#include "Logging/LogSuppressionInterface.h"
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
@@ -43,7 +45,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 	}
 	else if (AlphaMode != "OPAQUE")
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unsupported alphaMode"));
+		AddError("LoadMaterial_Internal()", "Unsupported alphaMode");
 		return nullptr;
 	}
 
@@ -109,11 +111,14 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			if (!(*JsonBaseColorTextureObject)->TryGetNumberField("index", TextureIndex))
 				return nullptr;
 
-			UTexture2D* Texture = LoadTexture(TextureIndex, MaterialsConfig);
+			UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
 			if (!Texture)
+			{
 				return nullptr;
+			}
 
 			Material->SetTextureParameterValue("baseColorTexture", Texture);
+
 			if (!AssignTexCoord(*JsonBaseColorTextureObject, Material, "baseColorTexCoord"))
 			{
 				return nullptr;
@@ -138,7 +143,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			if (!(*JsonMetallicRoughnessTextureObject)->TryGetNumberField("index", TextureIndex))
 				return nullptr;
 
-			UTexture2D* Texture = LoadTexture(TextureIndex, MaterialsConfig);
+			UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
 			if (!Texture)
 				return nullptr;
 
@@ -157,7 +162,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonNormalTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadTexture(TextureIndex, MaterialsConfig);
+		UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
 		if (!Texture)
 			return nullptr;
 
@@ -192,7 +197,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonEmissiveTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadTexture(TextureIndex, MaterialsConfig);
+		UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
 		if (!Texture)
 			return nullptr;
 
@@ -215,7 +220,7 @@ bool FglTFRuntimeParser::AssignTexCoord(TSharedPtr<FJsonObject> JsonTextureObjec
 	}
 	if (TexCoord < 0 || TexCoord > 3)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Invalid UV Set for %s: %lld"), *MaterialParam.ToString(), TexCoord);
+		AddError("AssignTexCoord", FString::Printf(TEXT("Invalid UV Set for %s: %lld"), *MaterialParam.ToString(), TexCoord));
 		return false;
 	}
 	FVector4 UVSet = FVector4(0, 0, 0, 0);
@@ -224,14 +229,13 @@ bool FglTFRuntimeParser::AssignTexCoord(TSharedPtr<FJsonObject> JsonTextureObjec
 	return true;
 }
 
-UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	if (Index < 0)
 		return nullptr;
 
 	if (MaterialsConfig.TexturesOverrideMap.Contains(Index))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Found overriden texture for %d"), Index);
 		return MaterialsConfig.TexturesOverrideMap[Index];
 	}
 
@@ -278,7 +282,6 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 Index, const FglTFRuntim
 
 	if (MaterialsConfig.ImagesOverrideMap.Contains(ImageIndex))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Found overriden image for %d"), ImageIndex);
 		return MaterialsConfig.ImagesOverrideMap[ImageIndex];
 	}
 
@@ -305,7 +308,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 Index, const FglTFRuntim
 			int64 Stride;
 			if (!GetBufferView(BufferViewIndex, Bytes, Stride))
 			{
-				UE_LOG(LogTemp, Error, TEXT("unable to get bufferView: %d"), BufferViewIndex);
+				AddError("LoadTexture()", FString::Printf(TEXT("Unable to get bufferView: %d"), BufferViewIndex));
 				return nullptr;
 			}
 		}
@@ -319,26 +322,26 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 Index, const FglTFRuntim
 	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Bytes.GetData(), Bytes.Num());
 	if (ImageFormat == EImageFormat::Invalid)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to detect image format"));
+		AddError("LoadTexture()", "Unable to detect image format");
 		return nullptr;
 	}
 
 	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
 	if (!ImageWrapper.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to create ImageWrapper"));
+		AddError("LoadTexture()", "Unable to create ImageWrapper");
 		return nullptr;
 	}
 	if (!ImageWrapper->SetCompressed(Bytes.GetData(), Bytes.Num()))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to parse image data"));
+		AddError("LoadTexture()", "Unable to parse image data");
 		return nullptr;
 	}
 
 	TArray<uint8> UncompressedBytes;
 	if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Unable to get raw image data"));
+		AddError("LoadTexture()", "Unable to get raw image data");
 		return nullptr;
 	}
 
@@ -346,19 +349,50 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 Index, const FglTFRuntim
 	int32 Width = ImageWrapper->GetWidth();
 	int32 Height = ImageWrapper->GetHeight();
 
-	UTexture2D* Texture = UTexture2D::CreateTransient(Width, Height, PixelFormat);
-	if (!Texture)
-		return nullptr;
+	if (Width > 0 && Height > 0 &&
+		(Width % GPixelFormats[PixelFormat].BlockSizeX) == 0 &&
+		(Height % GPixelFormats[PixelFormat].BlockSizeY) == 0)
+	{
 
-	FTexture2DMipMap& Mip = Texture->PlatformData->Mips[0];
-	void* Data = Mip.BulkData.Lock(LOCK_READ_WRITE);
-	FMemory::Memcpy(Data, UncompressedBytes.GetData(), UncompressedBytes.Num());
-	Mip.BulkData.Unlock();
-	Texture->UpdateResource();
+		UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
 
-	TexturesCache.Add(Index, Texture);
+		Texture->PlatformData = new FTexturePlatformData();
+		Texture->PlatformData->SizeX = Width;
+		Texture->PlatformData->SizeY = Height;
+		Texture->PlatformData->PixelFormat = PixelFormat;
 
-	return Texture;
+		FTexture2DMipMap* Mip = new FTexture2DMipMap();
+		Texture->PlatformData->Mips.Add(Mip);
+		Mip->SizeX = Width;
+		Mip->SizeY = Height;
+#if !WITH_EDITOR
+		ELogVerbosity::Type CurrentLogSerializationVerbosity = LogSerialization.GetVerbosity();
+		bool bResetLogVerbosity = false;
+		if (CurrentLogSerializationVerbosity >= ELogVerbosity::Warning)
+		{
+			LogSerialization.SetVerbosity(ELogVerbosity::Error);
+			bResetLogVerbosity = true;
+	}
+#endif
+		Mip->BulkData.Lock(LOCK_READ_WRITE);
+#if !WITH_EDITOR
+		if (bResetLogVerbosity)
+		{
+			LogSerialization.SetVerbosity(CurrentLogSerializationVerbosity);
+}
+#endif
+		void* Data = Mip->BulkData.Realloc(UncompressedBytes.Num());
+		FMemory::Memcpy(Data, UncompressedBytes.GetData(), UncompressedBytes.Num());
+		Mip->BulkData.Unlock();
+
+		Texture->UpdateResource();
+
+		TexturesCache.Add(Index, Texture);
+
+		return Texture;
+}
+
+	return nullptr;
 }
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)

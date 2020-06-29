@@ -2,6 +2,7 @@
 
 #include "glTFRuntimeParser.h"
 #include "StaticMeshDescription.h"
+#include "PhysXCookHelper.h"
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
@@ -17,11 +18,14 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	if (!LoadPrimitives(JsonPrimitives, Primitives, MaterialsConfig))
 		return nullptr;
 
-	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(GetTransientPackage(), NAME_None, RF_Public);
+	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(StaticMeshConfig.Outer ? StaticMeshConfig.Outer : GetTransientPackage(), NAME_None, RF_Public);
+	StaticMesh->bAllowCPUAccess = StaticMeshConfig.bAllowCPUAccess;
 
 	UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
 
 	TArray<FStaticMaterial> StaticMaterials;
+
+	TArray<uint32> CPUVertexInstancesIDs;
 
 	int32 NumUVs = 1;
 	for (FglTFRuntimePrimitive& Primitive : Primitives)
@@ -67,6 +71,12 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 				return false;
 
 			FVertexInstanceID NewVertexInstanceID = MeshDescription->CreateVertexInstance(VerticesIDs[VertexIndex]);
+
+			if (StaticMesh->bAllowCPUAccess)
+			{
+				CPUVertexInstancesIDs.Add(NewVertexInstanceID.GetValue());
+			}
+
 			if (Primitive.Normals.Num() > 0)
 			{
 				if (VertexIndex >= (uint32)Primitive.Normals.Num())
@@ -137,30 +147,43 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	}
 
 	StaticMesh->StaticMaterials = StaticMaterials;
-	
+
 	TArray<UStaticMeshDescription*> MeshDescriptions = { MeshDescription };
-	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, StaticMeshConfig.bBuildSimpleCollision);
+	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, false);
 
-	bool bRebuildPhysicsMeshes = false;
-
-#if WITH_EDITOR
-	StaticMesh->ComplexCollisionMesh = StaticMeshConfig.ComplexCollisionMesh;
-#else
-	if (StaticMeshConfig.ComplexCollisionMesh)
+	if (!StaticMesh->BodySetup)
 	{
-		StaticMesh->RenderData->AllocateLODResources(2);
-		StaticMesh->RenderData->LODResources.Insert(&StaticMeshConfig.ComplexCollisionMesh->RenderData->LODResources[0], 1);
-		StaticMesh->LODForCollision = 1;
-		bRebuildPhysicsMeshes = true;
+		StaticMesh->CreateBodySetup();
+	}
+
+	StaticMesh->BodySetup->bMeshCollideAll = false;
+	StaticMesh->BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
+
+	StaticMesh->BodySetup->InvalidatePhysicsData();
+
+#if !WITH_EDITOR
+	if (StaticMesh->bAllowCPUAccess)
+	{
+		FStaticMeshLODResources& LOD = StaticMesh->RenderData->LODResources[0];
+		//LOD.ReleaseResources();
+		LOD.IndexBuffer = FRawStaticIndexBuffer(true);
+		LOD.IndexBuffer.SetIndices(CPUVertexInstancesIDs, EIndexBufferStride::AutoDetect);
+		//LOD.InitResources(StaticMesh);
 	}
 #endif
 
+	if (StaticMeshConfig.bBuildSimpleCollision)
+	{
+		FKBoxElem BoxElem;
+		BoxElem.Center = StaticMesh->RenderData->Bounds.Origin;
+		BoxElem.X = StaticMesh->RenderData->Bounds.BoxExtent.X * 2.0f;
+		BoxElem.Y = StaticMesh->RenderData->Bounds.BoxExtent.Y * 2.0f;
+		BoxElem.Z = StaticMesh->RenderData->Bounds.BoxExtent.Z * 2.0f;
+		StaticMesh->BodySetup->AggGeom.BoxElems.Add(BoxElem);
+	}
+
 	for (const FBox& Box : StaticMeshConfig.BoxCollisions)
 	{
-		if (!StaticMesh->BodySetup)
-		{
-			StaticMesh->CreateBodySetup();
-		}
 		FKBoxElem BoxElem;
 		BoxElem.Center = Box.GetCenter();
 		FVector BoxSize = Box.GetSize();
@@ -168,25 +191,21 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 		BoxElem.Y = BoxSize.Y;
 		BoxElem.Z = BoxSize.Z;
 		StaticMesh->BodySetup->AggGeom.BoxElems.Add(BoxElem);
-		bRebuildPhysicsMeshes = true;
 	}
 
 	for (const FVector4 Sphere : StaticMeshConfig.SphereCollisions)
 	{
-		if (!StaticMesh->BodySetup)
-		{
-			StaticMesh->CreateBodySetup();
-		}
 		FKSphereElem SphereElem;
 		SphereElem.Center = Sphere;
 		SphereElem.Radius = Sphere.W;
 		StaticMesh->BodySetup->AggGeom.SphereElems.Add(SphereElem);
-		bRebuildPhysicsMeshes = true;
 	}
 
-	if (bRebuildPhysicsMeshes)
+	StaticMesh->BodySetup->CreatePhysicsMeshes();
+
+	if (OnStaticMeshCreated.IsBound())
 	{
-		StaticMesh->BodySetup->CreatePhysicsMeshes();
+		OnStaticMeshCreated.Broadcast(StaticMesh);
 	}
 
 	return StaticMesh;

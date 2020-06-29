@@ -398,6 +398,11 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	SkeletalMesh->PostLoad();
 #endif
 
+	if (OnSkeletalMeshCreated.IsBound())
+	{
+		OnSkeletalMeshCreated.Broadcast(SkeletalMesh);
+	}
+
 	return SkeletalMesh;
 }
 
