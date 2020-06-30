@@ -165,10 +165,16 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	if (StaticMesh->bAllowCPUAccess)
 	{
 		FStaticMeshLODResources& LOD = StaticMesh->RenderData->LODResources[0];
-		//LOD.ReleaseResources();
-		LOD.IndexBuffer = FRawStaticIndexBuffer(true);
-		LOD.IndexBuffer.SetIndices(CPUVertexInstancesIDs, EIndexBufferStride::AutoDetect);
-		//LOD.InitResources(StaticMesh);
+		ENQUEUE_RENDER_COMMAND(InitCommand)(
+			[&LOD, &CPUVertexInstancesIDs](FRHICommandListImmediate& RHICmdList)
+		{
+			LOD.IndexBuffer.ReleaseResource();
+			LOD.IndexBuffer = FRawStaticIndexBuffer(true);
+			LOD.IndexBuffer.SetIndices(CPUVertexInstancesIDs, EIndexBufferStride::AutoDetect);
+			LOD.IndexBuffer.InitResource();
+		});
+
+		FlushRenderingCommands();
 	}
 #endif
 
