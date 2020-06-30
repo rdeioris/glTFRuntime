@@ -943,7 +943,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TEXCOORD_0", UV,
 			{ 2 }, { 5126, 5121, 5123 }, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, Value.Y); }))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Error loading uvs 0"));
+			AddError("LoadPrimitive()", "Error loading TEXCOORD_0");
 			return false;
 		}
 
@@ -956,7 +956,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TEXCOORD_1", UV,
 			{ 2 }, { 5126, 5121, 5123 }, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, Value.Y); }))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Error loading uvs 1"));
+			AddError("LoadPrimitive()", "Error loading TEXCOORD_1");
 			return false;
 		}
 
@@ -969,7 +969,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_0", Joints,
 			{ 4 }, { 5121, 5123 }, false))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Error loading joints 0"));
+			AddError("LoadPrimitive()", "Error loading JOINTS_0");
 			return false;
 		}
 
@@ -982,7 +982,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_1", Joints,
 			{ 4 }, { 5121, 5123 }, false))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Error loading joints 1"));
+			AddError("LoadPrimitive()", "Error loading JOINTS_1");
 			return false;
 		}
 
@@ -995,7 +995,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_0", Weights,
 			{ 4 }, { 5126, 5121, 5123 }, true))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Error loading weights 0"));
+			AddError("LoadPrimitive()", "Error loading WEIGHTS_0");
 			return false;
 		}
 		Primitive.Weights.Add(Weights);
@@ -1007,7 +1007,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_1", Weights,
 			{ 4 }, { 5126, 5121, 5123 }, true))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Error loading weights 1"));
+			AddError("LoadPrimitive()", "Error loading WEIGHTS_1");
 			return false;
 		}
 		Primitive.Weights.Add(Weights);
@@ -1020,7 +1020,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		if (!GetAccessor(IndicesAccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, IndicesBytes))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Unable to load accessor: %lld"), IndicesAccessorIndex);
+			AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load accessor: %lld"), IndicesAccessorIndex));
 			return false;
 		}
 
@@ -1048,7 +1048,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("Invalid component type for indices: %lld"), ComponentType);
+				AddError("LoadPrimitive()", FString::Printf(TEXT("Invalid component type for indices: %lld"), ComponentType));
 				return false;
 			}
 
