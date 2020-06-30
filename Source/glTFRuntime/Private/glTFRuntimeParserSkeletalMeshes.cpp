@@ -319,13 +319,9 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			TotalVertexIndex++;
 		}
 
-		for (TPair<int32, FName>& Pair : BoneMap)
+		for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
 		{
-			int32 BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(Pair.Value);
-			if (BoneIndex > INDEX_NONE)
-			{
-				MeshSection.BoneMap.Add(BoneIndex);
-			}
+			MeshSection.BoneMap.Add(BoneIndex);
 		}
 	}
 
@@ -400,7 +396,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	if (OnSkeletalMeshCreated.IsBound())
 	{
 		OnSkeletalMeshCreated.Broadcast(SkeletalMesh);
-}
+	}
 
 	return SkeletalMesh;
 }
@@ -734,7 +730,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-}
+	}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {

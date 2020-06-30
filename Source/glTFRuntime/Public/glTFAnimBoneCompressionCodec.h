@@ -28,4 +28,8 @@ protected:
 		EAnimInterpolationType Interpolation,
 		int32& PosIndex0Out,
 		int32& PosIndex1Out) const;
+
+	FQuat GetTrackRotation(FAnimSequenceDecompressionContext& DecompContext, const int32 TrackIndex) const;
+	FVector GetTrackLocation(FAnimSequenceDecompressionContext& DecompContext, const int32 TrackIndex) const;
+	FVector GetTrackScale(FAnimSequenceDecompressionContext& DecompContext, const int32 TrackIndex) const;
 };

@@ -847,7 +847,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 		FMatrix SkeletonBasis = SceneBasis;
 		Transform = FTransform(SkeletonBasis.Inverse() * M * SkeletonBasis);
 	}
-	else
+	else if (Joints.Contains(Node.Index))
 	{
 		AddError("TraverseJoints()", FString::Printf(TEXT("No bind transform for node %d %s"), Node.Index, *Node.Name));
 	}
