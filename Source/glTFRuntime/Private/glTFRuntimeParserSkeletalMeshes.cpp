@@ -514,7 +514,7 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 		int64 JointIndex;
 		if (!JsonJoint->TryGetNumber(JointIndex))
 		{
-			return false;
+			return nullptr;
 		}
 		Joints.Add(JointIndex);
 	}
@@ -530,7 +530,7 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 	{
 		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[JsonAnimationIndex]->AsObject();
 		if (!JsonAnimationObject)
-			return false;
+			return nullptr;
 		float Duration;
 		TMap<FString, FRawAnimSequenceTrack> Tracks;
 		bool bAnimationFound = false;

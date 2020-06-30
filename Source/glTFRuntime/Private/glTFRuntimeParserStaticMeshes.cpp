@@ -68,7 +68,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 		for (uint32 VertexIndex : Primitive.Indices)
 		{
 			if (VertexIndex >= (uint32)VerticesIDs.Num())
-				return false;
+				return nullptr;
 
 			FVertexInstanceID NewVertexInstanceID = MeshDescription->CreateVertexInstance(VerticesIDs[VertexIndex]);
 
@@ -137,7 +137,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 				FTriangleID TriangleID = MeshDescription->CreateTriangle(PolygonGroupID, VertexInstancesIDs, Edges);
 				if (TriangleID == FTriangleID::Invalid)
 				{
-					return false;
+					return nullptr;
 				}
 				VertexInstancesIDs.Empty();
 				TriangleVerticesIDs.Empty();
