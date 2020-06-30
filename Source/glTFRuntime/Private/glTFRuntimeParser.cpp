@@ -405,14 +405,14 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 		TArray<float> Timeline;
 		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", Timeline, { 5126 }, false))
 		{
-			UE_LOG(LogTemp, Error, TEXT("unable to retrieve \"input\" from sampler"));
+			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"input\" from sampler %d"), SamplerIndex));
 			return false;
 		}
 
 		TArray<FVector4> Values;
 		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", Values, { 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, true))
 		{
-			UE_LOG(LogTemp, Error, TEXT("unable to retrieve \"output\" from sampler"));
+			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"output\" from sampler %d"), SamplerIndex));
 			return false;
 		}
 
@@ -849,7 +849,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("No bind transform for node %d %s"), Node.Index, *Node.Name);
+		AddError("TraverseJoints()", FString::Printf(TEXT("No bind transform for node %d %s"), Node.Index, *Node.Name));
 	}
 
 	Modifier.Add(FMeshBoneInfo(BoneName, Node.Name, Parent), Transform);

@@ -221,15 +221,14 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumIndices);
 	LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumIndices, 1);
 
-	for (TPair<int32, FName>& Pair : BoneMap)
+	int32 NumBones = SkeletalMesh->RefSkeleton.GetNum();
+
+	for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
 	{
-		int32 BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(Pair.Value);
-		if (BoneIndex > INDEX_NONE)
-		{
-			LodRenderData->RequiredBones.Add(BoneIndex);
-			LodRenderData->ActiveBoneIndices.Add(BoneIndex);
-		}
+		LodRenderData->RequiredBones.Add(BoneIndex);
+		LodRenderData->ActiveBoneIndices.Add(BoneIndex);
 	}
+
 
 	TArray<FSkinWeightInfo> InWeights;
 	InWeights.AddUninitialized(NumIndices);
@@ -401,7 +400,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	if (OnSkeletalMeshCreated.IsBound())
 	{
 		OnSkeletalMeshCreated.Broadcast(SkeletalMesh);
-	}
+}
 
 	return SkeletalMesh;
 }
@@ -591,13 +590,21 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
 
-
 #if !WITH_EDITOR
 	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
 	CompressionCodec->Tracks.AddDefaulted(BonesPoses.Num());
+	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.AddDefaulted(BonesPoses.Num());
+	for (int32 BoneIndex = 0; BoneIndex < BonesPoses.Num(); BoneIndex++)
+	{
+		AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable[BoneIndex] = BoneIndex;
+		for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
+		{
+			CompressionCodec->Tracks[BoneIndex].PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
+			CompressionCodec->Tracks[BoneIndex].RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
+			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
+		}
+	}
 #endif
-
-	TArray<FTransform> BonePoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
 
 	for (TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
 	{
@@ -616,7 +623,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		{
 			for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
 			{
-				Pair.Value.PosKeys.Add(BonePoses[BoneIndex].GetLocation());
+				Pair.Value.PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
 			}
 		}
 		else if (Pair.Value.PosKeys.Num() < NumFrames)
@@ -638,7 +645,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		{
 			for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
 			{
-				Pair.Value.RotKeys.Add(BonePoses[BoneIndex].GetRotation());
+				Pair.Value.RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 			}
 		}
 		else if (Pair.Value.RotKeys.Num() < NumFrames)
@@ -659,7 +666,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		{
 			for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
 			{
-				Pair.Value.ScaleKeys.Add(BonePoses[BoneIndex].GetScale3D());
+				Pair.Value.ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 			}
 		}
 		else if (Pair.Value.ScaleKeys.Num() < NumFrames)
@@ -714,7 +721,6 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		AnimSequence->AddNewRawTrack(BoneName, &Pair.Value);
 #else
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
-		AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.Add(FTrackToSkeletonMap(BoneIndex));
 #endif
 
 	}
@@ -728,7 +734,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-			}
+}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
