@@ -109,6 +109,53 @@ Notes:
 
 # Materials
 
+Materials, included PBR values and Textures as well as Slots, are automatically managed. All of the materials dinamically inherit from a so called 'UberMaterial'
+included in the plugin (albeit you are free to use another one by simply setting options, more on this below)
+
+In this example we will load the 'Damaged Helmet' asset available here:
+https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf
+
+<img src="Docs/Screenshots/DamagedHelmet.PNG?raw=true" alt="ConeOnly" width="50%"/>
+
+By using the glTFRuntimeAssetActor we can load the whole scene and check the final result:
+
+![PBRMaterial](Docs/Screenshots/PBRMaterial.PNG?raw=true "PBRMaterial")
+
+As you can see, no special options are required to build a standard PBR Material.
+
+Let's change the Level Blueprint to use another approach:
+
+This time we dinamically create a StaticMeshComponent and we assign the StaticMesh to it (note again the wrong transform):
+
+![PBRMaterial2](Docs/Screenshots/PBRMaterial2.PNG?raw=true "PBRMaterial2")
+
+What if we want to change the UberMaterial ? glTFRuntime expects 4 different Material Types: Opaqua, TwoSided, Translucent and TwoSidedTranslucent.
+
+If you want to completely change the rendering mode of glTF assets you need to define all of them.
+
+But le'ts focus on the 'Opaque' one (the one used by DamagedHelmet). Create a new 'dummy' Material (no nodes in it) and use it as an override for the 'Opaque' UberMaterial:
+
+![UberMaterialOverride](Docs/Screenshots/UberMaterialOverride.PNG?raw=true "UberMaterialOverride")
+
+The result will be something like this:
+
+<img src="Docs/Screenshots/UberMaterialOverride.PNG?raw=true" alt="ConeOnly" width="50%"/>
+
+Obviously sooner or later you will want to get the material PBR parameters (included textures) from the glTF asset, in such a case you need to create a bunch of parameters
+in your material asset:
+
+* baseColorFactor (vector3)
+* roughnessFactor (scalar)
+* metallicFactor (scalar)
+* emissiveFactor (vector3)
+* alphaCutoff (scalar)
+* baseColorTexture (texture2d)
+* normaltexture (texture2d)
+* metallicRoughnessTexture (texture2d)
+* emissiveTexture (texture2d)
+
+Check the M_glTFRuntimeBase material into the plugin Content directory for more infos.
+
 # Loading Skeletal Meshes
 
 # Skeletal Animations
