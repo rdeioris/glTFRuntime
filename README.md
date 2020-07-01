@@ -21,6 +21,22 @@ Check the Features Showcase: https://www.youtube.com/watch?v=6058JA8wX8I
 
 # Quickstart
 
+Consider buying the plugin from the Epic Marketplace, you will get automatic installation and you will support the project.
+
+If you want to build from sources, just start with a C++ project, and clone the master branch into the Plugins/ directory of your project, regenerate the solution files and rebuild the project.
+
+Once the plugin is enabled you will get 3 new main C++/Blueprint functions:
+```cpp
+UFUNCTION(BlueprintCallable, meta=(DisplayName="glTF Load Asset from Filename"), Category="glTFRuntime")
+static UglTFRuntimeAsset* glTFLoadAssetFromFilename(const FString Filename, const bool bPathRelativeToContent);
+
+UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from String"), Category = "glTFRuntime")
+static UglTFRuntimeAsset* glTFLoadAssetFromString(const FString JsonData);
+
+UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Url", AutoCreateRefTerm = "Headers"), Category = "glTFRuntime")
+static void glTFLoadAssetFromUrl(const FString Url, TMap<FString, FString> Headers, FglTFRuntimeHttpResponse Completed);
+```
+
 # Loading Scenes
 
 # Loading Static Meshes
