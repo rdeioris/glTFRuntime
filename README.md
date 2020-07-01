@@ -29,6 +29,22 @@ Once the plugin is enabled you will get 3 new main C++/Blueprint functions:
 
 ![MainFunctions](Docs/Screenshots/MainFunctions.PNG?raw=true "MainFunctions")
 
+Let's start with remote asset loading (we will use the official glTF 2.0 samples), open your level blueprint and on the BeginPlay Event, trigger
+the runtime asset loading:
+
+![UrlDuck](Docs/Screenshots/UrlDuck.PNG?raw=true "UrlDuck")
+
+A bunch of notes:
+
+* We are loading the asset from the https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Embedded/Duck.gltf url
+* The glTFRuntimeAssetActor is a ready-to-use Actor class included in the plugin. It is perfect for testing, but you are encouraged to implement more advanced structures.
+* The glTFLoadAssetFromUrl function is an asynchronous one, the related event will be triggered when the asset is loaded.
+* The glTFRuntimeAssetActor requires a glTFRuntimeAsset to correctly spawn.
+
+If all goes well you should see the Collada Duck:
+
+![ColladaDuck](Docs/Screenshots/ColladaDuck.PNG?raw=true "ColladaDuck")
+
 # Loading Scenes
 
 # Loading Static Meshes
