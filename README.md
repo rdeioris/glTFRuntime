@@ -158,6 +158,14 @@ Check the M_glTFRuntimeBase material into the plugin Content directory for more 
 
 # Collisions
 
+By default, generated StaticMeshes have no collisions. You can assign collision boxes and spheres using the configuration structure (the one you already used for materials):
+
+![Collisions](Docs/Screenshots/Collisions.PNG?raw=true "Collisions")
+
+The BuildSimpleCollision flag, generates an automatic collision based on the mesh bounding box.
+
+You can even set a complex collision by changing the collision complexity field, in such a case ensure to enable the AllowCPUAccess flag, otherwise the physics engine will not be able to generate the related shape. 
+
 # Loading Skeletal Meshes
 
 # Skeletal Animations
