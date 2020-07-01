@@ -195,6 +195,14 @@ The 'Skeleton' field will assign the specific Skeleton to the SkeletalMesh, whil
 
 # Skeletal Animations
 
+You can extract Skeletal Animations using the LoadSkeletalAnimation, LoadSkeletalAnimationByName and LoadNodeSkeletalAnimation functions:
+
+![SkeletalAnimations](Docs/Screenshots/SkeletalAnimations.PNG?raw=true "SkeletalAnimations")
+
+All of them require a SkeletalMesh to extract the Skeleton (this is technically not required as you could specify the Skeleton asset directly, but this will allow to set a preview asset in the editor, future glTFRuntime releases will allow to specify only a Skeleton too).
+
+Note that as long as dirreferent SkeletalMeshes use the same Skeleton, you can share AnimationBlueprint too.
+
 # Nodes Animations
 
 The glTF format, supports generic animation of nodes (read: changing their transforms over time).
