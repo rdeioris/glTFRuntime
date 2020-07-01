@@ -110,7 +110,7 @@ Notes:
 
 # Skeletal Animations
 
-# Curve Animations
+# Nodes Animations
 
 # Scene Hierarchy
 
