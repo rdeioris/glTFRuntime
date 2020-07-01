@@ -102,7 +102,7 @@ Notes:
 * As we are reusing an already configured StaticMesh Actor, Suzanne will inherit the previously set material slot
 * If you change Suzanne with 'Cone', you will get the Cone mesh (obviously) but without the transform applied (read: no rotation, no scale, no translation), transforms are set into the glTF Node (more on nodes traversing later)
 
-<img src="Docs/Screenshots/SuzanneOnly.PNG?raw=true" alt="SuzanneOnly" width="50%"/> <img src="Docs/Screenshots/ConeOnly.PNG?raw=true" alt="ConeOnly" width="50%"/>
+<img src="Docs/Screenshots/SuzanneOnly.PNG?raw=true" alt="SuzanneOnly" width="30%"/> <img src="Docs/Screenshots/ConeOnly.PNG?raw=true" alt="ConeOnly" width="30%"/>
 
 # Loading Skeletal Meshes
 
