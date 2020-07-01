@@ -62,13 +62,17 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		MaterialType = EglTFRuntimeMaterialType::TwoSided;
 	}
 
-
 	if (!MaterialsMap.Contains(MaterialType))
 	{
 		return nullptr;
 	}
 
 	UMaterialInterface* BaseMaterial = MaterialsMap[MaterialType];
+	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(MaterialType))
+	{
+		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[MaterialType];
+	}
+
 	if (!BaseMaterial)
 	{
 		return nullptr;
@@ -372,14 +376,14 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 		{
 			LogSerialization.SetVerbosity(ELogVerbosity::Error);
 			bResetLogVerbosity = true;
-	}
+		}
 #endif
 		Mip->BulkData.Lock(LOCK_READ_WRITE);
 #if !WITH_EDITOR
 		if (bResetLogVerbosity)
 		{
 			LogSerialization.SetVerbosity(CurrentLogSerializationVerbosity);
-}
+		}
 #endif
 		void* Data = Mip->BulkData.Realloc(UncompressedBytes.Num());
 		FMemory::Memcpy(Data, UncompressedBytes.GetData(), UncompressedBytes.Num());
@@ -390,10 +394,10 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 		TexturesCache.Add(Index, Texture);
 
 		return Texture;
-}
+		}
 
 	return nullptr;
-}
+	}
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {

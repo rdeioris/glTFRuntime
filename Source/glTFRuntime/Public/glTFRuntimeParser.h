@@ -104,6 +104,9 @@ struct FglTFRuntimeMaterialsConfig
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UberMaterialsOverrideMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<int32, UMaterialInterface*> MaterialsOverrideMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
