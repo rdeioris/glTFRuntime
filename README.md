@@ -187,6 +187,11 @@ You can see a skeleton exported from Unreal Engine as gltf below (yes, it is the
 
 <img src="Docs/Screenshots/Mannequin.PNG?raw=true" alt="Mannequin" width="50%"/>
 
+By default glTFRuntime will create a new Skeleton for each SkeletalMesh, you can force a specific Skeleton (useful for sharing animation) by setting the specific options:
+
+![SkeletonOverride](Docs/Screenshots/SkeletonOverride.PNG?raw=true "SkeletonOverride")
+
+The 'Skeleton' field will assign the specific Skeleton to the SkeletalMesh, while the 'OverwriteRefSkeleton' flag, will copy the bone poses to the SkeletalMesh (this will avoid annoying retargeting issues, expecially if the bones rotations have been changed by your DCC software). 
 
 # Skeletal Animations
 
