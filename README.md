@@ -237,6 +237,16 @@ https://github.com/rdeioris/LuaMachine/
 
 You will be able to govern asset loading from lua scripting
 
+# Notes when Packaging a Game
+
+All of the glTFRuntime features are available both in editor and in packaged builds.
+
+Just remember a bunch of notes:
+
+* Users can have the most bizarre filesystem layout, avoids using absolute paths, the Content directory is a good candidate for dynamically loading assets
+* Always expose errors feedback
+* Always check for invalid return value of the three main functions (glTFLoadAssetFromFilename, glTFLoadAssetFromString, glTFLoadAssetFromUrl). NULL check in C++ will be good enough as well as the IsValid node on Blueprints.
+
 # TODO/WIP
 
 * LODs
@@ -248,6 +258,7 @@ You will be able to govern asset loading from lua scripting
 * Instancing Extension (https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Vendor/EXT_mesh_gpu_instancing/README.md)
 * MSFT_lod extension (https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Vendor/MSFT_lod/README.md)
 * StaticMeshes/SkeletalMeshes merger (combine multiple meshes in a single one)
+* Android/iOS runtime support (only from Url or strings)
 
 # Commercial Support
 
