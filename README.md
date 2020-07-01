@@ -43,7 +43,7 @@ A bunch of notes:
 
 If all goes well you should see the Collada Duck:
 
-![ColladaDuck](Docs/Screenshots/ColladaDuck.PNG?raw=true "ColladaDuck")
+<img src="Docs/Screenshots/ColladaDuck.PNG?raw=true" alt="ColladaDuck" width="50%" />
 
 # Loading Scenes
 
