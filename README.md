@@ -156,6 +156,8 @@ in your material asset:
 
 Check the M_glTFRuntimeBase material into the plugin Content directory for more infos.
 
+# Collisions
+
 # Loading Skeletal Meshes
 
 # Skeletal Animations
