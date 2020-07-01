@@ -162,7 +162,17 @@ Check the M_glTFRuntimeBase material into the plugin Content directory for more 
 
 # Nodes Animations
 
-# Scene Hierarchy
+# glTF Hierarchy
+
+A glTF Asset is a collection of nodes grouped into scenes.
+
+glTFRuntime exposes an api to navigate the nodes tree.
+
+The first thing we can do is getting the list of all of the nodes in the asset. This is useful to understand how a node is made:
+
+![Nodes](Docs/Screenshots/Nodes.PNG?raw=true "Nodes")
+
+As you can see, each node has an index, a name, a transform, a parent index, a list of children indices as well as an optional mesh and skin. Using this data you can rebuild scenes.
 
 # Errors Management
 
