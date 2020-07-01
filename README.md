@@ -5,6 +5,8 @@ Join the Discord Channel: https://discord.gg/DzS7MHy
 
 Check the Features Showcase: https://www.youtube.com/watch?v=6058JA8wX8I
 
+![glTFRuntime](Docs/Screenshots/glTFRuntime512.jpg?raw=true "glTFRuntime")
+
 # Features
 
 * Allows to load Static Meshes, Skeletal Meshes, Animations, Hierarchies, Materials and Textures from glTF 2.0 Embedded files.
