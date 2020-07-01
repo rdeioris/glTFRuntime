@@ -156,6 +156,16 @@ in your material asset:
 
 Check the M_glTFRuntimeBase material into the plugin Content directory for more infos.
 
+# Collisions
+
+By default, generated StaticMeshes have no collisions. You can assign collision boxes and spheres using the configuration structure (the one you already used for materials):
+
+![Collisions](Docs/Screenshots/Collisions.PNG?raw=true "Collisions")
+
+The BuildSimpleCollision flag, generates an automatic collision based on the mesh bounding box.
+
+You can even set a complex collision by changing the collision complexity field, in such a case ensure to enable the AllowCPUAccess flag, otherwise the physics engine will not be able to generate the related shape. 
+
 # Loading Skeletal Meshes
 
 # Skeletal Animations
@@ -166,13 +176,13 @@ The glTF format, supports generic animation of nodes (read: changing their trans
 
 Albeit this is not a form of animation supported out of the box in Unreal Engine, glTFRuntime can export them as simple Curve Assets.
 
-Get the  asset and load it using the classic glTFRuntimeAssetActor. You will see the Hat of Suzanne moving vertically.
+Get the https://raw.githubusercontent.com/rdeioris/glTFRuntime/master/Docs/Assets/SuzanneWithHatAnimated.gltf asset and load it using the classic glTFRuntimeAssetActor. You will see the Hat of Suzanne moving vertically.
 
 This is accomplished by generating a curve from the asset and applying it at every tick.
 
 You can directly get a curve for a node animtion by using the LoadNodeAnimationCurve function:
 
-![LoadNodeAnimation](Docs/Screenshots/LoadNodeAnimation.PNG?raw=true "LoadNodeAnimation")
+![LoadNodeAnimationCurve](Docs/Screenshots/LoadNodeAnimationCurve.PNG?raw=true "LoadNodeAnimationCurve")
 
 Check the code in the Tick method of glTFRuntimeAssetActor for an example:
 
