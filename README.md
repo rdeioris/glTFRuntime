@@ -93,20 +93,22 @@ StaticMesh actor in the scene (i have dragged a classic Cube here):
 
 ![LoadStaticMesh](Docs/Screenshots/LoadStaticMesh.PNG?raw=true "LoadStaticMesh")
 
-The LoadStaticMesh function expects the index of a mesh into the glTF file. We are lucky as we now the index 0 is Suzanne, but you can load StaticMeshes by name too (the same you set in Blender):
+The LoadStaticMesh function expects the index of a mesh into the glTF file. We are lucky as we know the index 0 is Suzanne, but you can load StaticMeshes by name too (the same name you set in Blender):
 
 ![LoadStaticMeshByName](Docs/Screenshots/LoadStaticMeshByName.PNG?raw=true "LoadStaticMeshByName")
 
 Notes:
 
 * As we are reusing an already configured StaticMesh Actor, Suzanne will inherit the previously set material slot
-* If you change Suzanne with 'Cone', you will get the Cone mesh (obviously) but without the transform applied (read: no rotation, no scale, no translation), they are set into the glTF Node (more on nodes traversing later)
+* If you change Suzanne with 'Cone', you will get the Cone mesh (obviously) but without the transform applied (read: no rotation, no scale, no translation), transforms are set into the glTF Node (more on nodes traversing later)
 
 # Loading Skeletal Meshes
 
 # Skeletal Animations
 
 # Curve Animations
+
+# Scene Hierarchy
 
 # Errors Management
 
