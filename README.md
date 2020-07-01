@@ -139,7 +139,7 @@ But le'ts focus on the 'Opaque' one (the one used by DamagedHelmet). Create a ne
 
 The result will be something like this:
 
-<img src="Docs/Screenshots/UberMaterialOverride.PNG?raw=true" alt="ConeOnly" width="50%"/>
+<img src="Docs/Screenshots/UberMaterialOverrideDamagedHelmet.PNG?raw=true" alt="ConeOnly" width="50%"/>
 
 Obviously sooner or later you will want to get the material PBR parameters (included textures) from the glTF asset, in such a case you need to create a bunch of parameters
 in your material asset:
