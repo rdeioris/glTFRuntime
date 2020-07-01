@@ -172,7 +172,7 @@ This is accomplished by generating a curve from the asset and applying it at eve
 
 You can directly get a curve for a node animtion by using the LoadNodeAnimationCurve function:
 
-![LoadNodeAnimation](Docs/Screenshots/LoadNodeAnimation.PNG?raw=true "LoadNodeAnimation")
+![LoadNodeAnimationCurve](Docs/Screenshots/LoadNodeAnimationCurve.PNG?raw=true "LoadNodeAnimationCurve")
 
 Check the code in the Tick method of glTFRuntimeAssetActor for an example:
 
