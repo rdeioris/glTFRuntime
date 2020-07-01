@@ -168,6 +168,15 @@ You can even set a complex collision by changing the collision complexity field,
 
 # Loading Skeletal Meshes
 
+glTF Meshes can be combined with a so called 'Skin' (the equivalent of Unreal Engine Skeleton).
+Currently glTFRuntime supports up to 4 influences per vertex (support for 12 is on work).
+
+Download the CesiumMan asset: https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Embedded/CesiumMan.gltf
+
+The glTFRuntimeAssetActor will automatically manage Skeletal Meshes, but as with StaticMeshes you can manually load them:
+
+![SkeletalMesh](Docs/Screenshots/SkeletalMesh.PNG?raw=true "SkeletalMesh")
+
 # Skeletal Animations
 
 # Nodes Animations
@@ -259,6 +268,7 @@ Just remember a bunch of notes:
 * MSFT_lod extension (https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Vendor/MSFT_lod/README.md)
 * StaticMeshes/SkeletalMeshes merger (combine multiple meshes in a single one)
 * Android/iOS runtime support (only from Url or strings)
+* Support up to 12 bone/joint influences
 
 # Commercial Support
 
