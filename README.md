@@ -129,7 +129,7 @@ This time we dinamically create a StaticMeshComponent and we assign the StaticMe
 
 ![PBRMaterial2](Docs/Screenshots/PBRMaterial2.PNG?raw=true "PBRMaterial2")
 
-What if we want to change the UberMaterial ? glTFRuntime expects 4 different Material Types: Opaqua, TwoSided, Translucent and TwoSidedTranslucent.
+What if we want to change the UberMaterial ? glTFRuntime expects 4 different Material Types: Opaque, TwoSided, Translucent and TwoSidedTranslucent.
 
 If you want to completely change the rendering mode of glTF assets you need to define all of them.
 
@@ -161,6 +161,24 @@ Check the M_glTFRuntimeBase material into the plugin Content directory for more 
 # Skeletal Animations
 
 # Nodes Animations
+
+The glTF format, supports generic animation of nodes (read: changing their transforms over time).
+
+Albeit this is not a form of animation supported out of the box in Unreal Engine, glTFRuntime can export them as simple Curve Assets.
+
+Get the  asset and load it using the classic glTFRuntimeAssetActor. You will see the Hat of Suzanne moving vertically.
+
+This is accomplished by generating a curve from the asset and applying it at every tick.
+
+You can directly get a curve for a node animtion by using the LoadNodeAnimationCurve function:
+
+![LoadNodeAnimation](Docs/Screenshots/LoadNodeAnimation.PNG?raw=true "LoadNodeAnimation")
+
+Check the code in the Tick method of glTFRuntimeAssetActor for an example:
+
+https://github.com/rdeioris/glTFRuntime/blob/master/Source/glTFRuntime/Private/glTFRuntimeAssetActor.cpp#L135
+
+Note: rotations are managed as Euler rotations (this is a current limit of Unreal Engine Curves), so beware of the Gimbal Lock! In case of rotation errors just add more keyframes.
 
 # glTF Hierarchy
 
