@@ -63,6 +63,8 @@ In the export dialog ensure to select the gltf 2.0 Embedded format and to includ
 
 <img src="Docs/Screenshots/BlenderExport.PNG?raw=true" alt="BlenderExport" width="50%"/>
 
+(I have saved it as D:/SuzanneWithHat.gltf)
+
 Now back to the Level Blueprint:
 
 ![LoadSuzanneWithHat](Docs/Screenshots/LoadSuzanneWithHat.PNG?raw=true "LoadSuzanneWithHat")
@@ -71,6 +73,7 @@ Notes:
 
 * This time, as we are loading from the filesystem, we have a synchronous function.
 * Note the transform with the increased Z value (if you get suzanne below the floor, you now know why it is happening ;)
+* Ensure the path is valid (use the absolute one for being safe, use the 'Path Relative to Content' flag if you need to force users to place assets into the Content/ directory)
 
 The result:
 
@@ -117,6 +120,12 @@ Notes:
 # Errors Management
 
 # Integration with LuaMachine
+
+If you need modding for your projects, consider combining glTFRuntime with the LuaMachine Plugin:
+
+https://github.com/rdeioris/LuaMachine/
+
+You will be able to govern asset loading from lua scripting
 
 # TODO/WIP
 
