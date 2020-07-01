@@ -47,6 +47,18 @@ If all goes well you should see the Collada Duck:
 
 # Loading Scenes
 
+Time to run your favourite DCC to create a glTF file.
+
+Here i am using Blender 2.83, and i will create a simple scene with Suzanne and a Hat (well a cone) on the center:
+
+![SuzanneWithHat](Docs/Screenshots/SuzanneWithHat.PNG?raw=true "SuzanneWithHat")
+
+Now select both Suzanne and the Cone/Hat and select the File/Export/glTF2.0 menu option
+
+In the export dialog ensure to select the gltf 2.0 Embedded format and to include the selected objects:
+
+![BlenderExport](Docs/Screenshots/BlenderExport.PNG?raw=true "BlenderExport")
+
 # Loading Static Meshes
 
 # Loading Skeletal Meshes
