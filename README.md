@@ -27,7 +27,7 @@ If you want to build from sources, just start with a C++ project, and clone the 
 
 Once the plugin is enabled you will get 3 new main C++/Blueprint functions:
 
-<img src="Docs/Screenshots/MainFunctions.PNG?raw=true" alt="MainFunctions" width="50%"/>
+![MainFunctions](Docs/Screenshots/MainFunctions.PNG?raw=true "MainFunctions")
 
 Let's start with remote asset loading (we will use the official glTF 2.0 samples), open your level blueprint and on the BeginPlay Event, trigger
 the runtime asset loading:
@@ -57,7 +57,7 @@ Now select both Suzanne and the Cone/Hat and select the File/Export/glTF2.0 menu
 
 In the export dialog ensure to select the gltf 2.0 Embedded format and to include the selected objects:
 
-![BlenderExport](Docs/Screenshots/BlenderExport.PNG?raw=true "BlenderExport")
+<img src="Docs/Screenshots/BlenderExport.PNG?raw=true" alt="BlenderExport" width="50%"/>
 
 Now back to the Level Blueprint:
 
