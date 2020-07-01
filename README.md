@@ -166,7 +166,7 @@ The glTF format, supports generic animation of nodes (read: changing their trans
 
 Albeit this is not a form of animation supported out of the box in Unreal Engine, glTFRuntime can export them as simple Curve Assets.
 
-Get the  asset and load it using the classic glTFRuntimeAssetActor. You will see the Hat of Suzanne moving vertically.
+Get the https://raw.githubusercontent.com/rdeioris/glTFRuntime/master/Docs/Assets/SuzanneWithHatAnimated.gltf asset and load it using the classic glTFRuntimeAssetActor. You will see the Hat of Suzanne moving vertically.
 
 This is accomplished by generating a curve from the asset and applying it at every tick.
 
