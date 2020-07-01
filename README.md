@@ -121,6 +121,12 @@ Notes:
 
 # Integration with LuaMachine
 
+If you need modding for your projects, consider combining glTFRuntime with the LuaMachine Plugin:
+
+https://github.com/rdeioris/LuaMachine/
+
+You will be able to govern asset loading from lua scripting
+
 # TODO/WIP
 
 * LODs
