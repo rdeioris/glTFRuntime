@@ -201,7 +201,7 @@ You can extract Skeletal Animations using the LoadSkeletalAnimation, LoadSkeleta
 
 All of them require a SkeletalMesh to extract the Skeleton (this is technically not required as you could specify the Skeleton asset directly, but this will allow to set a preview asset in the editor, future glTFRuntime releases will allow to specify only a Skeleton too).
 
-Note that as long as dirreferent SkeletalMeshes use the same Skeleton, you can share AnimationBlueprint too.
+Note that as long as different SkeletalMeshes use the same Skeleton, you can share AnimationBlueprint too.
 
 # Nodes Animations
 
