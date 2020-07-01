@@ -27,7 +27,7 @@ If you want to build from sources, just start with a C++ project, and clone the 
 
 Once the plugin is enabled you will get 3 new main C++/Blueprint functions:
 
-![MainFunctions](Docs/Screenshots/MainFunctions.PNG?raw=true "MainFunctions")
+![MainFunctions](Docs/Screenshots/MainFunctions.PNG?raw=true "MainFunctions" =512)
 
 Let's start with remote asset loading (we will use the official glTF 2.0 samples), open your level blueprint and on the BeginPlay Event, trigger
 the runtime asset loading:
