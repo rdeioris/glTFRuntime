@@ -51,7 +51,7 @@ Time to run your favourite DCC to create a glTF file.
 
 Here i am using Blender 2.83, and i will create a simple scene with Suzanne and a Hat (well a cone) on the center:
 
-![SuzanneWithHat](Docs/Screenshots/SuzanneWithHat.PNG?raw=true "SuzanneWithHat")
+<img src="Docs/Screenshots/SuzanneWithHat.PNG?raw=true" alt="SuzanneWithHat" width="50%" />
 
 Now select both Suzanne and the Cone/Hat and select the File/Export/glTF2.0 menu option
 
@@ -62,6 +62,15 @@ In the export dialog ensure to select the gltf 2.0 Embedded format and to includ
 Now back to the Level Blueprint:
 
 ![LoadSuzanneWithHat](Docs/Screenshots/LoadSuzanneWithHat.PNG?raw=true "LoadSuzanneWithHat")
+
+Notes:
+
+* This time, as we are loading from the filesystem, we have a synchronous function.
+* Note the transform with the increased Z value (if you get suzanne below the floor, you now know why it is happening ;)
+
+The result:
+
+<img src="Docs/Screenshots/RunSuzanneWithHat.PNG?raw=true" alt="RunSuzanneWithHat" width="50%"/>
 
 # Loading Static Meshes
 
