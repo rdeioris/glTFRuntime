@@ -51,6 +51,7 @@ Time to run your favourite DCC to create a glTF file.
 
 Here i am using Blender 2.83, and i will create a simple scene with Suzanne and a Hat (well a cone) on the center:
 
+(you can download the asset from here if you do not want to build it by yourself: https://raw.githubusercontent.com/rdeioris/glTFRuntime/master/Docs/Assets/SuzanneWithHat.gltf)
 <img src="Docs/Screenshots/SuzanneWithHat.PNG?raw=true" alt="SuzanneWithHat" width="50%" />
 
 Now select both Suzanne and the Cone/Hat and select the File/Export/glTF2.0 menu option
