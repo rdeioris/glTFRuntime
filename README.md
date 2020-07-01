@@ -59,6 +59,10 @@ In the export dialog ensure to select the gltf 2.0 Embedded format and to includ
 
 ![BlenderExport](Docs/Screenshots/BlenderExport.PNG?raw=true "BlenderExport")
 
+Now back to the Level Blueprint:
+
+![LoadSuzanneWithHat](Docs/Screenshots/LoadSuzanneWithHat.PNG?raw=true "LoadSuzanneWithHat")
+
 # Loading Static Meshes
 
 # Loading Skeletal Meshes
