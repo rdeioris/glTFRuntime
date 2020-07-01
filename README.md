@@ -1,7 +1,9 @@
 # glTFRuntime
 Unreal Engine 4 Plugin for loading glTF assets at runtime 
 
-join the discord channel: https://discord.gg/DzS7MHy
+Join the Discord Channel: https://discord.gg/DzS7MHy
+
+Check the Features Showcase: https://www.youtube.com/watch?v=6058JA8wX8I
 
 # Features
 
