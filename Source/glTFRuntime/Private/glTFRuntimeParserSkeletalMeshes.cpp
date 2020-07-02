@@ -12,7 +12,8 @@
 #include "MeshUtilities.h"
 #endif
 #include "Engine/SkeletalMeshSocket.h"
-#include "glTfAnimBoneCompressionCodec.h"
+#include "glTFAnimBoneCompressionCodec.h"
+#include "Model.h"
 
 void FglTFRuntimeParser::NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton)
 {
@@ -453,7 +454,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 		return nullptr;
 	}
 
-	for (int32 AnimationIndex = 0; AnimationIndex, JsonAnimations->Num(); AnimationIndex++)
+	for (int32 AnimationIndex = 0; AnimationIndex < JsonAnimations->Num(); AnimationIndex++)
 	{
 		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[AnimationIndex]->AsObject();
 		if (!JsonAnimationObject)
@@ -730,7 +731,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-	}
+}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {

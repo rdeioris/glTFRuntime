@@ -5,7 +5,8 @@
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
-#include "Logging/LogSuppressionInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Modules/ModuleManager.h"
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
@@ -370,6 +371,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 		Mip->SizeX = Width;
 		Mip->SizeY = Height;
 #if !WITH_EDITOR
+#if !NO_LOGGING
 		ELogVerbosity::Type CurrentLogSerializationVerbosity = LogSerialization.GetVerbosity();
 		bool bResetLogVerbosity = false;
 		if (CurrentLogSerializationVerbosity >= ELogVerbosity::Warning)
@@ -378,12 +380,15 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 			bResetLogVerbosity = true;
 		}
 #endif
+#endif
 		Mip->BulkData.Lock(LOCK_READ_WRITE);
 #if !WITH_EDITOR
+#if !NO_LOGGING
 		if (bResetLogVerbosity)
 		{
 			LogSerialization.SetVerbosity(CurrentLogSerializationVerbosity);
 		}
+#endif
 #endif
 		void* Data = Mip->BulkData.Realloc(UncompressedBytes.Num());
 		FMemory::Memcpy(Data, UncompressedBytes.GetData(), UncompressedBytes.Num());
@@ -394,10 +399,10 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 		TexturesCache.Add(Index, Texture);
 
 		return Texture;
-		}
+	}
 
 	return nullptr;
-	}
+}
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {

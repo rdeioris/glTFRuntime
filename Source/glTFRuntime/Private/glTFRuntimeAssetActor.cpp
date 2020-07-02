@@ -2,6 +2,8 @@
 
 
 #include "glTFRuntimeAssetActor.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimSequence.h"
 
 // Sets default values
 AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()

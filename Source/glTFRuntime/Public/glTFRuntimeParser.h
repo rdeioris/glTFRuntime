@@ -4,7 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Dom/JsonValue.h"
+#include "Dom/JsonObject.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/SkeletalMesh.h"
 #include "glTFRuntimeAnimationCurve.h"
 
 #include "glTFRuntimeParser.generated.h"

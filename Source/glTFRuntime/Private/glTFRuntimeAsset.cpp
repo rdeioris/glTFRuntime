@@ -1,7 +1,7 @@
 // Copyright 2020, Roberto De Ioris.
 
-
 #include "glTFRuntimeAsset.h"
+#include "Animation/AnimSequence.h"
 
 #define GLTF_CHECK_PARSER(RetValue) if (!Parser)\
 	{\
@@ -172,7 +172,9 @@ bool UglTFRuntimeAsset::BuildTransformFromNodeBackward(const int32 NodeIndex, FT
 	while (Node.ParentIndex != INDEX_NONE)
 	{
 		if (!Parser->LoadNode(Node.ParentIndex, Node))
+		{
 			return false;
+		}
 		Transform *= Node.Transform;
 	}
 
@@ -206,7 +208,7 @@ bool UglTFRuntimeAsset::BuildTransformFromNodeForward(const int32 NodeIndex, con
 		NodesTree.Add(Node.Transform);
 		if (Node.Index == NodeIndex)
 		{
-			bFoundNode;
+			bFoundNode = true;
 			break;
 		}
 	}

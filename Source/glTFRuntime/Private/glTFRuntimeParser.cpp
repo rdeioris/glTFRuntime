@@ -1,6 +1,11 @@
 // Copyright 2020, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Misc/FileHelper.h"
+#include "Serialization/JsonSerializer.h"
+#include "Animation/Skeleton.h"
+#include "Materials/Material.h"
+#include "Misc/Base64.h"
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 

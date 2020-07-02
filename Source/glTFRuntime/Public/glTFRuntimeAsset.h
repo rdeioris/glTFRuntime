@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "glTFRuntimeParser.h"
+#include "Animation/AnimMontage.h"
 #include "glTFRuntimeAsset.generated.h"
 
 /**
