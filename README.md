@@ -299,6 +299,22 @@ Just remember a bunch of notes:
 Commercial support is offered by Unbit (Rome, Italy).
 Just enter the discord server and direct message the admin, or drop a mail to info at unbit dot it
 
+# Credits
+
+The glTF Assets shown are the official glTF Sample Models available from this repository
+
+https://github.com/KhronosGroup/glTF-Sample-Models
+
+DamagedHelmet:  theblueturtle_ Creative Commons Attribution-NonCommercial license
+
+BoxAnimated, CesiumMilkTruck, CesiumMan: Donated by Cesium, Creative Commons Attribution 4.0 International License
+
+AlphaBlendModeTest: Copyright 2018 Analytical Graphics, Inc. CC-BY 4.0
+
+BrainStem: Created by Keith Hunter and owned by Smith Micro Software, Inc, Poser Pro EULA
+
+Collada Duck: SCEA Shared Source License, Version 1.0
+
 # Thanks
 
 Silvia Sicks for the glTFRuntime Logo.
