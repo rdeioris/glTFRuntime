@@ -319,4 +319,4 @@ Collada Duck: SCEA Shared Source License, Version 1.0
 
 # Thanks
 
-Silvia Sicks for the glTFRuntime Logo.
+Silvia Sicks (https://silviasicks.wordpress.com/) for the glTFRuntime Logo.
