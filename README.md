@@ -5,6 +5,8 @@ Join the Discord Channel: https://discord.gg/DzS7MHy
 
 Check the Features Showcase: https://www.youtube.com/watch?v=6058JA8wX8I
 
+Buy it from the Marketplace to support the development: https://www.unrealengine.com/marketplace/en-US/product/gltfruntime
+
 ![glTFRuntime](Docs/Screenshots/glTFRuntime512.jpg?raw=true "glTFRuntime")
 
 # Features
@@ -21,7 +23,7 @@ Check the Features Showcase: https://www.youtube.com/watch?v=6058JA8wX8I
 
 # Quickstart
 
-Consider buying the plugin from the Epic Marketplace, you will get automatic installation and you will support the project.
+Consider buying the plugin from the Epic Marketplace (https://www.unrealengine.com/marketplace/en-US/product/gltfruntime), you will get automatic installation and you will support the project.
 
 If you want to build from sources, just start with a C++ project, and clone the master branch into the Plugins/ directory of your project, regenerate the solution files and rebuild the project.
 
