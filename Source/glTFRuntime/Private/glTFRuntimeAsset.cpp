@@ -54,6 +54,28 @@ bool UglTFRuntimeAsset::LoadFromString(const FString JsonData)
 	return Parser != nullptr;
 }
 
+bool UglTFRuntimeAsset::LoadFromData(const TArray64<uint8> Data)
+{
+	// asset already loaded ?
+	if (Parser)
+	{
+		return false;
+	}
+
+	Parser = FglTFRuntimeParser::FromData(Data);
+	if (Parser)
+	{
+		FScriptDelegate Delegate;
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnErrorProxy));
+		Parser->OnError.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnStaticMeshCreatedProxy));
+		Parser->OnStaticMeshCreated.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnSkeletalMeshCreatedProxy));
+		Parser->OnSkeletalMeshCreated.Add(Delegate);
+	}
+	return Parser != nullptr;
+}
+
 void UglTFRuntimeAsset::OnErrorProxy(const FString ErrorContext, const FString ErrorMessage)
 {
 	if (OnError.IsBound())

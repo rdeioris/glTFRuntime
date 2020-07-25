@@ -49,10 +49,23 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString Url, TMap<F
 		UglTFRuntimeAsset* Asset = nullptr;
 		if (bSuccess)
 		{
-			Asset = glTFLoadAssetFromString(ResponsePtr->GetContentAsString());
+			Asset = glTFLoadAssetFromData(ResponsePtr->GetContent());
 		}
 		Completed.ExecuteIfBound(Asset);
 	}, Completed);
 
 	HttpRequest->ProcessRequest();
+}
+
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArray<uint8> Data)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+		return nullptr;
+	TArray64<uint8> Data64;
+	Data64.Append(Data);
+	if (!Asset->LoadFromData(Data64))
+		return nullptr;
+
+	return Asset;
 }

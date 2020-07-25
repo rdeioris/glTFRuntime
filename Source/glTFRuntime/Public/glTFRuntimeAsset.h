@@ -71,6 +71,7 @@ public:
 
 	bool LoadFromFilename(const FString Filename);
 	bool LoadFromString(const FString JsonData);
+	bool LoadFromData(const TArray64<uint8> Data);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;

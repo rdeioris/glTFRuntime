@@ -294,7 +294,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 	if (!JsonImageObject)
 		return nullptr;
 
-	TArray<uint8> Bytes;
+	TArray64<uint8> Bytes;
 	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
 
 	FString Uri;
@@ -343,7 +343,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 		return nullptr;
 	}
 
-	TArray<uint8> UncompressedBytes;
+	TArray64<uint8> UncompressedBytes;
 	if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
 	{
 		AddError("LoadTexture()", "Unable to get raw image data");

@@ -308,7 +308,9 @@ public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject);
 
 	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString Filename);
+	static TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data);
 	static TSharedPtr<FglTFRuntimeParser> FromString(const FString JsonData);
+	static TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data);
 
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
@@ -333,16 +335,16 @@ public:
 
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 
-	bool GetBuffer(int32 BufferIndex, TArray<uint8>& Bytes);
-	bool GetBufferView(int32 BufferViewIndex, TArray<uint8>& Bytes, int64& Stride);
-	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray<uint8>& Bytes);
+	bool GetBuffer(int32 BufferIndex, TArray64<uint8>& Bytes);
+	bool GetBufferView(int32 BufferViewIndex, TArray64<uint8>& Bytes, int64& Stride);
+	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray64<uint8>& Bytes);
 
 	bool GetAllNodes(TArray<FglTFRuntimeNode>& Nodes);
 
 	int64 GetComponentTypeSize(const int64 ComponentType) const;
 	int64 GetTypeSize(const FString Type) const;
 
-	bool ParseBase64Uri(const FString Uri, TArray<uint8>& Bytes);
+	bool ParseBase64Uri(const FString Uri, TArray64<uint8>& Bytes);
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
 
@@ -358,6 +360,11 @@ public:
 	FglTFRuntimeOnStaticMeshCreated OnStaticMeshCreated;
 	FglTFRuntimeOnSkeletalMeshCreated OnSkeletalMeshCreated;
 
+	void SetBinaryBuffer(TArray64<uint8>& InBinaryBuffer)
+	{
+		BinaryBuffer = InBinaryBuffer;
+	}
+
 protected:
 	TSharedRef<FJsonObject> Root;
 
@@ -367,10 +374,12 @@ protected:
 	TMap<int32, USkeletalMesh*> SkeletalMeshesCache;
 	TMap<int32, UTexture2D*> TexturesCache;
 
-	TMap<int32, TArray<uint8>> BuffersCache;
+	TMap<int32, TArray64<uint8>> BuffersCache;
 
 	TArray<FglTFRuntimeNode> AllNodesCache;
 	bool bAllNodesCached;
+
+	TArray64<uint8> BinaryBuffer;
 
 	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	UMaterialInterface* LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
@@ -424,7 +433,7 @@ protected:
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
 			return false;
 
-		TArray<uint8> Bytes;
+		TArray64<uint8> Bytes;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, Bytes))
 			return false;
@@ -503,7 +512,7 @@ protected:
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
 			return false;
 
-		TArray<uint8> Bytes;
+		TArray64<uint8> Bytes;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, Bytes))
 			return false;
