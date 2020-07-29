@@ -318,7 +318,7 @@ public:
 	UStaticMesh* LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UMaterialInterface* LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
-	UTexture2D* LoadTexture(UObject* Outer, const int32 TextureIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UTexture2D* LoadTexture(UObject* Outer, const int32 TextureIndex, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	bool LoadNodes();
 	bool LoadNode(int32 NodeIndex, FglTFRuntimeNode& Node);

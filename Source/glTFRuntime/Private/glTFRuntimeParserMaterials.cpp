@@ -116,7 +116,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			if (!(*JsonBaseColorTextureObject)->TryGetNumberField("index", TextureIndex))
 				return nullptr;
 
-			UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
+			UTexture2D* Texture = LoadTexture(Material, TextureIndex, TextureCompressionSettings::TC_Default, true, MaterialsConfig);
 			if (!Texture)
 			{
 				return nullptr;
@@ -148,7 +148,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			if (!(*JsonMetallicRoughnessTextureObject)->TryGetNumberField("index", TextureIndex))
 				return nullptr;
 
-			UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
+			UTexture2D* Texture = LoadTexture(Material, TextureIndex, TextureCompressionSettings::TC_Default, false, MaterialsConfig);
 			if (!Texture)
 				return nullptr;
 
@@ -167,7 +167,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonNormalTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
+		UTexture2D* Texture = LoadTexture(Material, TextureIndex, TextureCompressionSettings::TC_Normalmap, false, MaterialsConfig);
 		if (!Texture)
 			return nullptr;
 
@@ -185,9 +185,12 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonOcclusionTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
+		UTexture2D* Texture = LoadTexture(Material, TextureIndex, TextureCompressionSettings::TC_Default, false, MaterialsConfig);
 		if (!Texture)
 			return nullptr;
+
+		Texture->SRGB = false;
+		Texture->CompressionSettings = TextureCompressionSettings::TC_Default;
 
 		Material->SetTextureParameterValue("occlusionTexture", Texture);
 		if (!AssignTexCoord(*JsonOcclusionTextureObject, Material, "occlusionTexCoord"))
@@ -220,7 +223,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		if (!(*JsonEmissiveTextureObject)->TryGetNumberField("index", TextureIndex))
 			return nullptr;
 
-		UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
+		UTexture2D* Texture = LoadTexture(Material, TextureIndex, TextureCompressionSettings::TC_Default, true, MaterialsConfig);
 		if (!Texture)
 			return nullptr;
 
@@ -252,20 +255,20 @@ bool FglTFRuntimeParser::AssignTexCoord(TSharedPtr<FJsonObject> JsonTextureObjec
 	return true;
 }
 
-UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 TextureIndex, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
-	if (Index < 0)
+	if (TextureIndex < 0)
 		return nullptr;
 
-	if (MaterialsConfig.TexturesOverrideMap.Contains(Index))
+	if (MaterialsConfig.TexturesOverrideMap.Contains(TextureIndex))
 	{
-		return MaterialsConfig.TexturesOverrideMap[Index];
+		return MaterialsConfig.TexturesOverrideMap[TextureIndex];
 	}
 
 	// first check cache
-	if (TexturesCache.Contains(Index))
+	if (TexturesCache.Contains(TextureIndex))
 	{
-		return TexturesCache[Index];
+		return TexturesCache[TextureIndex];
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonTextures;
@@ -275,12 +278,12 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 		return nullptr;
 	}
 
-	if (Index >= JsonTextures->Num())
+	if (TextureIndex >= JsonTextures->Num())
 	{
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonObject> JsonTextureObject = (*JsonTextures)[Index]->AsObject();
+	TSharedPtr<FJsonObject> JsonTextureObject = (*JsonTextures)[TextureIndex]->AsObject();
 	if (!JsonTextureObject)
 		return nullptr;
 
@@ -412,9 +415,12 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 Index, c
 		FMemory::Memcpy(Data, UncompressedBytes.GetData(), UncompressedBytes.Num());
 		Mip->BulkData.Unlock();
 
+		Texture->CompressionSettings = Compression;
+		Texture->SRGB = sRGB;
+
 		Texture->UpdateResource();
 
-		TexturesCache.Add(Index, Texture);
+		TexturesCache.Add(TextureIndex, Texture);
 
 		return Texture;
 	}

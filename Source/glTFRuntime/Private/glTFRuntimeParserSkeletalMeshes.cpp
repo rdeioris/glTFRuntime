@@ -83,11 +83,12 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	int32 MatIndex = 0;
 	TMap<int32, int32> BonesCache;
 
+	bool bHasNormals = false;
+
 #if WITH_EDITOR
 	TArray<SkeletalMeshImportData::FVertex> Wedges;
 	TArray<SkeletalMeshImportData::FTriangle> Triangles;
 	TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
-
 
 	for (FglTFRuntimePrimitive& Primitive : Primitives)
 	{
@@ -164,6 +165,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 					Triangle.TangentZ[0] = Primitive.Normals[Primitive.Indices[i - 2]];
 					Triangle.TangentZ[1] = Primitive.Normals[Primitive.Indices[i - 1]];
 					Triangle.TangentZ[2] = Primitive.Normals[Primitive.Indices[i]];
+					bHasNormals = true;
 				}
 
 				if (Primitive.Tangents.Num() > 0)
@@ -190,7 +192,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 
 	FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences);
 
-	ImportData.bHasNormals = true;
+	ImportData.bHasNormals = bHasNormals;
 	ImportData.bHasVertexColors = false;
 	ImportData.bHasTangents = false;
 	ImportData.Faces = Triangles;
@@ -267,6 +269,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			if (Index < Primitive.Normals.Num())
 			{
 				ModelVertex.TangentZ = Primitive.Normals[Index];
+				bHasNormals = true;
 			}
 			if (Index < Primitive.Tangents.Num())
 			{
@@ -341,7 +344,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	LODInfo.ReductionSettings.NumOfTrianglesPercentage = 1.0f;
 	LODInfo.ReductionSettings.NumOfVertPercentage = 1.0f;
 	LODInfo.ReductionSettings.MaxDeviationPercentage = 0.0f;
-	LODInfo.BuildSettings.bRecomputeNormals = false;
+	LODInfo.BuildSettings.bRecomputeNormals = !bHasNormals;
 	LODInfo.LODHysteresis = 0.02f;
 
 	SkeletalMesh->CalculateInvRefMatrices();
