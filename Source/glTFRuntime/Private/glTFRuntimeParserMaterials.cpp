@@ -178,6 +178,24 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		}
 	}
 
+	const TSharedPtr<FJsonObject>* JsonOcclusionTextureObject;
+	if (JsonMaterialObject->TryGetObjectField("occlusionTexture", JsonOcclusionTextureObject))
+	{
+		int64 TextureIndex;
+		if (!(*JsonOcclusionTextureObject)->TryGetNumberField("index", TextureIndex))
+			return nullptr;
+
+		UTexture2D* Texture = LoadTexture(Material, TextureIndex, MaterialsConfig);
+		if (!Texture)
+			return nullptr;
+
+		Material->SetTextureParameterValue("occlusionTexture", Texture);
+		if (!AssignTexCoord(*JsonOcclusionTextureObject, Material, "occlusionTexCoord"))
+		{
+			return nullptr;
+		}
+	}
+
 	const TArray<TSharedPtr<FJsonValue>>* emissiveFactorValues;
 	if (JsonMaterialObject->TryGetArrayField("emissiveFactor", emissiveFactorValues))
 	{
