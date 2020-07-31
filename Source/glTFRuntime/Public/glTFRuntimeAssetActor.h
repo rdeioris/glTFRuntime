@@ -24,6 +24,11 @@ protected:
 
 	TMap<USceneComponent*, float>  CurveBasedAnimationsTimeTracker;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "glTFRuntime")
+	TSet<FString> DiscoveredCurveAnimationsNames;
+
+	TMap<USceneComponent*, TMap<FString, UglTFRuntimeAnimationCurve*>> DiscoveredCurveAnimations;
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -45,6 +50,9 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On SkeletalMeshComponent Created"))
 	void ReceiveOnSkeletalMeshComponentCreated(USkeletalMeshComponent* SkeletalMeshComponent);
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	void SetCurveAnimationByName(const FString CurveAnimationName);
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")

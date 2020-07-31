@@ -273,6 +273,13 @@ UglTFRuntimeAnimationCurve* UglTFRuntimeAsset::LoadNodeAnimationCurve(const int3
 	return Parser->LoadNodeAnimationCurve(NodeIndex);
 }
 
+TArray<UglTFRuntimeAnimationCurve*> UglTFRuntimeAsset::LoadAllNodeAnimationCurves(const int32 NodeIndex)
+{
+	GLTF_CHECK_PARSER(TArray<UglTFRuntimeAnimationCurve*>());
+
+	return Parser->LoadAllNodeAnimationCurves(NodeIndex);
+}
+
 UAnimSequence* UglTFRuntimeAsset::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);

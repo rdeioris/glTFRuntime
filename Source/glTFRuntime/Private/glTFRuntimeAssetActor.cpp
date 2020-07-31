@@ -101,12 +101,19 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	// check for animations
 	if (!NewComponent->IsA<USkeletalMeshComponent>())
 	{
-		UglTFRuntimeAnimationCurve* AnimationCurve = Asset->LoadNodeAnimationCurve(Node.Index);
-		if (AnimationCurve)
+		TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
+		TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
+		for (UglTFRuntimeAnimationCurve* ComponentAnimationCurve : ComponentAnimationCurves)
 		{
-			CurveBasedAnimations.Add(NewComponent, AnimationCurve);
-			CurveBasedAnimationsTimeTracker.Add(NewComponent, 0);
+			if (!CurveBasedAnimations.Contains(NewComponent))
+			{
+				CurveBasedAnimations.Add(NewComponent, ComponentAnimationCurve);
+				CurveBasedAnimationsTimeTracker.Add(NewComponent, 0);
+			}
+			DiscoveredCurveAnimationsNames.Add(ComponentAnimationCurve->glTFCurveAnimationName);
+			ComponentAnimationCurvesMap.Add(ComponentAnimationCurve->glTFCurveAnimationName, ComponentAnimationCurve);
 		}
+		DiscoveredCurveAnimations.Add(NewComponent, ComponentAnimationCurvesMap);
 	}
 	else
 	{
@@ -133,6 +140,31 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	}
 }
 
+void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString CurveAnimationName)
+{
+	if (!DiscoveredCurveAnimationsNames.Contains(CurveAnimationName))
+	{
+		return;
+	}
+
+	for (TPair<USceneComponent*, UglTFRuntimeAnimationCurve*>& Pair : CurveBasedAnimations)
+	{
+
+		TMap<FString, UglTFRuntimeAnimationCurve*> WantedCurveAnimationsMap = DiscoveredCurveAnimations[Pair.Key];
+		if (WantedCurveAnimationsMap.Contains(CurveAnimationName))
+		{
+			Pair.Value = WantedCurveAnimationsMap[CurveAnimationName];
+			CurveBasedAnimationsTimeTracker[Pair.Key] = 0;
+		}
+		else
+		{
+			Pair.Value = nullptr;
+		}
+
+	}
+
+}
+
 // Called every frame
 void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 {
@@ -140,6 +172,11 @@ void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 
 	for (TPair<USceneComponent*, UglTFRuntimeAnimationCurve*>& Pair : CurveBasedAnimations)
 	{
+		// the curve could be null
+		if (!Pair.Value)
+		{
+			continue;
+		}
 		float MinTime;
 		float MaxTime;
 		Pair.Value->GetTimeRange(MinTime, MaxTime);

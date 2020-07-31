@@ -60,6 +60,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
+
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool NodeIsBone(const int32 NodeIndex);
 
