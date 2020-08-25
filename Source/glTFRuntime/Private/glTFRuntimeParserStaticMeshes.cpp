@@ -147,6 +147,35 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	StaticMesh->StaticMaterials = StaticMaterials;
 
 	TArray<UStaticMeshDescription*> MeshDescriptions = { MeshDescription };
+
+	if (StaticMeshConfig.PivotPosition != EglTFRuntimePivotPosition::Asset)
+	{
+		for (UStaticMeshDescription* OriginalMeshDescription : MeshDescriptions)
+		{
+			FBoxSphereBounds MeshBounds = OriginalMeshDescription->GetMeshDescription().GetBounds();
+			FVector PivotDelta = FVector::ZeroVector;
+			TVertexAttributesRef<FVector> VertexPositions = OriginalMeshDescription->GetVertexPositions();
+
+			if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Center)
+			{
+				PivotDelta = MeshBounds.GetSphere().Center;
+			}
+			else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Top)
+			{
+				PivotDelta = MeshBounds.GetBox().GetCenter() + FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
+			}
+			else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Bottom)
+			{
+				PivotDelta = MeshBounds.GetBox().GetCenter() - FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
+			}
+
+			for (const FVertexID VertexID : OriginalMeshDescription->Vertices().GetElementIDs())
+			{
+				VertexPositions[VertexID] -= PivotDelta ;
+			}
+		}
+	}
+
 	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, false);
 
 	if (!StaticMesh->BodySetup)
@@ -213,7 +242,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	}
 
 	return StaticMesh;
-}
+			}
 
 bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {

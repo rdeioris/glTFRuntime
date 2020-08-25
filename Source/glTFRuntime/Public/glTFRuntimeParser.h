@@ -88,6 +88,15 @@ enum class EglTFRuntimeCacheMode : uint8
 	Write
 };
 
+UENUM()
+enum class EglTFRuntimePivotPosition : uint8
+{
+	Asset,
+	Center,
+	Top,
+	Bottom
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSocket
 {
@@ -145,6 +154,9 @@ struct FglTFRuntimeStaticMeshConfig
 	bool bAllowCPUAccess;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimePivotPosition PivotPosition;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	UObject* Outer;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -158,6 +170,7 @@ struct FglTFRuntimeStaticMeshConfig
 		Outer = nullptr;
 		CollisionComplexity = ECollisionTraceFlag::CTF_UseDefault;
 		bAllowCPUAccess = true;
+		PivotPosition = EglTFRuntimePivotPosition::Asset;
 	}
 };
 
