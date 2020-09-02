@@ -6,6 +6,7 @@
 #include "UObject/NoExportTypes.h"
 #include "glTFRuntimeParser.h"
 #include "Animation/AnimMontage.h"
+#include "Camera/CameraActor.h"
 #include "glTFRuntimeAsset.generated.h"
 
 /**
@@ -62,6 +63,18 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	TArray<FString> GetCamerasNames();
+
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"), Category = "glTFRuntime")
+	ACameraActor* LoadNodeCamera(UObject* WorldContextObject, const int32 NodeIndex, TSubclassOf<ACameraActor> CameraActorClass);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	TArray<int32> GetCameraNodesIndices();
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	bool LoadCamera(const int32 CameraIndex, UCameraComponent* CameraComponent);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool NodeIsBone(const int32 NodeIndex);

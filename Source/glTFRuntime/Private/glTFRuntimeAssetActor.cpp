@@ -53,7 +53,18 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	}
 
 	USceneComponent* NewComponent = nullptr;
-	if (Node.MeshIndex < 0)
+	if (Node.CameraIndex != INDEX_NONE)
+	{
+		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, *Node.Name);
+		NewCameraComponent->SetupAttachment(NodeParentComponent);
+		NewCameraComponent->RegisterComponent();
+		NewCameraComponent->SetRelativeTransform(Node.Transform);
+		AddInstanceComponent(NewCameraComponent);
+		Asset->LoadCamera(Node.CameraIndex, NewCameraComponent);
+		NewComponent = NewCameraComponent;
+
+	}
+	else if (Node.MeshIndex < 0)
 	{
 		NewComponent = NewObject<USceneComponent>(this, *Node.Name);
 		NewComponent->SetupAttachment(NodeParentComponent);

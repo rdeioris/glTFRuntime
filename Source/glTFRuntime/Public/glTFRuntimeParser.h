@@ -7,6 +7,7 @@
 #include "Dom/JsonObject.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
+#include "Camera/CameraComponent.h"
 #include "glTFRuntimeAnimationCurve.h"
 
 #include "glTFRuntimeParser.generated.h"
@@ -53,6 +54,9 @@ struct FglTFRuntimeNode
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
 	int32 SkinIndex;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
+	int32 CameraIndex;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
 	TArray<int32> ChildrenIndices;
@@ -354,6 +358,10 @@ public:
 	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray64<uint8>& Bytes);
 
 	bool GetAllNodes(TArray<FglTFRuntimeNode>& Nodes);
+
+	TArray<FString> GetCamerasNames();
+
+	bool LoadCameraIntoCameraComponent(const int32 CameraIndex, UCameraComponent* CameraComponent);
 
 	int64 GetComponentTypeSize(const int64 ComponentType) const;
 	int64 GetTypeSize(const FString Type) const;

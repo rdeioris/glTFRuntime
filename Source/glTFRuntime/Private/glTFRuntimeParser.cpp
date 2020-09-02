@@ -392,6 +392,8 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 
 	Node.SkinIndex = GetJsonObjectIndex(JsonNodeObject, "skin", INDEX_NONE);
 
+	Node.CameraIndex = GetJsonObjectIndex(JsonNodeObject, "camera", INDEX_NONE);
+
 	FMatrix Matrix = FMatrix::Identity;
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues;
@@ -569,6 +571,35 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 	}
 
 	return true;
+}
+
+TArray<FString> FglTFRuntimeParser::GetCamerasNames()
+{
+	TArray<FString> CamerasNames;
+	const TArray<TSharedPtr<FJsonValue>>* JsonCameras;
+	if (!Root->TryGetArrayField("cameras", JsonCameras))
+	{
+		return CamerasNames;
+	}
+
+	for (TSharedPtr<FJsonValue> JsonCamera : *JsonCameras)
+	{
+		TSharedPtr<FJsonObject> JsonCameraObject = JsonCamera->AsObject();
+		if (!JsonCameraObject)
+		{
+			continue;
+		}
+
+		FString CameraName;
+		if (!JsonCameraObject->TryGetStringField("name", CameraName))
+		{
+			continue;
+		}
+
+		CamerasNames.Add(CameraName);
+	}
+
+	return CamerasNames;
 }
 
 UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int32 NodeIndex)
@@ -782,11 +813,101 @@ int32 FglTFRuntimeParser::FindCommonRoot(TArray<int32> Indices)
 	return CurrentRootIndex;
 }
 
+bool FglTFRuntimeParser::LoadCameraIntoCameraComponent(const int32 CameraIndex, UCameraComponent* CameraComponent)
+{
+	if (!CameraComponent)
+	{
+		AddError("LoadCameraIntoCameraComponent()", "No valid CameraComponent specified.");
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> CameraObject = GetJsonObjectFromRootIndex("cameras", CameraIndex);
+	if (!CameraObject)
+	{
+		AddError("LoadCameraIntoCameraComponent()", "Invalid Camera Index.");
+		return false;
+	}
+
+	FString CameraType = GetJsonObjectString(CameraObject.ToSharedRef(), "type", "");
+	if (CameraType.IsEmpty())
+	{
+		AddError("LoadCameraIntoCameraComponent()", "No Camera type specified.");
+		return false;
+	}
+
+	if (CameraType.Equals("perspective", ESearchCase::IgnoreCase))
+	{
+		CameraComponent->ProjectionMode = ECameraProjectionMode::Perspective;
+		const TSharedPtr<FJsonObject>* PerspectiveObject;
+		if (CameraObject->TryGetObjectField("perspective", PerspectiveObject))
+		{
+			double AspectRatio;
+			if ((*PerspectiveObject)->TryGetNumberField("aspectRatio", AspectRatio))
+			{
+				CameraComponent->AspectRatio = AspectRatio;
+			}
+
+			double YFov;
+			if ((*PerspectiveObject)->TryGetNumberField("yfov", YFov))
+			{
+				CameraComponent->FieldOfView = FMath::RadiansToDegrees(YFov) * CameraComponent->AspectRatio;
+			}
+		}
+
+		return true;
+	}
+
+	if (CameraType.Equals("orthographic", ESearchCase::IgnoreCase))
+	{
+		CameraComponent->ProjectionMode = ECameraProjectionMode::Orthographic;
+		const TSharedPtr<FJsonObject>* OrthographicObject;
+		if (CameraObject->TryGetObjectField("orthographic", OrthographicObject))
+		{
+			double XMag;
+			if (!(*OrthographicObject)->TryGetNumberField("xmag", XMag))
+			{
+				AddError("LoadCameraIntoCameraComponent()", "No Orthographic Width specified.");
+				return false;
+			}
+			double YMag;
+			if (!(*OrthographicObject)->TryGetNumberField("ymag", YMag))
+			{
+				AddError("LoadCameraIntoCameraComponent()", "No Orthographic Height specified.");
+				return false;
+			}
+			double ZFar;
+			if (!(*OrthographicObject)->TryGetNumberField("zfar", ZFar))
+			{
+				AddError("LoadCameraIntoCameraComponent()", "No Orthographic Far specified.");
+				return false;
+			}
+			double ZNear;
+			if (!(*OrthographicObject)->TryGetNumberField("znear", ZNear))
+			{
+				AddError("LoadCameraIntoCameraComponent()", "No Orthographic Near specified.");
+				return false;
+			}
+
+			CameraComponent->AspectRatio = XMag / YMag;
+			CameraComponent->OrthoWidth = XMag * SceneScale;
+
+			CameraComponent->OrthoFarClipPlane = ZFar * SceneScale;
+			CameraComponent->OrthoNearClipPlane = ZNear * SceneScale;
+		}
+		return true;
+	}
+
+	AddError("LoadCameraIntoCameraComponent()", "Unsupported Camera Type.");
+	return false;
+}
+
 USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
 	if (!JsonSkinObject)
+	{
 		return nullptr;
+	}
 
 	TMap<int32, FName> BoneMap;
 

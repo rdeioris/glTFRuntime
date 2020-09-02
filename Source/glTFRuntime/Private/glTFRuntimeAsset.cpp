@@ -133,11 +133,92 @@ bool UglTFRuntimeAsset::GetNode(const int32 NodeIndex, FglTFRuntimeNode& Node)
 	return Parser->LoadNode(NodeIndex, Node);
 }
 
+ACameraActor* UglTFRuntimeAsset::LoadNodeCamera(UObject* WorldContextObject, const int32 NodeIndex, TSubclassOf<ACameraActor> CameraActorClass)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	if (!CameraActorClass)
+	{
+		Parser->AddError("UglTFRuntimeAsset::LoadNodeCamera()", "Invalid Camera Actor Class.");
+		return nullptr;
+	}
+
+	FglTFRuntimeNode Node;
+	if (!Parser->LoadNode(NodeIndex, Node))
+	{
+		return nullptr;
+	}
+
+	if (Node.CameraIndex == INDEX_NONE)
+	{
+		Parser->AddError("UglTFRuntimeAsset::LoadNodeCamera()", "Node has no valid associated Camera.");
+		return nullptr;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!World)
+	{
+		Parser->AddError("UglTFRuntimeAsset::LoadNodeCamera()", "Unable to retrieve World.");
+		return nullptr;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ACameraActor* NewCameraActor = World->SpawnActor<ACameraActor>(CameraActorClass, Node.Transform, SpawnParameters);
+	if (!NewCameraActor)
+	{
+		return nullptr;
+	}
+
+	UCameraComponent* CameraComponent = NewCameraActor->FindComponentByClass<UCameraComponent>();
+	if (!Parser->LoadCameraIntoCameraComponent(Node.CameraIndex, CameraComponent))
+	{
+		return nullptr;
+	}
+	return NewCameraActor;
+}
+
+bool UglTFRuntimeAsset::LoadCamera(const int32 CameraIndex, UCameraComponent* CameraComponent)
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->LoadCameraIntoCameraComponent(CameraIndex, CameraComponent);
+}
+
+TArray<int32> UglTFRuntimeAsset::GetCameraNodesIndices()
+{
+	TArray<int32> NodeIndices;
+
+	GLTF_CHECK_PARSER(NodeIndices);
+
+	TArray<FglTFRuntimeNode> Nodes;
+	if (Parser->GetAllNodes(Nodes))
+	{
+		for (FglTFRuntimeNode& Node : Nodes)
+		{
+			if (Node.CameraIndex == INDEX_NONE)
+			{
+				continue;
+			}
+			NodeIndices.Add(Node.Index);
+		}
+	}
+
+	return NodeIndices;
+}
+
 bool UglTFRuntimeAsset::GetNodeByName(const FString NodeName, FglTFRuntimeNode& Node)
 {
 	GLTF_CHECK_PARSER(false);
 
 	return Parser->LoadNodeByName(NodeName, Node);
+}
+
+TArray<FString> UglTFRuntimeAsset::GetCamerasNames()
+{
+	GLTF_CHECK_PARSER(TArray<FString>());
+
+	return Parser->GetCamerasNames();
 }
 
 UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
