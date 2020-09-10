@@ -151,7 +151,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	}
 }
 
-void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString CurveAnimationName)
+void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimationName)
 {
 	if (!DiscoveredCurveAnimationsNames.Contains(CurveAnimationName))
 	{

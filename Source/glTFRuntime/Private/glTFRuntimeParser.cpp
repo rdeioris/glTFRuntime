@@ -9,36 +9,39 @@
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString Filename)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename)
 {
 	TArray64<uint8> Content;
 	if (!FFileHelper::LoadFileToArray(Content, *Filename))
 	{
 		return nullptr;
 	}
-	return FromData(Content);
+	return FromData(Content.GetData(), Content.Num());
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const TArray64<uint8> Data)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum)
 {
 	// detect binary format
-	if (Data.Num() > 20)
+	if (DataNum > 20)
 	{
-		if (Data[0] == 0x67 &&
-			Data[1] == 0x6C &&
-			Data[2] == 0x54 &&
-			Data[3] == 0x46)
+		if (DataPtr[0] == 0x67 &&
+			DataPtr[1] == 0x6C &&
+			DataPtr[2] == 0x54 &&
+			DataPtr[3] == 0x46)
 		{
-			return FromBinary(Data);
+			return FromBinary(DataPtr, DataNum);
 		}
 	}
-
-	FString JsonData;
-	FFileHelper::BufferToString(JsonData, Data.GetData(), Data.Num());
-	return FromString(JsonData);
+	if (DataNum <= INT32_MAX)
+	{
+		FString JsonData;
+		FFileHelper::BufferToString(JsonData, DataPtr, (int32)DataNum);
+		return FromString(JsonData);
+	}
+	return nullptr;
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString JsonData)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData)
 {
 	TSharedPtr<FJsonValue> RootValue;
 
@@ -55,7 +58,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString Json
 	return MakeShared<FglTFRuntimeParser>(JsonObject.ToSharedRef());
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const TArray64<uint8> Data)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum)
 {
 	FString JsonData;
 	TArray64<uint8> BinaryBuffer;
@@ -64,11 +67,9 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const TArray64<uin
 	bool bBinaryFound = false;
 	int64 BlobIndex = 12;
 
-	const uint8* DataPtr = Data.GetData();
-
-	while (BlobIndex < Data.Num())
+	while (BlobIndex < DataNum)
 	{
-		if (BlobIndex + 8 > Data.Num())
+		if (BlobIndex + 8 > DataNum)
 		{
 			return nullptr;
 		}
@@ -78,7 +79,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const TArray64<uin
 
 		BlobIndex += 8;
 
-		if ((BlobIndex + *ChunkLength) > Data.Num())
+		if ((BlobIndex + *ChunkLength) > DataNum)
 		{
 			return nullptr;
 		}
@@ -113,7 +114,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const TArray64<uin
 	return Parser;
 }
 
-FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, FMatrix InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
+FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
 {
 	bAllNodesCached = false;
 
@@ -214,7 +215,7 @@ bool FglTFRuntimeParser::LoadScenes(TArray<FglTFRuntimeScene>& Scenes)
 	return true;
 }
 
-bool FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems)
+bool FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems)
 {
 	if (Index < 0)
 		return false;
@@ -238,7 +239,7 @@ bool FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, cons
 	return true;
 }
 
-TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 Index)
+TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index)
 {
 	TArray<TSharedRef<FJsonValue>> JsonArray;
 	if (!CheckJsonIndex(JsonObject, FieldName, Index, JsonArray))
@@ -249,7 +250,7 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromIndex(TSharedRef<FJ
 	return JsonArray[Index]->AsObject();
 }
 
-FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const FString DefaultValue)
+FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue)
 {
 	FString Value;
 	if (!JsonObject->TryGetStringField(FieldName, Value))
@@ -259,7 +260,7 @@ FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObje
 	return Value;
 }
 
-int32 FglTFRuntimeParser::GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 DefaultValue)
+int32 FglTFRuntimeParser::GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 DefaultValue)
 {
 	int64 Value;
 	if (!JsonObject->TryGetNumberField(FieldName, Value))
@@ -348,7 +349,7 @@ bool FglTFRuntimeParser::LoadNodeByName(FString Name, FglTFRuntimeNode& Node)
 	return false;
 }
 
-void FglTFRuntimeParser::AddError(const FString ErrorContext, const FString ErrorMessage)
+void FglTFRuntimeParser::AddError(const FString& ErrorContext, const FString& ErrorMessage)
 {
 	FString FullMessage = ErrorContext + ": " + ErrorMessage;
 	Errors.Add(FullMessage);
@@ -787,7 +788,7 @@ int32 FglTFRuntimeParser::FindTopRoot(int32 Index)
 	return Node.Index;
 }
 
-int32 FglTFRuntimeParser::FindCommonRoot(TArray<int32> Indices)
+int32 FglTFRuntimeParser::FindCommonRoot(const TArray<int32>& Indices)
 {
 	int32 CurrentRootIndex = Indices[0];
 	bool bTryNextParent = true;
@@ -1414,7 +1415,7 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 	return false;
 }
 
-bool FglTFRuntimeParser::ParseBase64Uri(const FString Uri, TArray64<uint8>& Bytes)
+bool FglTFRuntimeParser::ParseBase64Uri(const FString& Uri, TArray64<uint8>& Bytes)
 {
 	// check it is a valid base64 data uri
 	if (!Uri.StartsWith("data:"))
@@ -1711,7 +1712,7 @@ int64 FglTFRuntimeParser::GetComponentTypeSize(const int64 ComponentType) const
 	return 0;
 }
 
-int64 FglTFRuntimeParser::GetTypeSize(const FString Type) const
+int64 FglTFRuntimeParser::GetTypeSize(const FString& Type) const
 {
 	if (Type == "SCALAR")
 		return 1;
@@ -1741,7 +1742,7 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(MaterialsMap);
 }
 
-float FglTFRuntimeParser::FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)
+float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)
 {
 	SecondIndex = INDEX_NONE;
 	// first search for second (higher value)

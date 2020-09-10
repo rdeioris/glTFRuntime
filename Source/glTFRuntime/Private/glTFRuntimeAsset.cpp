@@ -10,7 +10,7 @@
 	}\
 
 
-bool UglTFRuntimeAsset::LoadFromFilename(const FString Filename)
+bool UglTFRuntimeAsset::LoadFromFilename(const FString& Filename)
 {
 	// asset already loaded ?
 	if (Parser)
@@ -32,7 +32,7 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString Filename)
 	return Parser != nullptr;
 }
 
-bool UglTFRuntimeAsset::LoadFromString(const FString JsonData)
+bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData)
 {
 	// asset already loaded ?
 	if (Parser)
@@ -54,7 +54,7 @@ bool UglTFRuntimeAsset::LoadFromString(const FString JsonData)
 	return Parser != nullptr;
 }
 
-bool UglTFRuntimeAsset::LoadFromData(const TArray64<uint8> Data)
+bool UglTFRuntimeAsset::LoadFromData(const uint8* DataPtr, int64 DataNum)
 {
 	// asset already loaded ?
 	if (Parser)
@@ -62,7 +62,7 @@ bool UglTFRuntimeAsset::LoadFromData(const TArray64<uint8> Data)
 		return false;
 	}
 
-	Parser = FglTFRuntimeParser::FromData(Data);
+	Parser = FglTFRuntimeParser::FromData(DataPtr, DataNum);
 	if (Parser)
 	{
 		FScriptDelegate Delegate;
@@ -76,7 +76,7 @@ bool UglTFRuntimeAsset::LoadFromData(const TArray64<uint8> Data)
 	return Parser != nullptr;
 }
 
-void UglTFRuntimeAsset::OnErrorProxy(const FString ErrorContext, const FString ErrorMessage)
+void UglTFRuntimeAsset::OnErrorProxy(const FString& ErrorContext, const FString& ErrorMessage)
 {
 	if (OnError.IsBound())
 	{
@@ -207,7 +207,7 @@ TArray<int32> UglTFRuntimeAsset::GetCameraNodesIndices()
 	return NodeIndices;
 }
 
-bool UglTFRuntimeAsset::GetNodeByName(const FString NodeName, FglTFRuntimeNode& Node)
+bool UglTFRuntimeAsset::GetNodeByName(const FString& NodeName, FglTFRuntimeNode& Node)
 {
 	GLTF_CHECK_PARSER(false);
 
@@ -228,7 +228,7 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(const int32 MeshIndex, const FglT
 	return Parser->LoadStaticMesh(MeshIndex, StaticMeshConfig);
 }
 
-UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString& MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
@@ -256,7 +256,7 @@ UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalM
 	return Parser->LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, SkeletalAnimationConfig);
 }
 
-UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
@@ -328,7 +328,7 @@ bool UglTFRuntimeAsset::BuildTransformFromNodeForward(const int32 NodeIndex, con
 	return true;
 }
 
-UAnimMontage* UglTFRuntimeAsset::LoadSkeletalAnimationAsMontage(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FString SlotNodeName, const FglTFRuntimeSkeletalAnimationConfig AnimationConfig)
+UAnimMontage* UglTFRuntimeAsset::LoadSkeletalAnimationAsMontage(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FString& SlotNodeName, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig)
 {
 	UAnimSequence* AnimSequence = LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, AnimationConfig);
 	if (!AnimSequence)
@@ -361,14 +361,14 @@ TArray<UglTFRuntimeAnimationCurve*> UglTFRuntimeAsset::LoadAllNodeAnimationCurve
 	return Parser->LoadAllNodeAnimationCurves(NodeIndex);
 }
 
-UAnimSequence* UglTFRuntimeAsset::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
+UAnimSequence* UglTFRuntimeAsset::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadNodeSkeletalAnimation(SkeletalMesh, NodeIndex, SkeletalAnimationConfig);
 }
 
-bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32> NodeIndices, const FString NodeName, FglTFRuntimeNode& Node)
+bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32>& NodeIndices, const FString& NodeName, FglTFRuntimeNode& Node)
 {
 	GLTF_CHECK_PARSER(false);
 
