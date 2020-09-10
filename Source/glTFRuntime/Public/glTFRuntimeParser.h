@@ -329,6 +329,11 @@ public:
 	static TSharedPtr<FglTFRuntimeParser> FromString(const FString& JsonData);
 	static TSharedPtr<FglTFRuntimeParser> FromData(const uint8* DataPtr, int64 DataNum);
 
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray<uint8> Data) { return FromBinary(Data.GetData(), Data.Num()); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data) { return FromBinary(Data.GetData(), Data.Num()); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray<uint8> Data) { return FromData(Data.GetData(), Data.Num()); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data) { return FromData(Data.GetData(), Data.Num()); }
+
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
