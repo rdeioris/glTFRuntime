@@ -6,7 +6,7 @@
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString Filename, const bool bPathRelativeToContent)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
@@ -24,7 +24,7 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const 
 	return Asset;
 }
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FString JsonData)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FString& JsonData)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
@@ -35,7 +35,7 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FS
 	return Asset;
 }
 
-void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString Url, TMap<FString, FString> Headers, FglTFRuntimeHttpResponse Completed)
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed)
 {
 	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
 	HttpRequest->SetURL(Url);
@@ -57,14 +57,12 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString Url, TMap<F
 	HttpRequest->ProcessRequest();
 }
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArray<uint8> Data)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArray<uint8>& Data)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
 		return nullptr;
-	TArray64<uint8> Data64;
-	Data64.Append(Data);
-	if (!Asset->LoadFromData(Data64))
+	if (!Asset->LoadFromData(Data.GetData(), Data.Num()))
 		return nullptr;
 
 	return Asset;

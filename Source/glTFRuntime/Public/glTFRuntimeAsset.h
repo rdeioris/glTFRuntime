@@ -29,16 +29,16 @@ public:
 	bool GetNode(const int32 NodeIndex, FglTFRuntimeNode& Node);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	bool GetNodeByName(const FString NodeName, FglTFRuntimeNode& Node);
+	bool GetNodeByName(const FString& NodeName, FglTFRuntimeNode& Node);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	bool FindNodeByNameInArray(const TArray<int32> NodeIndices, const FString NodeName, FglTFRuntimeNode& Node);
+	bool FindNodeByNameInArray(const TArray<int32>& NodeIndices, const FString& NodeName, FglTFRuntimeNode& Node);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "StaticMeshConfig", AutoCreateRefTerm = "StaticMeshConfig"), Category = "glTFRuntime")
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "StaticMeshConfig", AutoCreateRefTerm = "StaticMeshConfig"), Category = "glTFRuntime")
-	UStaticMesh* LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	UStaticMesh* LoadStaticMeshByName(const FString& MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalMeshConfig", AutoCreateRefTerm = "SkeletalMeshConfig"), Category = "glTFRuntime")
 	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig);
@@ -50,13 +50,13 @@ public:
 	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
-	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
+	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
-	UAnimSequence* LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
+	UAnimSequence* LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
-	UAnimMontage* LoadSkeletalAnimationAsMontage(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FString SlotNodeName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
+	UAnimMontage* LoadSkeletalAnimationAsMontage(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FString& SlotNodeName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
@@ -85,9 +85,11 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool BuildTransformFromNodeForward(const int32 NodeIndex, const int32 LastNodeIndex, FTransform& Transform);
 
-	bool LoadFromFilename(const FString Filename);
-	bool LoadFromString(const FString JsonData);
-	bool LoadFromData(const TArray64<uint8> Data);
+	bool LoadFromFilename(const FString& Filename);
+	bool LoadFromString(const FString& JsonData);
+	bool LoadFromData(const uint8* DataPtr, int64 DataNum);
+	FORCEINLINE bool LoadFromData(const TArray<uint8>& Data) { return LoadFromData(Data.GetData(), Data.Num()); }
+	FORCEINLINE bool LoadFromData(const TArray64<uint8>& Data) { return LoadFromData(Data.GetData(), Data.Num()); }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;
@@ -102,7 +104,7 @@ public:
 	FglTFRuntimeOnSkeletalMeshCreated OnSkeletalMeshCreated;
 
 	UFUNCTION()
-	void OnErrorProxy(const FString ErrorContext, const FString ErrorMessage);
+	void OnErrorProxy(const FString& ErrorContext, const FString& ErrorMessage);
 
 	UFUNCTION()
 	void OnStaticMeshCreatedProxy(UStaticMesh* StaticMesh);
