@@ -321,13 +321,18 @@ struct FglTFRuntimePrimitive
 class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject
 {
 public:
-	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, FMatrix InSceneBasis, float InSceneScale);
+	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale);
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject);
 
-	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString Filename);
-	static TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data);
-	static TSharedPtr<FglTFRuntimeParser> FromString(const FString JsonData);
-	static TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data);
+	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString& Filename);
+	static TSharedPtr<FglTFRuntimeParser> FromBinary(const uint8* DataPtr, int64 DataNum);
+	static TSharedPtr<FglTFRuntimeParser> FromString(const FString& JsonData);
+	static TSharedPtr<FglTFRuntimeParser> FromData(const uint8* DataPtr, int64 DataNum);
+
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray<uint8> Data) { return FromBinary(Data.GetData(), Data.Num()); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data) { return FromBinary(Data.GetData(), Data.Num()); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray<uint8> Data) { return FromData(Data.GetData(), Data.Num()); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data) { return FromData(Data.GetData(), Data.Num()); }
 
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
@@ -364,16 +369,16 @@ public:
 	bool LoadCameraIntoCameraComponent(const int32 CameraIndex, UCameraComponent* CameraComponent);
 
 	int64 GetComponentTypeSize(const int64 ComponentType) const;
-	int64 GetTypeSize(const FString Type) const;
+	int64 GetTypeSize(const FString& Type) const;
 
-	bool ParseBase64Uri(const FString Uri, TArray64<uint8>& Bytes);
+	bool ParseBase64Uri(const FString& Uri, TArray64<uint8>& Bytes);
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
 
 	bool LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
-	void AddError(const FString ErrorContext, const FString ErrorMessage);
+	void AddError(const FString& ErrorContext, const FString& ErrorMessage);
 	void ClearErrors();
 
 	bool NodeIsBone(const int32 NodeIndex);
@@ -382,7 +387,7 @@ public:
 	FglTFRuntimeOnStaticMeshCreated OnStaticMeshCreated;
 	FglTFRuntimeOnSkeletalMeshCreated OnSkeletalMeshCreated;
 
-	void SetBinaryBuffer(TArray64<uint8>& InBinaryBuffer)
+	void SetBinaryBuffer(const TArray64<uint8>& InBinaryBuffer)
 	{
 		BinaryBuffer = InBinaryBuffer;
 	}
@@ -417,21 +422,21 @@ protected:
 
 	void FixNodeParent(FglTFRuntimeNode& Node);
 
-	int32 FindCommonRoot(TArray<int32> NodeIndices);
+	int32 FindCommonRoot(const TArray<int32>& NodeIndices);
 	int32 FindTopRoot(int32 NodeIndex);
 	bool HasRoot(int32 NodeIndex, int32 RootIndex);
 
-	bool CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems);
+	bool CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems);
 	bool CheckJsonRootIndex(const FString FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems) { return CheckJsonIndex(Root, FieldName, Index, JsonItems); }
-	TSharedPtr<FJsonObject> GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 Index);
-	TSharedPtr<FJsonObject> GetJsonObjectFromRootIndex(const FString FieldName, const int32 Index) { return GetJsonObjectFromIndex(Root, FieldName, Index); }
+	TSharedPtr<FJsonObject> GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index);
+	TSharedPtr<FJsonObject> GetJsonObjectFromRootIndex(const FString& FieldName, const int32 Index) { return GetJsonObjectFromIndex(Root, FieldName, Index); }
 
-	FString GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const FString DefaultValue);
-	int32 GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject, const FString FieldName, const int32 DefaultValue);
+	FString GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue);
+	int32 GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 DefaultValue);
 
 	bool FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues, FMatrix& Matrix);
 
-	float FindBestFrames(TArray<float> FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex);
+	float FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex);
 
 	void NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton);
 	void NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FVector BoneScale);
@@ -449,7 +454,7 @@ protected:
 	TArray<FString> Errors;
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedElements, const TArray<int64> SupportedTypes, const bool bNormalized, Callback Filter)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const bool bNormalized, Callback Filter)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -528,7 +533,7 @@ protected:
 	}
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedTypes, const bool bNormalized, Callback Filter)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const bool bNormalized, Callback Filter)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -593,13 +598,13 @@ protected:
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedElements, const TArray<int64> SupportedTypes, const bool bNormalized)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const bool bNormalized)
 	{
 		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; });
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString Name, TArray<T>& Data, const TArray<int64> SupportedTypes, const bool bNormalized)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const bool bNormalized)
 	{
 		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; });
 	}

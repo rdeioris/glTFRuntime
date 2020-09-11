@@ -52,7 +52,7 @@ public:
 	void ReceiveOnSkeletalMeshComponentCreated(USkeletalMeshComponent* SkeletalMeshComponent);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
-	void SetCurveAnimationByName(const FString CurveAnimationName);
+	void SetCurveAnimationByName(const FString& CurveAnimationName);
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")
