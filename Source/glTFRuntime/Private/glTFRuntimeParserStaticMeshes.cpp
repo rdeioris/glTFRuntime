@@ -61,6 +61,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 		TVertexInstanceAttributesRef<FVector> NormalsInstanceAttributesRef = MeshDescription->GetVertexInstanceNormals();
 		TVertexInstanceAttributesRef<FVector> TangentsInstanceAttributesRef = MeshDescription->GetVertexInstanceTangents();
 		TVertexInstanceAttributesRef<FVector2D> UVsInstanceAttributesRef = MeshDescription->GetVertexInstanceUVs();
+		TVertexInstanceAttributesRef<FVector4> ColorsInstanceAttributesRef = MeshDescription->GetVertexInstanceColors();
 
 		UVsInstanceAttributesRef.SetNumIndices(NumUVs);
 
@@ -112,6 +113,18 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 				}
 			}
 
+			if (Primitive.Colors.Num() > 0)
+			{
+				if (VertexIndex >= (uint32)Primitive.Colors.Num())
+				{
+					ColorsInstanceAttributesRef[NewVertexInstanceID] = FVector4(0, 0, 0, 0);
+				}
+				else
+				{
+					ColorsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Colors[VertexIndex];
+				}
+			}
+
 			for (int32 UVIndex = 0; UVIndex < Primitive.UVs.Num(); UVIndex++)
 			{
 				if (VertexIndex >= (uint32)Primitive.UVs[UVIndex].Num())
@@ -157,6 +170,31 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 
 	}
 
+	if (StaticMeshConfig.PivotPosition != EglTFRuntimePivotPosition::Asset)
+	{
+		FBoxSphereBounds MeshBounds = MeshDescription->GetMeshDescription().GetBounds();
+		FVector PivotDelta = FVector::ZeroVector;
+		TVertexAttributesRef<FVector> VertexPositions = MeshDescription->GetVertexPositions();
+
+		if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Center)
+		{
+			PivotDelta = MeshBounds.GetSphere().Center;
+		}
+		else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Top)
+		{
+			PivotDelta = MeshBounds.GetBox().GetCenter() + FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
+		}
+		else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Bottom)
+		{
+			PivotDelta = MeshBounds.GetBox().GetCenter() - FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
+		}
+
+		for (const FVertexID VertexID : MeshDescription->Vertices().GetElementIDs())
+		{
+			VertexPositions[VertexID] -= PivotDelta;
+		}
+	}
+
 	StaticMesh->StaticMaterials = StaticMaterials;
 
 	FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription->GetMeshDescription());
@@ -175,35 +213,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	}
 
 	TArray<UStaticMeshDescription*> MeshDescriptions = { MeshDescription };
-
-	if (StaticMeshConfig.PivotPosition != EglTFRuntimePivotPosition::Asset)
-	{
-		for (UStaticMeshDescription* OriginalMeshDescription : MeshDescriptions)
-		{
-			FBoxSphereBounds MeshBounds = OriginalMeshDescription->GetMeshDescription().GetBounds();
-			FVector PivotDelta = FVector::ZeroVector;
-			TVertexAttributesRef<FVector> VertexPositions = OriginalMeshDescription->GetVertexPositions();
-
-			if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Center)
-			{
-				PivotDelta = MeshBounds.GetSphere().Center;
-			}
-			else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Top)
-			{
-				PivotDelta = MeshBounds.GetBox().GetCenter() + FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
-			}
-			else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Bottom)
-			{
-				PivotDelta = MeshBounds.GetBox().GetCenter() - FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
-			}
-
-			for (const FVertexID VertexID : OriginalMeshDescription->Vertices().GetElementIDs())
-			{
-				VertexPositions[VertexID] -= PivotDelta;
-			}
-		}
-	}
-
+	
 	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, false);
 
 	if (!StaticMesh->BodySetup)
@@ -220,7 +230,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	if (StaticMesh->bAllowCPUAccess)
 	{
 		FStaticMeshLODResources& LOD = StaticMesh->RenderData->LODResources[0];
-		ENQUEUE_RENDER_COMMAND(InitCommand)(
+		ENQUEUE_RENDER_COMMAND(FixIndexBufferOnCPUCommand)(
 			[&LOD, &CPUVertexInstancesIDs](FRHICommandListImmediate& RHICmdList)
 		{
 			LOD.IndexBuffer.ReleaseResource();
@@ -270,7 +280,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	}
 
 	return StaticMesh;
-			}
+}
 
 bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
