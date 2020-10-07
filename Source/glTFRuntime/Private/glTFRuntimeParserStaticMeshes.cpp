@@ -3,7 +3,9 @@
 #include "glTFRuntimeParser.h"
 #include "StaticMeshDescription.h"
 #include "StaticMeshOperations.h"
-#include "PhysXCookHelper.h"
+#if WITH_EDITOR
+#include "Editor/EditorEngine.h"
+#endif
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
@@ -29,6 +31,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	int32 NumUVs = 1;
 	bool bCalculateNormals = false;
 	bool bCalculateTangents = false;
+	bool bHasVertexColors = false;
 	for (FglTFRuntimePrimitive& Primitive : Primitives)
 	{
 		if (Primitive.UVs.Num() > NumUVs)
@@ -123,6 +126,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 				{
 					ColorsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Colors[VertexIndex];
 				}
+				bHasVertexColors = true;
 			}
 
 			for (int32 UVIndex = 0; UVIndex < Primitive.UVs.Num(); UVIndex++)
@@ -213,8 +217,21 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	}
 
 	TArray<UStaticMeshDescription*> MeshDescriptions = { MeshDescription };
-	
+
 	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, false);
+
+	bool bIsMobile = GMaxRHIFeatureLevel == ERHIFeatureLevel::ES3_1;
+#if WITH_EDITOR
+	UEditorEngine* Editor = (UEditorEngine*)GEngine;
+	bIsMobile |= Editor->GetActiveFeatureLevelPreviewType() == ERHIFeatureLevel::ES3_1;
+#endif
+
+	if ((bHasVertexColors || bIsMobile) && StaticMesh->RenderData && StaticMesh->RenderData->LODResources.Num() > 0)
+	{
+		StaticMesh->ReleaseResources();
+		StaticMesh->RenderData->LODResources[0].bHasColorVertexData = true;
+		StaticMesh->InitResources();
+	}
 
 	if (!StaticMesh->BodySetup)
 	{
@@ -226,8 +243,9 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 
 	StaticMesh->BodySetup->InvalidatePhysicsData();
 
+	// required for building complex collisions
 #if !WITH_EDITOR
-	if (StaticMesh->bAllowCPUAccess)
+	if (!bIsMobile && StaticMesh->bAllowCPUAccess && StaticMesh->RenderData && StaticMesh->RenderData->LODResources.Num() > 0)
 	{
 		FStaticMeshLODResources& LOD = StaticMesh->RenderData->LODResources[0];
 		ENQUEUE_RENDER_COMMAND(FixIndexBufferOnCPUCommand)(

@@ -51,6 +51,7 @@ public class glTFRuntime : ModuleRules
         if (Target.Type == TargetType.Editor)
         {
             PrivateDependencyModuleNames.Add("SkeletalMeshUtilitiesCommon");
+            PrivateDependencyModuleNames.Add("UnrealEd");
         }
 
 
