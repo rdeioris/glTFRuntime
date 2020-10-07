@@ -115,6 +115,21 @@ struct FglTFRuntimeSocket
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeBone
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString BoneName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 ParentIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FTransform Transform;
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimeMaterialsConfig
 {
 	GENERATED_BODY()
@@ -231,7 +246,10 @@ struct FglTFRuntimeSkeletalMeshConfig
 	bool bOverwriteRefSkeleton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TMap<FString, FTransform> CustomSkeleton;
+	TArray<FglTFRuntimeBone> CustomSkeleton;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bIgnoreSkin;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FglTFRuntimeSkeletonConfig SkeletonConfig;
@@ -244,6 +262,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
 		bOverwriteRefSkeleton = false;
 		Skeleton = nullptr;
+		bIgnoreSkin = false;
 	}
 };
 
@@ -423,6 +442,7 @@ protected:
 	bool LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter);
 
 	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
+	bool FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
 	void FixNodeParent(FglTFRuntimeNode& Node);
