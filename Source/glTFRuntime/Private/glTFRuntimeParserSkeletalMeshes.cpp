@@ -241,11 +241,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			TArray<FVector> MorphTargetPositions;
 			for (uint32 PointIndex = 0; PointIndex < (uint32)Primitive.Positions.Num(); PointIndex++)
 			{
-				if ((MorphTarget.Positions[PointIndex] - Primitive.Positions[PointIndex]).SizeSquared() > FMath::Square(THRESH_POINTS_ARE_SAME))
-				{
-					MorphTargetPoints.Add(PointsBase + PointIndex);
-					MorphTargetPositions.Add(MorphTarget.Positions[PointIndex]);
-				}
+				MorphTargetPoints.Add(PointsBase + PointIndex);
+				MorphTargetPositions.Add(Primitive.Positions[PointIndex] + MorphTarget.Positions[PointIndex]);
 			}
 			MorphTargetModifiedPoints.Add(MorphTargetPoints);
 			FSkeletalMeshImportData MorphTargetImportData;
@@ -722,7 +719,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 			CompressionCodec->Tracks[BoneIndex].RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 		}
-}
+	}
 #endif
 
 	for (TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
@@ -833,8 +830,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 				{
 					Pair.Value.PosKeys[FrameIndex] = Pair.Value.PosKeys[0];
 				}
-				}
 			}
+		}
 
 #if WITH_EDITOR
 		AnimSequence->AddNewRawTrack(BoneName, &Pair.Value);
@@ -853,7 +850,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-		}
+}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
