@@ -93,16 +93,17 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	TArray<int32> PointToRawMap;
 	int32 MatIndex = 0;
 	TMap<int32, int32> BonesCache;
-	TArray<TSet<uint32>> MorphTargetModifiedPoints;
-	TArray<FSkeletalMeshImportData> MorphTargetsData;
-	TArray<FString> MorphTargetNames;
-
+	
 	bool bHasNormals = false;
 
 #if WITH_EDITOR
 	TArray<SkeletalMeshImportData::FVertex> Wedges;
 	TArray<SkeletalMeshImportData::FTriangle> Triangles;
 	TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
+
+	TArray<TSet<uint32>> MorphTargetModifiedPoints;
+	TArray<FSkeletalMeshImportData> MorphTargetsData;
+	TArray<FString> MorphTargetNames;
 
 	for (FglTFRuntimePrimitive& Primitive : Primitives)
 	{
@@ -405,7 +406,9 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 		LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
 	}
 
-	/*bool bHasMorphTargets = false;
+	bool bHasMorphTargets = false;
+	int32 MorphTargetIndex = 0;
+	int32 BaseIndex = 0;
 	for (int32 PrimitiveIndex = 0; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
 	{
 		FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
@@ -416,7 +419,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
 			MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
 
-			UMorphTarget* MorphTarget = NewObject<UMorphTarget>(SkeletalMesh, NAME_None, RF_Public);
+			FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
+			UMorphTarget* MorphTarget = NewObject<UMorphTarget>(SkeletalMesh, *MorphTargetName, RF_Public);
 			for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
 			{
 				FMorphTargetDelta Delta;
@@ -429,7 +433,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 				{
 					Delta.PositionDelta = FVector::ZeroVector;
 				}
-				Delta.SourceIdx = VertexIndex;
+				Delta.SourceIdx = BaseIndex + Index;
 				Delta.TangentZDelta = FVector(0, 0, 0);
 				if (Delta.PositionDelta == FVector::ZeroVector && Delta.TangentZDelta == FVector::ZeroVector)
 				{
@@ -442,12 +446,13 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			SkeletalMesh->RegisterMorphTarget(MorphTarget, false);
 			bHasMorphTargets = true;
 		}
+		BaseIndex += Primitive.Indices.Num();
 	}
 
 	if (bHasMorphTargets)
 	{
 		SkeletalMesh->InitMorphTargetsAndRebuildRenderData();
-	}*/
+	}
 #endif
 
 	SkeletalMesh->ResetLODInfo();
