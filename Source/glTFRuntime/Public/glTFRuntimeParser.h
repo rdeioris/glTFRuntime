@@ -130,6 +130,18 @@ struct FglTFRuntimeBone
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeMorphTarget
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FVector> Positions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FVector> Normals;
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimeMaterialsConfig
 {
 	GENERATED_BODY()
@@ -337,6 +349,7 @@ struct FglTFRuntimePrimitive
 	TArray<TArray<FglTFRuntimeUInt16Vector4>> Joints;
 	TArray<TArray<FVector4>> Weights;
 	TArray<FVector4> Colors;
+	TArray<FglTFRuntimeMorphTarget> MorphTargets;
 };
 
 /**

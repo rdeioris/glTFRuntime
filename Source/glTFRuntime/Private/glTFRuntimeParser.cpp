@@ -1370,6 +1370,61 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		}
 	}
 
+	const TArray<TSharedPtr<FJsonValue>>* JsonTargetsArray;
+	if (JsonPrimitiveObject->TryGetArrayField("targets", JsonTargetsArray))
+	{
+		for (TSharedPtr<FJsonValue> JsonTargetItem : *JsonTargetsArray)
+		{
+			TSharedPtr<FJsonObject> JsonTargetObject = JsonTargetItem->AsObject();
+			if (!JsonTargetObject)
+			{
+				AddError("LoadPrimitive()", "Error on MorphTarget item: expected an object.");
+				return false;
+			}
+
+			FglTFRuntimeMorphTarget MorphTarget;
+
+			bool bValid = false;
+
+			if (JsonTargetObject->HasField("POSITION"))
+			{
+				if (!BuildFromAccessorField(JsonTargetObject.ToSharedRef(), "POSITION", MorphTarget.Positions,
+					{ 3 }, { 5126 }, false, [&](FVector Value) -> FVector { return SceneBasis.TransformPosition(Value) * SceneScale; }))
+				{
+					AddError("LoadPrimitive()", "Unable to load POSITION attribute for MorphTarget");
+					return false;
+				}
+				if (MorphTarget.Positions.Num() != Primitive.Positions.Num())
+				{
+					AddError("LoadPrimitive()", "Invalid POSITION attribute size for MorphTarget.");
+					return false;
+				}
+				bValid = true;
+			}
+
+			if (JsonTargetObject->HasField("NORMAL"))
+			{
+				if (!BuildFromAccessorField(JsonTargetObject.ToSharedRef(), "NORMAL", MorphTarget.Normals,
+					{ 3 }, { 5126 }, false, [&](FVector Value) -> FVector { return SceneBasis.TransformVector(Value); }))
+				{
+					AddError("LoadPrimitive()", "Unable to load NORMAL attribute for MorphTarget");
+					return false;
+				}
+				if (MorphTarget.Normals.Num() != Primitive.Normals.Num())
+				{
+					AddError("LoadPrimitive()", "Invalid NORMAL attribute size for MorphTarget.");
+					return false;
+				}
+				bValid = true;
+			}
+
+			if (bValid)
+			{
+				Primitive.MorphTargets.Add(MorphTarget);
+			}
+		}
+	}
+
 	int64 IndicesAccessorIndex;
 	if (JsonPrimitiveObject->TryGetNumberField("indices", IndicesAccessorIndex))
 	{
