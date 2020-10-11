@@ -71,6 +71,7 @@ struct FglTFRuntimeNode
 		ParentIndex = INDEX_NONE;
 		MeshIndex = INDEX_NONE;
 		SkinIndex = INDEX_NONE;
+		CameraIndex = INDEX_NONE;
 	}
 };
 
