@@ -970,6 +970,73 @@ bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
 	return false;
 }
 
+bool FglTFRuntimeParser::FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	RefSkeleton.Empty();
+
+	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
+
+	if (SkeletalMeshConfig.CustomSkeleton.Num() > 0)
+	{
+		bool bFoundRoot = false;
+		for (int32 BoneIndex = 0; BoneIndex < SkeletalMeshConfig.CustomSkeleton.Num(); BoneIndex++)
+		{
+			const FString CurrentBoneName = SkeletalMeshConfig.CustomSkeleton[BoneIndex].BoneName;
+			const int32 CurrentBoneParentIndex = SkeletalMeshConfig.CustomSkeleton[BoneIndex].ParentIndex;
+			const FTransform CurrentBoneTransform = SkeletalMeshConfig.CustomSkeleton[BoneIndex].Transform;
+			if (CurrentBoneParentIndex == INDEX_NONE)
+			{
+				if (bFoundRoot)
+				{
+					AddError("FillFakeSkeleton()", "Only one root bone can be defined.");
+					return false;
+				}
+				bFoundRoot = true;
+			}
+			else if (CurrentBoneParentIndex >= 0)
+			{
+				if (CurrentBoneParentIndex >= SkeletalMeshConfig.CustomSkeleton.Num())
+				{
+					AddError("FillFakeSkeleton()", "Bone ParentIndex is not valid.");
+					return false;
+				}
+			}
+			else
+			{
+				AddError("FillFakeSkeleton()", "The only supported negative ParentIndex is -1 (for root bone)");
+				return false;
+			}
+
+			// now check for duplicated bone names
+			for (int32 CheckBoneIndex = 0; CheckBoneIndex < SkeletalMeshConfig.CustomSkeleton.Num(); CheckBoneIndex++)
+			{
+				if (CheckBoneIndex == BoneIndex)
+				{
+					continue;
+				}
+
+				if (SkeletalMeshConfig.CustomSkeleton[CheckBoneIndex].BoneName == CurrentBoneName)
+				{
+					AddError("FillFakeSkeleton()", "Duplicated bone name found");
+					return false;
+				}
+			}
+			FName BoneName = FName(CurrentBoneName);
+			Modifier.Add(FMeshBoneInfo(BoneName, CurrentBoneName, CurrentBoneParentIndex), CurrentBoneTransform);
+
+			BoneMap.Add(BoneIndex, BoneName);
+		}
+	}
+	else
+	{
+		FName RootBoneName = FName("root");
+		Modifier.Add(FMeshBoneInfo(RootBoneName, RootBoneName.ToString(), INDEX_NONE), FTransform::Identity);
+		BoneMap.Add(0, RootBoneName);
+	}
+
+	return true;
+}
+
 bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	// get the list of valid joints	
@@ -1300,6 +1367,61 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		{
 			AddError("LoadPrimitive()", "Error loading COLOR_0");
 			return false;
+		}
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonTargetsArray;
+	if (JsonPrimitiveObject->TryGetArrayField("targets", JsonTargetsArray))
+	{
+		for (TSharedPtr<FJsonValue> JsonTargetItem : *JsonTargetsArray)
+		{
+			TSharedPtr<FJsonObject> JsonTargetObject = JsonTargetItem->AsObject();
+			if (!JsonTargetObject)
+			{
+				AddError("LoadPrimitive()", "Error on MorphTarget item: expected an object.");
+				return false;
+			}
+
+			FglTFRuntimeMorphTarget MorphTarget;
+
+			bool bValid = false;
+
+			if (JsonTargetObject->HasField("POSITION"))
+			{
+				if (!BuildFromAccessorField(JsonTargetObject.ToSharedRef(), "POSITION", MorphTarget.Positions,
+					{ 3 }, { 5126 }, false, [&](FVector Value) -> FVector { return SceneBasis.TransformPosition(Value) * SceneScale; }))
+				{
+					AddError("LoadPrimitive()", "Unable to load POSITION attribute for MorphTarget");
+					return false;
+				}
+				if (MorphTarget.Positions.Num() != Primitive.Positions.Num())
+				{
+					AddError("LoadPrimitive()", "Invalid POSITION attribute size for MorphTarget.");
+					return false;
+				}
+				bValid = true;
+			}
+
+			if (JsonTargetObject->HasField("NORMAL"))
+			{
+				if (!BuildFromAccessorField(JsonTargetObject.ToSharedRef(), "NORMAL", MorphTarget.Normals,
+					{ 3 }, { 5126 }, false, [&](FVector Value) -> FVector { return SceneBasis.TransformVector(Value); }))
+				{
+					AddError("LoadPrimitive()", "Unable to load NORMAL attribute for MorphTarget");
+					return false;
+				}
+				if (MorphTarget.Normals.Num() != Primitive.Normals.Num())
+				{
+					AddError("LoadPrimitive()", "Invalid NORMAL attribute size for MorphTarget.");
+					return false;
+				}
+				bValid = true;
+			}
+
+			if (bValid)
+			{
+				Primitive.MorphTargets.Add(MorphTarget);
+			}
 		}
 	}
 

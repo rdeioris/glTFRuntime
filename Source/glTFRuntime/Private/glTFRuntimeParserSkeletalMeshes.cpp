@@ -14,6 +14,7 @@
 #include "Engine/SkeletalMeshSocket.h"
 #include "glTFAnimBoneCompressionCodec.h"
 #include "Model.h"
+#include "Animation/MorphTarget.h"
 
 void FglTFRuntimeParser::NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton)
 {
@@ -61,11 +62,21 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
 
 	TMap<int32, FName> BoneMap;
-
-	if (!FillReferenceSkeleton(JsonSkinObject, SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
+	if (!SkeletalMeshConfig.bIgnoreSkin)
 	{
-		AddError("LoadSkeletalMesh_Internal()", "Unable to fill RefSkeleton.");
-		return nullptr;
+		if (!FillReferenceSkeleton(JsonSkinObject, SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
+		{
+			AddError("LoadSkeletalMesh_Internal()", "Unable to fill RefSkeleton.");
+			return nullptr;
+		}
+	}
+	else
+	{
+		if (!FillFakeSkeleton(SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig))
+		{
+			AddError("LoadSkeletalMesh_Internal()", "Unable to fill fake RefSkeleton.");
+			return nullptr;
+		}
 	}
 
 	if (SkeletalMeshConfig.SkeletonConfig.bNormalizeSkeletonScale)
@@ -82,13 +93,17 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	TArray<int32> PointToRawMap;
 	int32 MatIndex = 0;
 	TMap<int32, int32> BonesCache;
-
+	
 	bool bHasNormals = false;
 
 #if WITH_EDITOR
 	TArray<SkeletalMeshImportData::FVertex> Wedges;
 	TArray<SkeletalMeshImportData::FTriangle> Triangles;
 	TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
+
+	TArray<TSet<uint32>> MorphTargetModifiedPoints;
+	TArray<FSkeletalMeshImportData> MorphTargetsData;
+	TArray<FString> MorphTargetNames;
 
 	for (FglTFRuntimePrimitive& Primitive : Primitives)
 	{
@@ -188,7 +203,22 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	FSkeletalMeshImportData ImportData;
 
 	for (int32 i = 0; i < Points.Num(); i++)
+	{
 		PointToRawMap.Add(i);
+	}
+
+	if (SkeletalMeshConfig.bIgnoreSkin)
+	{
+		Influences.Empty();
+		for (int32 WedgeIndex = 0; WedgeIndex < Wedges.Num(); WedgeIndex++)
+		{
+			SkeletalMeshImportData::FRawBoneInfluence Influence;
+			Influence.VertexIndex = Wedges[WedgeIndex].VertexIndex;
+			Influence.BoneIndex = 0;
+			Influence.Weight = 1;
+			Influences.Add(Influence);
+		}
+	}
 
 	FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences);
 
@@ -201,6 +231,33 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	ImportData.NumTexCoords = 1;
 	ImportData.Wedges = Wedges;
 	ImportData.Influences = Influences;
+
+	int32 MorphTargetIndex = 0;
+	int32 PointsBase = 0;
+	for (FglTFRuntimePrimitive& Primitive : Primitives)
+	{
+		for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
+		{
+			TSet<uint32> MorphTargetPoints;
+			TArray<FVector> MorphTargetPositions;
+			for (uint32 PointIndex = 0; PointIndex < (uint32)Primitive.Positions.Num(); PointIndex++)
+			{
+				MorphTargetPoints.Add(PointsBase + PointIndex);
+				MorphTargetPositions.Add(Primitive.Positions[PointIndex] + MorphTarget.Positions[PointIndex]);
+			}
+			MorphTargetModifiedPoints.Add(MorphTargetPoints);
+			FSkeletalMeshImportData MorphTargetImportData;
+			ImportData.CopyDataNeedByMorphTargetImport(MorphTargetImportData);
+			MorphTargetImportData.Points = MorphTargetPositions;
+			MorphTargetsData.Add(MorphTargetImportData);
+			MorphTargetNames.Add(FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++));
+		}
+		PointsBase += Primitive.Positions.Num();
+	}
+
+	ImportData.MorphTargetModifiedPoints = MorphTargetModifiedPoints;
+	ImportData.MorphTargets = MorphTargetsData;
+	ImportData.MorphTargetNames = MorphTargetNames;
 
 	FSkeletalMeshModel* ImportedResource = SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
@@ -288,35 +345,46 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, ModelVertex.GetTangentY(), ModelVertex.TangentZ);
 			LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
 
-			for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
+			if (!SkeletalMeshConfig.bIgnoreSkin)
 			{
-				FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
-				FVector4 Weights = Primitive.Weights[JointsIndex][Index];
-				for (int32 j = 0; j < 4; j++)
+				for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
 				{
-					if (BoneMap.Contains(Joints[j]))
+					FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
+					FVector4 Weights = Primitive.Weights[JointsIndex][Index];
+					for (int32 j = 0; j < 4; j++)
 					{
-						int32 BoneIndex = INDEX_NONE;
-						if (BonesCache.Contains(Joints[j]))
+						if (BoneMap.Contains(Joints[j]))
 						{
-							BoneIndex = BonesCache[Joints[j]];
+							int32 BoneIndex = INDEX_NONE;
+							if (BonesCache.Contains(Joints[j]))
+							{
+								BoneIndex = BonesCache[Joints[j]];
+							}
+							else
+							{
+								BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMap[Joints[j]]);
+								BonesCache.Add(Joints[j], BoneIndex);
+							}
+
+							uint8 QuantizedWeight = FMath::Clamp((uint8)(Weights[j] * ((double)0xFF)), (uint8)0x00, (uint8)0xFF);
+
+							InWeights[TotalVertexIndex].InfluenceWeights[j] = QuantizedWeight;
+							InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
 						}
 						else
 						{
-							BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMap[Joints[j]]);
-							BonesCache.Add(Joints[j], BoneIndex);
+							AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
+							return nullptr;
 						}
-
-						uint8 QuantizedWeight = FMath::Clamp((uint8)(Weights[j] * ((double)0xFF)), (uint8)0x00, (uint8)0xFF);
-
-						InWeights[TotalVertexIndex].InfluenceWeights[j] = QuantizedWeight;
-						InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
 					}
-					else
-					{
-						AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
-						return nullptr;
-					}
+				}
+			}
+			else
+			{
+				for (int32 j = 0; j < 4; j++)
+				{
+					InWeights[TotalVertexIndex].InfluenceWeights[j] = j == 0 ? 0xFF : 0;
+					InWeights[TotalVertexIndex].InfluenceBones[j] = 0;
 				}
 			}
 
@@ -336,6 +404,54 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	for (int32 Index = 0; Index < NumIndices; Index++)
 	{
 		LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
+	}
+
+	bool bHasMorphTargets = false;
+	int32 MorphTargetIndex = 0;
+	int32 BaseIndex = 0;
+	for (int32 PrimitiveIndex = 0; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
+	{
+		FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
+
+		for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
+		{
+			FMorphTargetLODModel MorphTargetLODModel;
+			MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
+			MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
+
+			FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
+			UMorphTarget* MorphTarget = NewObject<UMorphTarget>(SkeletalMesh, *MorphTargetName, RF_Public);
+			for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
+			{
+				FMorphTargetDelta Delta;
+				int32 VertexIndex = Primitive.Indices[Index];
+				if (VertexIndex < MorphTargetData.Positions.Num())
+				{
+					Delta.PositionDelta = MorphTargetData.Positions[VertexIndex];
+				}
+				else
+				{
+					Delta.PositionDelta = FVector::ZeroVector;
+				}
+				Delta.SourceIdx = BaseIndex + Index;
+				Delta.TangentZDelta = FVector(0, 0, 0);
+				if (Delta.PositionDelta == FVector::ZeroVector && Delta.TangentZDelta == FVector::ZeroVector)
+				{
+					continue;
+				}
+				MorphTargetLODModel.Vertices.Add(Delta);
+
+			}
+			MorphTarget->MorphLODModels.Add(MorphTargetLODModel);
+			SkeletalMesh->RegisterMorphTarget(MorphTarget, false);
+			bHasMorphTargets = true;
+		}
+		BaseIndex += Primitive.Indices.Num();
+	}
+
+	if (bHasMorphTargets)
+	{
+		SkeletalMesh->InitMorphTargetsAndRebuildRenderData();
 	}
 #endif
 
@@ -421,11 +537,16 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
-	if (!JsonSkinObject)
+	TSharedPtr<FJsonObject> JsonSkinObject = MakeShared<FJsonObject>();
+
+	if (!SkeletalMeshConfig.bIgnoreSkin)
 	{
-		AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Skin with index %d"), SkinIndex));
-		return nullptr;
+		JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+		if (!JsonSkinObject)
+		{
+			AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Skin with index %d"), SkinIndex));
+			return nullptr;
+		}
 	}
 
 	USkeletalMesh* SkeletalMesh = LoadSkeletalMesh_Internal(JsonMeshObject.ToSharedRef(), JsonSkinObject.ToSharedRef(), SkeletalMeshConfig);
