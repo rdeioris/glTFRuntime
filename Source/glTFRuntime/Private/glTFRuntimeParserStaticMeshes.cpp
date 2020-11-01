@@ -3,6 +3,7 @@
 #include "glTFRuntimeParser.h"
 #include "StaticMeshDescription.h"
 #include "StaticMeshOperations.h"
+#include "Engine/StaticMeshSocket.h"
 #if WITH_EDITOR
 #include "Editor/EditorEngine.h"
 #endif
@@ -174,10 +175,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 
 	}
 
+	FVector PivotDelta = FVector::ZeroVector;
 	if (StaticMeshConfig.PivotPosition != EglTFRuntimePivotPosition::Asset)
 	{
 		FBoxSphereBounds MeshBounds = MeshDescription->GetMeshDescription().GetBounds();
-		FVector PivotDelta = FVector::ZeroVector;
 		TVertexAttributesRef<FVector> VertexPositions = MeshDescription->GetVertexPositions();
 
 		if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Center)
@@ -291,6 +292,24 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	}
 
 	StaticMesh->BodySetup->CreatePhysicsMeshes();
+
+	for (const TPair<FString, FTransform>& Pair : StaticMeshConfig.Sockets)
+	{
+		UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
+		Socket->SocketName = FName(Pair.Key);
+		Socket->RelativeLocation = Pair.Value.GetLocation();
+		Socket->RelativeRotation = Pair.Value.Rotator();
+		Socket->RelativeScale = Pair.Value.GetScale3D();
+		StaticMesh->AddSocket(Socket);
+	}
+
+	if (!StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
+	{
+		UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
+		Socket->SocketName = FName(StaticMeshConfig.ExportOriginalPivotToSocket);
+		Socket->RelativeLocation = -PivotDelta;
+		StaticMesh->AddSocket(Socket);
+	}
 
 	if (OnStaticMeshCreated.IsBound())
 	{

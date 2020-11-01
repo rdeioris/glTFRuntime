@@ -3,6 +3,7 @@
 
 #include "glTFRuntimeAssetActor.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
 
 // Sets default values
@@ -86,6 +87,17 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 				StaticMeshConfig.Outer = StaticMeshComponent;
 			}
 			UStaticMesh* StaticMesh = Asset->LoadStaticMesh(Node.MeshIndex, StaticMeshConfig);
+			if (StaticMesh && !StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
+			{
+				UStaticMeshSocket* DeltaSocket = StaticMesh->FindSocket(FName(StaticMeshConfig.ExportOriginalPivotToSocket));
+				if (DeltaSocket)
+				{
+					FTransform NewTransform = Node.Transform;
+					FVector DeltaLocation = NewTransform.TransformPosition(-DeltaSocket->RelativeLocation);
+					NewTransform.AddToTranslation(DeltaLocation);
+					StaticMeshComponent->SetRelativeTransform(NewTransform);
+				}
+			}
 			StaticMeshComponent->SetStaticMesh(StaticMesh);
 			ReceiveOnStaticMeshComponentCreated(StaticMeshComponent);
 			NewComponent = StaticMeshComponent;
