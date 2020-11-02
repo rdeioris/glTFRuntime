@@ -92,8 +92,9 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 				UStaticMeshSocket* DeltaSocket = StaticMesh->FindSocket(FName(StaticMeshConfig.ExportOriginalPivotToSocket));
 				if (DeltaSocket)
 				{
-					FTransform NewTransform = Node.Transform;
-					FVector DeltaLocation = NewTransform.TransformPosition(-DeltaSocket->RelativeLocation);
+					FTransform NewTransform = StaticMeshComponent->GetRelativeTransform();
+					FVector DeltaLocation = -DeltaSocket->RelativeLocation * NewTransform.GetScale3D();
+					DeltaLocation = NewTransform.GetRotation().RotateVector(DeltaLocation);
 					NewTransform.AddToTranslation(DeltaLocation);
 					StaticMeshComponent->SetRelativeTransform(NewTransform);
 				}
