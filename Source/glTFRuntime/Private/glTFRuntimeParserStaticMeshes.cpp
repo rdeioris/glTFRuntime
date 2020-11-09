@@ -369,6 +369,64 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const Fgl
 	return StaticMesh;
 }
 
+bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig)
+{
+	if (!ProceduralMeshComponent)
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+	if (!JsonMeshObject)
+	{
+		return false;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
+	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
+	{
+		return false;
+	}
+
+	TArray<FglTFRuntimePrimitive> Primitives;
+	if (!LoadPrimitives(JsonPrimitives, Primitives, ProceduralMeshConfig.MaterialsConfig))
+	{
+		return false;
+	}
+
+	ProceduralMeshComponent->bUseComplexAsSimpleCollision = ProceduralMeshConfig.bUseComplexAsSimpleCollision;
+
+	int32 SectionIndex = ProceduralMeshComponent->GetNumSections();
+	for (FglTFRuntimePrimitive& Primitive : Primitives)
+	{
+		TArray<FVector2D> UV;
+		if (Primitive.UVs.Num() > 0)
+		{
+			UV = Primitive.UVs[0];
+		}
+		TArray<int32> Triangles;
+		for (uint32 Index : Primitive.Indices)
+		{
+			Triangles.Add(Index);
+		}
+		TArray<FLinearColor> Colors;
+		for (FVector4 Color : Primitive.Colors)
+		{
+			Colors.Add(FLinearColor(Color));
+		}
+		TArray<FProcMeshTangent> Tangents;
+		for (FVector Tangent : Primitive.Tangents)
+		{
+			Tangents.Add(FProcMeshTangent(Tangent, false));
+		}
+		ProceduralMeshComponent->CreateMeshSection_LinearColor(SectionIndex, Primitive.Positions, Triangles, Primitive.Normals, UV, Colors, Tangents, ProceduralMeshConfig.bBuildSimpleCollision);
+		ProceduralMeshComponent->SetMaterial(SectionIndex, Primitive.Material);
+		SectionIndex++;
+	}
+
+	return true;
+}
+
 UStaticMesh* FglTFRuntimeParser::LoadStaticMeshByName(const FString Name, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;

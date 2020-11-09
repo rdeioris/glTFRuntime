@@ -26,8 +26,9 @@ public class glTFRuntime : ModuleRules
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
-                "Core"
+                "Core",
 				// ... add other public dependencies that you statically link with here ...
+                "ProceduralMeshComponent"
             }
             );
 
@@ -43,7 +44,7 @@ public class glTFRuntime : ModuleRules
                 "RenderCore",
                 "RHI",
                 "ApplicationCore",
-                "Http"
+                "Http",
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

@@ -112,6 +112,9 @@ public:
 	UFUNCTION()
 	void OnSkeletalMeshCreatedProxy(USkeletalMesh* SkeletalMesh);
 
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ProceduralMeshConfig", AutoCreateRefTerm = "ProceduralMeshConfig"), Category = "glTFRuntime")
+	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

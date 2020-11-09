@@ -9,7 +9,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Camera/CameraComponent.h"
 #include "glTFRuntimeAnimationCurve.h"
-
+#include "ProceduralMeshComponent.h"
 #include "glTFRuntimeParser.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
@@ -211,6 +211,41 @@ struct FglTFRuntimeStaticMeshConfig
 		Outer = nullptr;
 		CollisionComplexity = ECollisionTraceFlag::CTF_UseDefault;
 		bAllowCPUAccess = true;
+		PivotPosition = EglTFRuntimePivotPosition::Asset;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeProceduralMeshConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bReverseWinding;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bBuildSimpleCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FBox> BoxCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FVector4> SphereCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bUseComplexAsSimpleCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimePivotPosition PivotPosition;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
+
+	FglTFRuntimeProceduralMeshConfig()
+	{
+		bReverseWinding = false;
+		bBuildSimpleCollision = false;
+		bUseComplexAsSimpleCollision = false;
 		PivotPosition = EglTFRuntimePivotPosition::Asset;
 	}
 };
@@ -434,6 +469,8 @@ public:
 	{
 		BinaryBuffer = InBinaryBuffer;
 	}
+
+	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
 
 protected:
 	TSharedRef<FJsonObject> Root;

@@ -386,3 +386,10 @@ bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32>& NodeIndices, 
 	}
 	return false;
 }
+
+bool UglTFRuntimeAsset::LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig)
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->LoadStaticMeshIntoProceduralMeshComponent(MeshIndex, ProceduralMeshComponent, ProceduralMeshConfig);
+}
