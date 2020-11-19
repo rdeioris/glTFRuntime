@@ -542,7 +542,7 @@ protected:
 			return false;
 
 		TArray64<uint8> Bytes;
-		int64 ComponentType, Stride, Elements, ElementSize, Count;
+		int64 ComponentType = 0, Stride = 0, Elements = 0, ElementSize = 0, Count = 0;
 		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, Bytes))
 			return false;
 
