@@ -100,7 +100,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 				}
 			}
 			StaticMeshComponent->SetStaticMesh(StaticMesh);
-			ReceiveOnStaticMeshComponentCreated(StaticMeshComponent);
+			ReceiveOnStaticMeshComponentCreated(StaticMeshComponent, Node);
 			NewComponent = StaticMeshComponent;
 		}
 		else
@@ -112,7 +112,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 			AddInstanceComponent(SkeletalMeshComponent);
 			USkeletalMesh* SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfig);
 			SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
-			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent);
+			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
 			NewComponent = SkeletalMeshComponent;
 		}
 	}
@@ -221,12 +221,12 @@ void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 	}
 }
 
-void AglTFRuntimeAssetActor::ReceiveOnStaticMeshComponentCreated_Implementation(UStaticMeshComponent* StaticMeshComponent)
+void AglTFRuntimeAssetActor::ReceiveOnStaticMeshComponentCreated_Implementation(UStaticMeshComponent* StaticMeshComponent, const FglTFRuntimeNode& Node)
 {
 
 }
 
-void AglTFRuntimeAssetActor::ReceiveOnSkeletalMeshComponentCreated_Implementation(USkeletalMeshComponent* SkeletalMeshComponent)
+void AglTFRuntimeAssetActor::ReceiveOnSkeletalMeshComponentCreated_Implementation(USkeletalMeshComponent* SkeletalMeshComponent, const FglTFRuntimeNode& Node)
 {
 
 }
