@@ -910,6 +910,11 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 		return nullptr;
 	}
 
+	if (CanReadFromCache(SkeletonConfig.CacheMode) && SkeletonsCache.Contains(SkinIndex))
+	{
+		return SkeletonsCache[SkinIndex];
+	}
+
 	TMap<int32, FName> BoneMap;
 
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
@@ -927,6 +932,11 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 	}
 
 	Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
+
+	if (CanWriteToCache(SkeletonConfig.CacheMode))
+	{
+		SkeletonsCache.Add(SkinIndex, Skeleton);
+	}
 
 	return Skeleton;
 }
