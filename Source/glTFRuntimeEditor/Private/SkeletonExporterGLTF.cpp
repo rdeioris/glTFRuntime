@@ -7,13 +7,9 @@ USkeletonExporterGLTF::USkeletonExporterGLTF(const FObjectInitializer& ObjectIni
 	: Super(ObjectInitializer)
 {
 	SupportedClass = USkeleton::StaticClass();
-	FormatExtension.Add(TEXT("gltf"));
-	PreferredFormatIndex = 0;
-	FormatDescription.Add(TEXT("glTF Embedded file"));
-	bText = true;
 }
 
-void USkeletonExporterGLTF::GetSkeletonBoneChildren(const FReferenceSkeleton& SkeletonRef, const int32 ParentBoneIndex, TArray<int32>& BoneChildrenIndices)
+void FglTFExportContextSkeleton::GetSkeletonBoneChildren(const FReferenceSkeleton& SkeletonRef, const int32 ParentBoneIndex, TArray<int32>& BoneChildrenIndices)
 {
 	int32 NumBones = SkeletonRef.GetNum();
 	for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
@@ -25,7 +21,7 @@ void USkeletonExporterGLTF::GetSkeletonBoneChildren(const FReferenceSkeleton& Sk
 	}
 }
 
-FMatrix USkeletonExporterGLTF::BuildBoneFullMatrix(const FReferenceSkeleton& SkeletonRef, const int32 ParentBoneIndex)
+FMatrix FglTFExportContextSkeleton::BuildBoneFullMatrix(const FReferenceSkeleton& SkeletonRef, const int32 ParentBoneIndex)
 {
 	TArray<FTransform> BoneTransforms = SkeletonRef.GetRefBonePose();
 
@@ -40,24 +36,12 @@ FMatrix USkeletonExporterGLTF::BuildBoneFullMatrix(const FReferenceSkeleton& Ske
 	return Transform.ToMatrixWithScale();
 }
 
-bool USkeletonExporterGLTF::ExportText(const FExportObjectInnerContext* Context, UObject* Object, const TCHAR* Type, FOutputDevice& Ar, FFeedbackContext* Warn, uint32 PortFlags)
+void FglTFExportContextSkeleton::GenerateSkeleton(USkeleton* Skeleton)
 {
-	USkeleton* Skeleton = CastChecked<USkeleton>(Object);
-
-	TSharedRef<FJsonObject> JsonRoot = MakeShared<FJsonObject>();
-
-	TSharedRef<FJsonObject> JsonAsset = MakeShared<FJsonObject>();
-
-	JsonAsset->SetStringField("generator", "Unreal Engine glTFRuntime Plugin");
-	JsonAsset->SetStringField("version", "2.0");
-
-	JsonRoot->SetObjectField("asset", JsonAsset);
-
 	const FReferenceSkeleton& SkeletonRef = Skeleton->GetReferenceSkeleton();
 
 	int32 NumBones = SkeletonRef.GetNum();
 
-	TArray<TSharedPtr<FJsonValue>> JsonNodes;
 	TArray<FTransform> BoneTransforms = SkeletonRef.GetRefBonePose();
 
 	FMatrix Basis = FBasisVectorMatrix(FVector(0, 1, 0), FVector(0, 0, 1), FVector(-1, 0, 0), FVector::ZeroVector);
@@ -104,8 +88,6 @@ bool USkeletonExporterGLTF::ExportText(const FExportObjectInnerContext* Context,
 		JsonJoints.Add(MakeShared<FJsonValueNumber>(BoneIndex));
 	}
 
-	JsonRoot->SetArrayField("nodes", JsonNodes);
-
 	TArray<TSharedPtr<FJsonValue>> JsonSkins;
 	TSharedRef<FJsonObject> JsonSkin = MakeShared<FJsonObject>();
 	JsonSkin->SetStringField("name", Skeleton->GetName());
@@ -118,35 +100,83 @@ bool USkeletonExporterGLTF::ExportText(const FExportObjectInnerContext* Context,
 	JsonRoot->SetArrayField("skins", JsonSkins);
 
 	// build accessors/bufferViews/buffers for bind matrices
-	TSharedRef<FJsonObject> JsonAccessor = MakeShared<FJsonObject>();
-	JsonAccessor->SetNumberField("bufferView", 0);
-	JsonAccessor->SetNumberField("componentType", 5126);
-	JsonAccessor->SetNumberField("count", NumBones);
-	JsonAccessor->SetStringField("type", "MAT4");
-	TArray<TSharedPtr<FJsonValue>> JsonAccessors;
-	JsonAccessors.Add(MakeShared<FJsonValueObject>(JsonAccessor));
-	JsonRoot->SetArrayField("accessors", JsonAccessors);
+	AppendAccessor(5126, NumBones, "MAT4", (uint8*)MatricesData.GetData(), NumBones * 16 * sizeof(float));
+}
+
+bool USkeletonExporterGLTF::ExportText(const FExportObjectInnerContext* Context, UObject* Object, const TCHAR* Type, FOutputDevice& Ar, FFeedbackContext* Warn, uint32 PortFlags)
+{
+	USkeleton* Skeleton = CastChecked<USkeleton>(Object);
+
+	TSharedRef<FglTFExportContextSkeleton> ExporterContext = MakeShared<FglTFExportContextSkeleton>();
+
+	ExporterContext->GenerateSkeleton(Skeleton);
+
+	Ar.Log(ExporterContext->GenerateJson());
+
+	return true;
+}
+
+int32 FglTFExportContext::AppendAccessor(const int64 ComponentType, const uint64 Count, const FString& DataType, uint8* Data, uint64 Len, const bool bMinMax, FVector AccessorMin, FVector AccessorMax)
+{
+	TSharedRef<FJsonObject> JsonBuffer = MakeShared<FJsonObject>();
+	JsonBuffer->SetNumberField("byteLength", Len);
+	JsonBuffer->SetStringField("uri", "data:application/octet-stream;base64," + FBase64::Encode(Data, Len));
+	int32 BufferIndex = JsonBuffers.Add(MakeShared<FJsonValueObject>(JsonBuffer));
 
 	TSharedRef<FJsonObject> JsonBufferView = MakeShared<FJsonObject>();
-	JsonBufferView->SetNumberField("buffer", 0);
-	JsonBufferView->SetNumberField("byteLength", NumBones * 16 * sizeof(float));
+	JsonBufferView->SetNumberField("buffer", BufferIndex);
+	JsonBufferView->SetNumberField("byteLength", Len);
 	JsonBufferView->SetNumberField("byteOffset", 0);
-	TArray<TSharedPtr<FJsonValue>> JsonBufferViews;
-	JsonBufferViews.Add(MakeShared<FJsonValueObject>(JsonBufferView));
-	JsonRoot->SetArrayField("bufferViews", JsonBufferViews);
+	int32 BufferViewIndex = JsonBufferViews.Add(MakeShared<FJsonValueObject>(JsonBufferView));
 
-	TSharedRef<FJsonObject> JsonBuffer = MakeShared<FJsonObject>();
-	JsonBuffer->SetNumberField("byteLength", NumBones * 16 * sizeof(float));
-	JsonBuffer->SetStringField("uri", "data:application/octet-stream;base64," + FBase64::Encode((uint8*)MatricesData.GetData(), NumBones * 16 * sizeof(float)));
-	TArray<TSharedPtr<FJsonValue>> JsonBuffers;
-	JsonBuffers.Add(MakeShared<FJsonValueObject>(JsonBuffer));
+	TSharedRef<FJsonObject> JsonAccessor = MakeShared<FJsonObject>();
+	JsonAccessor->SetNumberField("bufferView", BufferViewIndex);
+	JsonAccessor->SetNumberField("componentType", ComponentType);
+	JsonAccessor->SetNumberField("count", Count);
+	JsonAccessor->SetStringField("type", DataType);
+
+	if (bMinMax)
+	{
+		TArray<TSharedPtr<FJsonValue>> JsonAccessorMin;
+		JsonAccessorMin.Add(MakeShared<FJsonValueNumber>(AccessorMin.X));
+		JsonAccessorMin.Add(MakeShared<FJsonValueNumber>(AccessorMin.Y));
+		JsonAccessorMin.Add(MakeShared<FJsonValueNumber>(AccessorMin.Z));
+
+		TArray<TSharedPtr<FJsonValue>> JsonAccessorMax;
+		JsonAccessorMax.Add(MakeShared<FJsonValueNumber>(AccessorMax.X));
+		JsonAccessorMax.Add(MakeShared<FJsonValueNumber>(AccessorMax.Y));
+		JsonAccessorMax.Add(MakeShared<FJsonValueNumber>(AccessorMax.Z));
+
+		JsonAccessor->SetArrayField("min", JsonAccessorMin);
+		JsonAccessor->SetArrayField("max", JsonAccessorMax);
+	}
+
+	return JsonAccessors.Add(MakeShared<FJsonValueObject>(JsonAccessor));
+}
+
+FglTFExportContext::FglTFExportContext()
+{
+	JsonRoot = MakeShared<FJsonObject>();
+
+	TSharedRef<FJsonObject> JsonAsset = MakeShared<FJsonObject>();
+
+	JsonAsset->SetStringField("generator", "Unreal Engine glTFRuntime Plugin");
+	JsonAsset->SetStringField("version", "2.0");
+
+	JsonRoot->SetObjectField("asset", JsonAsset);
+}
+
+FString FglTFExportContext::GenerateJson()
+{
+	JsonRoot->SetArrayField("scenes", JsonScenes);
+	JsonRoot->SetArrayField("nodes", JsonNodes);
+	JsonRoot->SetArrayField("accessors", JsonAccessors);
+	JsonRoot->SetArrayField("bufferViews", JsonBufferViews);
 	JsonRoot->SetArrayField("buffers", JsonBuffers);
 
 	FString Json;
 	TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&Json);
 	FJsonSerializer::Serialize(MakeShared<FJsonValueObject>(JsonRoot), "", JsonWriter);
 
-	Ar.Log(Json);
-
-	return true;
+	return Json;
 }

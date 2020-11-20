@@ -38,6 +38,8 @@ public class glTFRuntimeEditor : ModuleRules
                 "CoreUObject",
                 "Engine",
                 "JSON",
+                "RHI",
+                "RenderCore",
 				// ... add private dependencies that you statically link with here ...	
 			}
             );
