@@ -242,6 +242,13 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const 
 	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, SkeletalMeshConfig);
 }
 
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeName, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadSkeletalMeshRecursive(NodeName, SkeletalMeshConfig.OverrideSkinIndex, SkeletalMeshConfig);
+}
+
 USkeleton* UglTFRuntimeAsset::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig SkeletonConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);

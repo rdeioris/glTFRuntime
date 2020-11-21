@@ -45,29 +45,25 @@ void FglTFRuntimeParser::NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& 
 	}
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, TSharedRef<FJsonObject> JsonSkinObject, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, const int32 SkinIndex)
+USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntimeLOD> LODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
-
-	// get primitives
-	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
-	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
-	{
-		AddError("LoadSkeletalMesh_Internal()", "No primitives defined in the asset.");
-		return nullptr;
-	}
-
-	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonPrimitives, Primitives, SkeletalMeshConfig.MaterialsConfig))
-		return nullptr;
-
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
 
+	int32 NewSkinIndex = SkeletalMeshConfig.OverrideSkinIndex != INDEX_NONE ? SkeletalMeshConfig.OverrideSkinIndex : SkinIndex;
+
 	TMap<int32, FName> BoneMap;
-	if (!SkeletalMeshConfig.bIgnoreSkin)
+	if (!SkeletalMeshConfig.bIgnoreSkin && NewSkinIndex != INDEX_NONE)
 	{
-		if (!FillReferenceSkeleton(JsonSkinObject, SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
+		TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", NewSkinIndex);
+		if (!JsonSkinObject)
 		{
-			AddError("LoadSkeletalMesh_Internal()", "Unable to fill RefSkeleton.");
+			AddError("CreateSkeletalMeshFromLODs()", "Unable to fill RefSkeleton.");
+			return nullptr;
+		}
+
+		if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
+		{
+			AddError("CreateSkeletalMeshFromLODs()", "Unable to fill RefSkeleton.");
 			return nullptr;
 		}
 	}
@@ -75,7 +71,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	{
 		if (!FillFakeSkeleton(SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig))
 		{
-			AddError("LoadSkeletalMesh_Internal()", "Unable to fill fake RefSkeleton.");
+			AddError("CreateSkeletalMeshFromLODs()", "Unable to fill fake RefSkeleton.");
 			return nullptr;
 		}
 	}
@@ -90,375 +86,398 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 		SkeletalMesh->RefSkeleton = SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
 	}
 
+	TMap<int32, int32> MainBonesCache;
 	TArray<FVector> Points;
 	TArray<int32> PointToRawMap;
 	int32 MatIndex = 0;
-	TMap<int32, int32> BonesCache;
-	
+
 	bool bHasNormals = false;
 
 #if WITH_EDITOR
-	TArray<SkeletalMeshImportData::FVertex> Wedges;
-	TArray<SkeletalMeshImportData::FTriangle> Triangles;
-	TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
 
 	TArray<TSet<uint32>> MorphTargetModifiedPoints;
 	TArray<FSkeletalMeshImportData> MorphTargetsData;
 	TArray<FString> MorphTargetNames;
 
-	for (FglTFRuntimePrimitive& Primitive : Primitives)
-	{
-		int32 Base = Points.Num();
-		Points.Append(Primitive.Positions);
-
-		int32 TriangleIndex = 0;
-		TSet<TPair<int32, int32>> InfluencesMap;
-
-		for (int32 i = 0; i < Primitive.Indices.Num(); i++)
-		{
-			int32 PrimitiveIndex = Primitive.Indices[i];
-
-			SkeletalMeshImportData::FVertex Wedge;
-			Wedge.VertexIndex = Base + PrimitiveIndex;
-
-			for (int32 UVIndex = 0; UVIndex < Primitive.UVs.Num(); UVIndex++)
-			{
-				Wedge.UVs[UVIndex] = Primitive.UVs[UVIndex][PrimitiveIndex];
-			}
-
-			int32 WedgeIndex = Wedges.Add(Wedge);
-
-			for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
-			{
-				FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][PrimitiveIndex];
-				FVector4 Weights = Primitive.Weights[JointsIndex][PrimitiveIndex];
-				// 4 bones for each joints list
-				for (int32 JointPartIndex = 0; JointPartIndex < 4; JointPartIndex++)
-				{
-					if (BoneMap.Contains(Joints[JointPartIndex]))
-					{
-						SkeletalMeshImportData::FRawBoneInfluence Influence;
-						Influence.VertexIndex = Wedge.VertexIndex;
-						int32 BoneIndex = INDEX_NONE;
-						if (BonesCache.Contains(Joints[JointPartIndex]))
-						{
-							BoneIndex = BonesCache[Joints[JointPartIndex]];
-						}
-						else
-						{
-							BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMap[Joints[JointPartIndex]]);
-							BonesCache.Add(Joints[JointPartIndex], BoneIndex);
-						}
-						Influence.BoneIndex = BoneIndex;
-						Influence.Weight = Weights[JointPartIndex];
-						TPair<int32, int32> InfluenceKey = TPair<int32, int32>(Influence.VertexIndex, Influence.BoneIndex);
-						// do not waste cpu time processing zero influences
-						if (!FMath::IsNearlyZero(Influence.Weight, KINDA_SMALL_NUMBER) && !InfluencesMap.Contains(InfluenceKey))
-						{
-							Influences.Add(Influence);
-							InfluencesMap.Add(InfluenceKey);
-						}
-					}
-					else
-					{
-						AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[JointPartIndex]));
-						return nullptr;
-					}
-				}
-			}
-
-			TriangleIndex++;
-			if (TriangleIndex == 3)
-			{
-				SkeletalMeshImportData::FTriangle Triangle;
-
-				Triangle.WedgeIndex[0] = WedgeIndex - 2;
-				Triangle.WedgeIndex[1] = WedgeIndex - 1;
-				Triangle.WedgeIndex[2] = WedgeIndex;
-
-				if (Primitive.Normals.Num() > 0)
-				{
-					Triangle.TangentZ[0] = Primitive.Normals[Primitive.Indices[i - 2]];
-					Triangle.TangentZ[1] = Primitive.Normals[Primitive.Indices[i - 1]];
-					Triangle.TangentZ[2] = Primitive.Normals[Primitive.Indices[i]];
-					bHasNormals = true;
-				}
-
-				if (Primitive.Tangents.Num() > 0)
-				{
-					Triangle.TangentX[0] = Primitive.Tangents[Primitive.Indices[i - 2]];
-					Triangle.TangentX[1] = Primitive.Tangents[Primitive.Indices[i - 1]];
-					Triangle.TangentX[2] = Primitive.Tangents[Primitive.Indices[i]];
-				}
-
-				Triangle.MatIndex = MatIndex;
-
-				Triangles.Add(Triangle);
-				TriangleIndex = 0;
-			}
-		}
-
-		MatIndex++;
-	}
-
-	FSkeletalMeshImportData ImportData;
-
-	for (int32 i = 0; i < Points.Num(); i++)
-	{
-		PointToRawMap.Add(i);
-	}
-
-	if (SkeletalMeshConfig.bIgnoreSkin)
-	{
-		Influences.Empty();
-		for (int32 WedgeIndex = 0; WedgeIndex < Wedges.Num(); WedgeIndex++)
-		{
-			SkeletalMeshImportData::FRawBoneInfluence Influence;
-			Influence.VertexIndex = Wedges[WedgeIndex].VertexIndex;
-			Influence.BoneIndex = 0;
-			Influence.Weight = 1;
-			Influences.Add(Influence);
-		}
-	}
-
-	FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences);
-
-	ImportData.bHasNormals = bHasNormals;
-	ImportData.bHasVertexColors = false;
-	ImportData.bHasTangents = false;
-	ImportData.Faces = Triangles;
-	ImportData.Points = Points;
-	ImportData.PointToRawMap = PointToRawMap;
-	ImportData.NumTexCoords = 1;
-	ImportData.Wedges = Wedges;
-	ImportData.Influences = Influences;
-
-	int32 MorphTargetIndex = 0;
-	int32 PointsBase = 0;
-	for (FglTFRuntimePrimitive& Primitive : Primitives)
-	{
-		for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
-		{
-			TSet<uint32> MorphTargetPoints;
-			TArray<FVector> MorphTargetPositions;
-			for (uint32 PointIndex = 0; PointIndex < (uint32)Primitive.Positions.Num(); PointIndex++)
-			{
-				MorphTargetPoints.Add(PointsBase + PointIndex);
-				MorphTargetPositions.Add(Primitive.Positions[PointIndex] + MorphTarget.Positions[PointIndex]);
-			}
-			MorphTargetModifiedPoints.Add(MorphTargetPoints);
-			FSkeletalMeshImportData MorphTargetImportData;
-			ImportData.CopyDataNeedByMorphTargetImport(MorphTargetImportData);
-			MorphTargetImportData.Points = MorphTargetPositions;
-			MorphTargetsData.Add(MorphTargetImportData);
-			const FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
-			MorphTargetNames.Add(MorphTargetName);
-		}
-		PointsBase += Primitive.Positions.Num();
-	}
-
-	ImportData.MorphTargetModifiedPoints = MorphTargetModifiedPoints;
-	ImportData.MorphTargets = MorphTargetsData;
-	ImportData.MorphTargetNames = MorphTargetNames;
-
 	FSkeletalMeshModel* ImportedResource = SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
-	ImportedResource->LODModels.Add(new FSkeletalMeshLODModel());
-	FSkeletalMeshLODModel& LODModel = ImportedResource->LODModels[0];
 
-	SkeletalMesh->SaveLODImportedData(0, ImportData);
-#else
-	FSkeletalMeshLODRenderData* LodRenderData = new FSkeletalMeshLODRenderData();
-	SkeletalMesh->AllocateResourceForRendering();
-	SkeletalMesh->GetResourceForRendering()->LODRenderData.Add(LodRenderData);
-
-	LodRenderData->RenderSections.SetNumUninitialized(Primitives.Num());
-
-	int32 NumIndices = 0;
-	for (int32 i = 0; i < Primitives.Num(); i++)
+	for (FglTFRuntimeLOD& LOD : LODs)
 	{
-		NumIndices += Primitives[i].Indices.Num();
-	}
+		TArray<SkeletalMeshImportData::FVertex> Wedges;
+		TArray<SkeletalMeshImportData::FTriangle> Triangles;
+		TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
 
-	LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumIndices);
-	LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumIndices, 1);
-
-	int32 NumBones = SkeletalMesh->RefSkeleton.GetNum();
-
-	for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
-	{
-		LodRenderData->RequiredBones.Add(BoneIndex);
-		LodRenderData->ActiveBoneIndices.Add(BoneIndex);
-	}
-
-
-	TArray<FSkinWeightInfo> InWeights;
-	InWeights.AddUninitialized(NumIndices);
-
-	int32 TotalVertexIndex = 0;
-
-	for (int32 i = 0; i < Primitives.Num(); i++)
-	{
-		FglTFRuntimePrimitive& Primitive = Primitives[i];
-
-		int32 Base = Points.Num();
-		Points.Append(Primitive.Positions);
-
-		new(&LodRenderData->RenderSections[i]) FSkelMeshRenderSection();
-		FSkelMeshRenderSection& MeshSection = LodRenderData->RenderSections[i];
-
-		MeshSection.MaterialIndex = i;
-		MeshSection.BaseIndex = TotalVertexIndex;
-		MeshSection.NumTriangles = Primitive.Indices.Num() / 3;
-		MeshSection.BaseVertexIndex = Base;
-		MeshSection.MaxBoneInfluences = 4;
-
-		MeshSection.NumVertices = Primitive.Positions.Num();
-
-		TMap<int32, TArray<int32>> OverlappingVertices;
-		MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
-
-		for (int32 VertexIndex = 0; VertexIndex < Primitive.Indices.Num(); VertexIndex++)
+		for (FglTFRuntimePrimitive& Primitive : LOD.Primitives)
 		{
-			int32 Index = Primitive.Indices[VertexIndex];
-			FModelVertex ModelVertex;
-			ModelVertex.Position = Primitive.Positions[Index];
-			ModelVertex.TangentX = FVector::ZeroVector;
-			ModelVertex.TangentZ = FVector::ZeroVector;
-			if (Index < Primitive.Normals.Num())
-			{
-				ModelVertex.TangentZ = Primitive.Normals[Index];
-				bHasNormals = true;
-			}
-			if (Index < Primitive.Tangents.Num())
-			{
-				ModelVertex.TangentX = Primitive.Tangents[Index];
-			}
-			if (Primitive.UVs.Num() > 0 && Index < Primitive.UVs[0].Num())
-			{
-				ModelVertex.TexCoord = Primitive.UVs[0][Index];
-			}
-			else
-			{
-				ModelVertex.TexCoord = FVector2D::ZeroVector;
-			}
+			int32 Base = Points.Num();
+			Points.Append(Primitive.Positions);
 
-			LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
-			LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, ModelVertex.GetTangentY(), ModelVertex.TangentZ);
-			LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
+			int32 TriangleIndex = 0;
+			TSet<TPair<int32, int32>> InfluencesMap;
 
-			if (!SkeletalMeshConfig.bIgnoreSkin)
+			TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : BoneMap;
+			TMap<int32, int32>& BonesCacheInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.BonesCache : MainBonesCache;
+
+			for (int32 i = 0; i < Primitive.Indices.Num(); i++)
 			{
+				int32 PrimitiveIndex = Primitive.Indices[i];
+
+				SkeletalMeshImportData::FVertex Wedge;
+				Wedge.VertexIndex = Base + PrimitiveIndex;
+
+				for (int32 UVIndex = 0; UVIndex < Primitive.UVs.Num(); UVIndex++)
+				{
+					Wedge.UVs[UVIndex] = Primitive.UVs[UVIndex][PrimitiveIndex];
+				}
+
+				int32 WedgeIndex = Wedges.Add(Wedge);
+
 				for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
 				{
-					FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
-					FVector4 Weights = Primitive.Weights[JointsIndex][Index];
-					for (int32 j = 0; j < 4; j++)
+					FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][PrimitiveIndex];
+					FVector4 Weights = Primitive.Weights[JointsIndex][PrimitiveIndex];
+					// 4 bones for each joints list
+					for (int32 JointPartIndex = 0; JointPartIndex < 4; JointPartIndex++)
 					{
-						if (BoneMap.Contains(Joints[j]))
+						if (BoneMapInUse.Contains(Joints[JointPartIndex]))
 						{
+							SkeletalMeshImportData::FRawBoneInfluence Influence;
+							Influence.VertexIndex = Wedge.VertexIndex;
 							int32 BoneIndex = INDEX_NONE;
-							if (BonesCache.Contains(Joints[j]))
+							if (BonesCacheInUse.Contains(Joints[JointPartIndex]))
 							{
-								BoneIndex = BonesCache[Joints[j]];
+								BoneIndex = BonesCacheInUse[Joints[JointPartIndex]];
 							}
 							else
 							{
-								BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMap[Joints[j]]);
-								BonesCache.Add(Joints[j], BoneIndex);
+								BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMapInUse[Joints[JointPartIndex]]);
+								BonesCacheInUse.Add(Joints[JointPartIndex], BoneIndex);
 							}
-
-							uint8 QuantizedWeight = FMath::Clamp((uint8)(Weights[j] * ((double)0xFF)), (uint8)0x00, (uint8)0xFF);
-
-							InWeights[TotalVertexIndex].InfluenceWeights[j] = QuantizedWeight;
-							InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
+							Influence.BoneIndex = BoneIndex;
+							Influence.Weight = Weights[JointPartIndex];
+							TPair<int32, int32> InfluenceKey = TPair<int32, int32>(Influence.VertexIndex, Influence.BoneIndex);
+							// do not waste cpu time processing zero influences
+							if (!FMath::IsNearlyZero(Influence.Weight, KINDA_SMALL_NUMBER) && !InfluencesMap.Contains(InfluenceKey))
+							{
+								Influences.Add(Influence);
+								InfluencesMap.Add(InfluenceKey);
+							}
 						}
 						else
 						{
-							AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
+							AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[JointPartIndex]));
 							return nullptr;
 						}
 					}
 				}
-			}
-			else
-			{
-				for (int32 j = 0; j < 4; j++)
+
+				TriangleIndex++;
+				if (TriangleIndex == 3)
 				{
-					InWeights[TotalVertexIndex].InfluenceWeights[j] = j == 0 ? 0xFF : 0;
-					InWeights[TotalVertexIndex].InfluenceBones[j] = 0;
+					SkeletalMeshImportData::FTriangle Triangle;
+
+					Triangle.WedgeIndex[0] = WedgeIndex - 2;
+					Triangle.WedgeIndex[1] = WedgeIndex - 1;
+					Triangle.WedgeIndex[2] = WedgeIndex;
+
+					if (Primitive.Normals.Num() > 0)
+					{
+						Triangle.TangentZ[0] = Primitive.Normals[Primitive.Indices[i - 2]];
+						Triangle.TangentZ[1] = Primitive.Normals[Primitive.Indices[i - 1]];
+						Triangle.TangentZ[2] = Primitive.Normals[Primitive.Indices[i]];
+						bHasNormals = true;
+					}
+
+					if (Primitive.Tangents.Num() > 0)
+					{
+						Triangle.TangentX[0] = Primitive.Tangents[Primitive.Indices[i - 2]];
+						Triangle.TangentX[1] = Primitive.Tangents[Primitive.Indices[i - 1]];
+						Triangle.TangentX[2] = Primitive.Tangents[Primitive.Indices[i]];
+					}
+
+					Triangle.MatIndex = MatIndex;
+
+					Triangles.Add(Triangle);
+					TriangleIndex = 0;
 				}
 			}
 
-			TotalVertexIndex++;
+			MatIndex++;
 		}
+
+		FSkeletalMeshImportData ImportData;
+
+		for (int32 i = 0; i < Points.Num(); i++)
+		{
+			PointToRawMap.Add(i);
+		}
+
+		if (SkeletalMeshConfig.bIgnoreSkin)
+		{
+			Influences.Empty();
+			for (int32 WedgeIndex = 0; WedgeIndex < Wedges.Num(); WedgeIndex++)
+			{
+				SkeletalMeshImportData::FRawBoneInfluence Influence;
+				Influence.VertexIndex = Wedges[WedgeIndex].VertexIndex;
+				Influence.BoneIndex = 0;
+				Influence.Weight = 1;
+				Influences.Add(Influence);
+			}
+		}
+
+		FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences);
+
+		ImportData.bHasNormals = bHasNormals;
+		ImportData.bHasVertexColors = false;
+		ImportData.bHasTangents = false;
+		ImportData.Faces = Triangles;
+		ImportData.Points = Points;
+		ImportData.PointToRawMap = PointToRawMap;
+		ImportData.NumTexCoords = 1;
+		ImportData.Wedges = Wedges;
+		ImportData.Influences = Influences;
+
+		int32 MorphTargetIndex = 0;
+		int32 PointsBase = 0;
+		for (FglTFRuntimePrimitive& Primitive : LOD.Primitives)
+		{
+			for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
+			{
+				TSet<uint32> MorphTargetPoints;
+				TArray<FVector> MorphTargetPositions;
+				for (uint32 PointIndex = 0; PointIndex < (uint32)Primitive.Positions.Num(); PointIndex++)
+				{
+					MorphTargetPoints.Add(PointsBase + PointIndex);
+					MorphTargetPositions.Add(Primitive.Positions[PointIndex] + MorphTarget.Positions[PointIndex]);
+				}
+				MorphTargetModifiedPoints.Add(MorphTargetPoints);
+				FSkeletalMeshImportData MorphTargetImportData;
+				ImportData.CopyDataNeedByMorphTargetImport(MorphTargetImportData);
+				MorphTargetImportData.Points = MorphTargetPositions;
+				MorphTargetsData.Add(MorphTargetImportData);
+				const FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
+				MorphTargetNames.Add(MorphTargetName);
+			}
+			PointsBase += Primitive.Positions.Num();
+		}
+
+		ImportData.MorphTargetModifiedPoints = MorphTargetModifiedPoints;
+		ImportData.MorphTargets = MorphTargetsData;
+		ImportData.MorphTargetNames = MorphTargetNames;
+
+
+		int32 LODIndex = ImportedResource->LODModels.Add(new FSkeletalMeshLODModel());
+		FSkeletalMeshLODModel& LODModel = ImportedResource->LODModels[LODIndex];
+
+		SkeletalMesh->SaveLODImportedData(LODIndex, ImportData);
+#else
+
+	SkeletalMesh->AllocateResourceForRendering();
+
+	for (FglTFRuntimeLOD& LOD : LODs)
+	{
+		FSkeletalMeshLODRenderData* LodRenderData = new FSkeletalMeshLODRenderData();
+		int32 LODIndex = SkeletalMesh->GetResourceForRendering()->LODRenderData.Add(LodRenderData);
+
+		LodRenderData->RenderSections.SetNumUninitialized(LOD.Primitives.Num());
+
+		int32 NumIndices = 0;
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.Primitives.Num(); PrimitiveIndex++)
+		{
+			NumIndices += LOD.Primitives[PrimitiveIndex].Indices.Num();
+		}
+
+		LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumIndices);
+		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumIndices, 1);
+
+		int32 NumBones = SkeletalMesh->RefSkeleton.GetNum();
 
 		for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
 		{
-			MeshSection.BoneMap.Add(BoneIndex);
+			LodRenderData->RequiredBones.Add(BoneIndex);
+			LodRenderData->ActiveBoneIndices.Add(BoneIndex);
 		}
-	}
 
-	LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(4);
-	LodRenderData->SkinWeightVertexBuffer = InWeights;
-	LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));
+		TArray<FSkinWeightInfo> InWeights;
+		InWeights.AddUninitialized(NumIndices);
 
-	for (int32 Index = 0; Index < NumIndices; Index++)
-	{
-		LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
-	}
+		int32 TotalVertexIndex = 0;
 
-	bool bHasMorphTargets = false;
-	int32 MorphTargetIndex = 0;
-	int32 BaseIndex = 0;
-	for (int32 PrimitiveIndex = 0; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
-	{
-		FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
-
-		for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.Primitives.Num(); PrimitiveIndex++)
 		{
-			FMorphTargetLODModel MorphTargetLODModel;
-			MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
-			MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
+			FglTFRuntimePrimitive& Primitive = LOD.Primitives[PrimitiveIndex];
 
-			const FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
-			UMorphTarget* MorphTarget = NewObject<UMorphTarget>(SkeletalMesh, *MorphTargetName, RF_Public);
-			for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
+			int32 Base = Points.Num();
+			Points.Append(Primitive.Positions);
+
+			new(&LodRenderData->RenderSections[PrimitiveIndex]) FSkelMeshRenderSection();
+			FSkelMeshRenderSection& MeshSection = LodRenderData->RenderSections[PrimitiveIndex];
+
+			MeshSection.MaterialIndex = PrimitiveIndex;
+			MeshSection.BaseIndex = TotalVertexIndex;
+			MeshSection.NumTriangles = Primitive.Indices.Num() / 3;
+			MeshSection.BaseVertexIndex = Base;
+			MeshSection.MaxBoneInfluences = 4;
+
+			MeshSection.NumVertices = Primitive.Positions.Num();
+
+			TMap<int32, TArray<int32>> OverlappingVertices;
+			MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
+
+			for (int32 VertexIndex = 0; VertexIndex < Primitive.Indices.Num(); VertexIndex++)
 			{
-				FMorphTargetDelta Delta;
-				int32 VertexIndex = Primitive.Indices[Index];
-				if (VertexIndex < MorphTargetData.Positions.Num())
+				int32 Index = Primitive.Indices[VertexIndex];
+				FModelVertex ModelVertex;
+				ModelVertex.Position = Primitive.Positions[Index];
+				ModelVertex.TangentX = FVector::ZeroVector;
+				ModelVertex.TangentZ = FVector::ZeroVector;
+				if (Index < Primitive.Normals.Num())
 				{
-					Delta.PositionDelta = MorphTargetData.Positions[VertexIndex];
+					ModelVertex.TangentZ = Primitive.Normals[Index];
+					bHasNormals = true;
+				}
+				if (Index < Primitive.Tangents.Num())
+				{
+					ModelVertex.TangentX = Primitive.Tangents[Index];
+				}
+				if (Primitive.UVs.Num() > 0 && Index < Primitive.UVs[0].Num())
+				{
+					ModelVertex.TexCoord = Primitive.UVs[0][Index];
 				}
 				else
 				{
-					Delta.PositionDelta = FVector::ZeroVector;
+					ModelVertex.TexCoord = FVector2D::ZeroVector;
 				}
-				Delta.SourceIdx = BaseIndex + Index;
-				Delta.TangentZDelta = FVector(0, 0, 0);
-				MorphTargetLODModel.Vertices.Add(Delta);
+
+				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
+				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, ModelVertex.GetTangentY(), ModelVertex.TangentZ);
+				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
+
+				TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : BoneMap;
+				TMap<int32, int32>& BonesCacheInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.BonesCache : MainBonesCache;
+
+				if (!SkeletalMeshConfig.bIgnoreSkin)
+				{
+					for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
+					{
+						FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
+						FVector4 Weights = Primitive.Weights[JointsIndex][Index];
+						for (int32 j = 0; j < 4; j++)
+						{
+							if (BoneMapInUse.Contains(Joints[j]))
+							{
+								int32 BoneIndex = INDEX_NONE;
+								if (BonesCacheInUse.Contains(Joints[j]))
+								{
+									BoneIndex = BonesCacheInUse[Joints[j]];
+								}
+								else
+								{
+									BoneIndex = SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMapInUse[Joints[j]]);
+									BonesCacheInUse.Add(Joints[j], BoneIndex);
+								}
+
+								uint8 QuantizedWeight = FMath::Clamp((uint8)(Weights[j] * ((double)0xFF)), (uint8)0x00, (uint8)0xFF);
+
+								InWeights[TotalVertexIndex].InfluenceWeights[j] = QuantizedWeight;
+								InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
+							}
+							else
+							{
+								AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
+								return nullptr;
+							}
+						}
+					}
+				}
+				else
+				{
+					for (int32 j = 0; j < 4; j++)
+					{
+						InWeights[TotalVertexIndex].InfluenceWeights[j] = j == 0 ? 0xFF : 0;
+						InWeights[TotalVertexIndex].InfluenceBones[j] = 0;
+					}
+				}
+
+				TotalVertexIndex++;
 			}
-			MorphTarget->MorphLODModels.Add(MorphTargetLODModel);
-			SkeletalMesh->RegisterMorphTarget(MorphTarget, false);
-			bHasMorphTargets = true;
+
+			for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
+			{
+				MeshSection.BoneMap.Add(BoneIndex);
+			}
 		}
-		BaseIndex += Primitive.Indices.Num();
-	}
 
-	if (bHasMorphTargets)
-	{
-		SkeletalMesh->InitMorphTargetsAndRebuildRenderData();
-	}
+		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(4);
+		LodRenderData->SkinWeightVertexBuffer = InWeights;
+		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));
+
+		for (int32 Index = 0; Index < NumIndices; Index++)
+		{
+			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
+		}
+
+		bool bHasMorphTargets = false;
+		int32 MorphTargetIndex = 0;
+		int32 BaseIndex = 0;
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.Primitives.Num(); PrimitiveIndex++)
+		{
+			FglTFRuntimePrimitive& Primitive = LOD.Primitives[PrimitiveIndex];
+
+			for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
+			{
+				FMorphTargetLODModel MorphTargetLODModel;
+				MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
+				MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
+
+				const FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
+				UMorphTarget* MorphTarget = NewObject<UMorphTarget>(SkeletalMesh, *MorphTargetName, RF_Public);
+				for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
+				{
+					FMorphTargetDelta Delta;
+					int32 VertexIndex = Primitive.Indices[Index];
+					if (VertexIndex < MorphTargetData.Positions.Num())
+					{
+						Delta.PositionDelta = MorphTargetData.Positions[VertexIndex];
+					}
+					else
+					{
+						Delta.PositionDelta = FVector::ZeroVector;
+					}
+					Delta.SourceIdx = BaseIndex + Index;
+					Delta.TangentZDelta = FVector(0, 0, 0);
+					MorphTargetLODModel.Vertices.Add(Delta);
+				}
+				MorphTarget->MorphLODModels.Add(MorphTargetLODModel);
+				SkeletalMesh->RegisterMorphTarget(MorphTarget, false);
+				bHasMorphTargets = true;
+			}
+			BaseIndex += Primitive.Indices.Num();
+		}
+
+		if (bHasMorphTargets)
+		{
+			SkeletalMesh->InitMorphTargetsAndRebuildRenderData();
+		}
 #endif
+		// LOD tuning
 
-	SkeletalMesh->ResetLODInfo();
-	FSkeletalMeshLODInfo& LODInfo = SkeletalMesh->AddLODInfo();
-	LODInfo.ReductionSettings.NumOfTrianglesPercentage = 1.0f;
-	LODInfo.ReductionSettings.NumOfVertPercentage = 1.0f;
-	LODInfo.ReductionSettings.MaxDeviationPercentage = 0.0f;
-	LODInfo.BuildSettings.bRecomputeNormals = !bHasNormals;
-	LODInfo.LODHysteresis = 0.02f;
+		SkeletalMesh->ResetLODInfo();
+		FSkeletalMeshLODInfo& LODInfo = SkeletalMesh->AddLODInfo();
+		LODInfo.ReductionSettings.NumOfTrianglesPercentage = 1.0f;
+		LODInfo.ReductionSettings.NumOfVertPercentage = 1.0f;
+		LODInfo.ReductionSettings.MaxDeviationPercentage = 0.0f;
+		LODInfo.BuildSettings.bRecomputeNormals = !bHasNormals;
+		LODInfo.LODHysteresis = 0.02f;
+
+		for (MatIndex = 0; MatIndex < LOD.Primitives.Num(); MatIndex++)
+		{
+			LODInfo.LODMaterialMap.Add(MatIndex);
+			SkeletalMesh->Materials.Add(LOD.Primitives[MatIndex].Material);
+			SkeletalMesh->Materials[MatIndex].UVChannelData.bInitialized = true;
+		}
+	}
 
 	SkeletalMesh->CalculateInvRefMatrices();
 
@@ -469,13 +488,6 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 #if WITH_EDITOR
 	SkeletalMesh->VertexColorGuid = SkeletalMesh->bHasVertexColors ? FGuid::NewGuid() : FGuid();
 #endif
-
-	for (MatIndex = 0; MatIndex < Primitives.Num(); MatIndex++)
-	{
-		LODInfo.LODMaterialMap.Add(MatIndex);
-		SkeletalMesh->Materials.Add(Primitives[MatIndex].Material);
-		SkeletalMesh->Materials[MatIndex].UVChannelData.bInitialized = true;
-	}
 
 #if WITH_EDITOR
 	IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
@@ -491,9 +503,9 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	}
 	else
 	{
-		if (CanReadFromCache(SkeletalMeshConfig.SkeletonConfig.CacheMode) && SkeletonsCache.Contains(SkinIndex))
+		if (CanReadFromCache(SkeletalMeshConfig.SkeletonConfig.CacheMode) && SkeletonsCache.Contains(NewSkinIndex))
 		{
-			SkeletalMesh->Skeleton = SkeletonsCache[SkinIndex];
+			SkeletalMesh->Skeleton = SkeletonsCache[NewSkinIndex];
 		}
 		else
 		{
@@ -501,7 +513,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 			SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
 			if (CanWriteToCache(SkeletalMeshConfig.SkeletonConfig.CacheMode))
 			{
-				SkeletonsCache.Add(SkinIndex, SkeletalMesh->Skeleton);
+				SkeletonsCache.Add(NewSkinIndex, SkeletalMesh->Skeleton);
 			}
 			SkeletalMesh->Skeleton->SetPreviewMesh(SkeletalMesh);
 		}
@@ -530,7 +542,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh_Internal(TSharedRef<FJsonObj
 	return SkeletalMesh;
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
 
 	// first check cache
@@ -546,19 +558,26 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonObject> JsonSkinObject = MakeShared<FJsonObject>();
-
-	if (!SkeletalMeshConfig.bIgnoreSkin)
+	// get primitives
+	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
+	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
 	{
-		JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
-		if (!JsonSkinObject)
-		{
-			AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Skin with index %d"), SkinIndex));
-			return nullptr;
-		}
+		AddError("LoadSkeletalMesh", "No primitives defined in the asset.");
+		return nullptr;
 	}
 
-	USkeletalMesh* SkeletalMesh = LoadSkeletalMesh_Internal(JsonMeshObject.ToSharedRef(), JsonSkinObject.ToSharedRef(), SkeletalMeshConfig, SkinIndex);
+	TArray<FglTFRuntimePrimitive> Primitives;
+	if (!LoadPrimitives(JsonPrimitives, Primitives, SkeletalMeshConfig.MaterialsConfig))
+	{
+		return nullptr;
+	}
+
+	TArray<FglTFRuntimeLOD> LODs;
+	FglTFRuntimeLOD LOD0;
+	LOD0.Primitives = Primitives;
+	LODs.Add(LOD0);
+
+	USkeletalMesh* SkeletalMesh = CreateSkeletalMeshFromLODs(LODs, SkinIndex, SkeletalMeshConfig);
 	if (!SkeletalMesh)
 	{
 		AddError("LoadSkeletalMesh()", "Unable to load SkeletalMesh.");
@@ -573,7 +592,112 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	return SkeletalMesh;
 }
 
-UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
+{
+	FglTFRuntimeNode Node;
+	if (!LoadNodeByName(NodeName, Node))
+	{
+		AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
+		return nullptr;
+	}
+
+	TArray<FglTFRuntimeNode> Nodes;
+	if (!LoadNodesRecursive(Node.Index, Nodes))
+	{
+		AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
+		return nullptr;
+	}
+
+	int32 NewSkinIndex = SkinIndex;
+
+	if (NewSkinIndex == INDEX_NONE)
+	{
+		// first search for skinning
+		for (FglTFRuntimeNode& ChildNode : Nodes)
+		{
+			if (ChildNode.SkinIndex != INDEX_NONE)
+			{
+				NewSkinIndex = ChildNode.SkinIndex;
+				break;
+			}
+		}
+
+		if (NewSkinIndex == INDEX_NONE)
+		{
+			AddError("LoadSkeletalMeshRecursive()", "Unable to find a valid Skin");
+			return nullptr;
+		}
+	}
+
+	TArray<FglTFRuntimePrimitive> Primitives;
+
+	// now search for all meshes (will be all merged in the same primitives list)
+	for (FglTFRuntimeNode& ChildNode : Nodes)
+	{
+		if (ChildNode.MeshIndex != INDEX_NONE)
+		{
+			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", ChildNode.MeshIndex);
+			if (!JsonMeshObject)
+			{
+				AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to find Mesh with index %d"), ChildNode.MeshIndex));
+				return nullptr;
+			}
+
+			// get primitives
+			const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
+			if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
+			{
+				AddError("LoadSkeletalMeshRecursive()", "No primitives defined in the asset.");
+				return nullptr;
+			}
+
+			// keep track of primitives
+			int32 PrimitiveFirstIndex = Primitives.Num();
+
+			if (!LoadPrimitives(JsonPrimitives, Primitives, SkeletalMeshConfig.MaterialsConfig))
+			{
+				return nullptr;
+			}
+
+			// if the SkinIndex is different from the selected one,
+			// build an override bone map
+			if (ChildNode.SkinIndex != INDEX_NONE && ChildNode.SkinIndex != NewSkinIndex)
+			{
+				TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
+				if (!JsonSkinObject)
+				{
+					AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to fill skin %d"), ChildNode.SkinIndex));
+					return nullptr;
+				}
+
+				TMap<int32, FName> BoneMap;
+
+				FReferenceSkeleton FakeRefSkeleton;
+				if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), FakeRefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
+				{
+					AddError("LoadSkeletalMeshRecursive()", "Unable to fill RefSkeleton.");
+					return nullptr;
+				}
+
+				// apply overrides
+				for (int32 PrimitiveIndex = PrimitiveFirstIndex; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
+				{
+					FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
+					Primitive.OverrideBoneMap = BoneMap;
+				}
+			}
+		}
+	}
+
+	TArray<FglTFRuntimeLOD> LODs;
+	FglTFRuntimeLOD LOD0;
+	LOD0.Primitives = Primitives;
+	LODs.Add(LOD0);
+
+	return CreateSkeletalMeshFromLODs(LODs, NewSkinIndex, SkeletalMeshConfig);
+}
+
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig & AnimationConfig)
 {
 	if (!SkeletalMesh)
 	{
@@ -608,7 +732,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 	return nullptr;
 }
 
-UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
+UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
 {
 
 	if (!SkeletalMesh)
@@ -689,7 +813,7 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 }
 
 
-UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig)
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig & AnimationConfig)
 {
 	if (!SkeletalMesh)
 	{
@@ -872,9 +996,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-}
+	}
 
-bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack> & Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)

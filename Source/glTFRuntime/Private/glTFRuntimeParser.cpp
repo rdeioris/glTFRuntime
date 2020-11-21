@@ -195,6 +195,28 @@ void FglTFRuntimeParser::FixNodeParent(FglTFRuntimeNode& Node)
 	}
 }
 
+bool FglTFRuntimeParser::LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes)
+{
+	FglTFRuntimeNode Node;
+	if (!LoadNode(NodeIndex, Node))
+	{
+		AddError("LoadNodesRecursive()", FString::Printf(TEXT("Unable to load node %d"), NodeIndex));
+		return false;
+	}
+
+	Nodes.Add(Node);
+
+	for (int32 ChildIndex : Node.ChildrenIndices)
+	{
+		if (!LoadNodesRecursive(ChildIndex, Nodes))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool FglTFRuntimeParser::LoadScenes(TArray<FglTFRuntimeScene>& Scenes)
 {
 	const TArray<TSharedPtr<FJsonValue>>* JsonScenes;
@@ -326,7 +348,7 @@ bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadNodeByName(FString Name, FglTFRuntimeNode& Node)
+bool FglTFRuntimeParser::LoadNodeByName(const FString& Name, FglTFRuntimeNode& Node)
 {
 	// a bit hacky, but allows zero-copy for cached values
 	if (!bAllNodesCached)
@@ -1058,7 +1080,9 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 		{
 			int64 JointIndex;
 			if (!JsonJoint->TryGetNumber(JointIndex))
+			{
 				return false;
+			}
 			Joints.Add(JointIndex);
 		}
 	}
@@ -1214,7 +1238,9 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	int32 NewParentIndex = Modifier.FindBoneIndex(BoneName);
 	// something horrible happened...
 	if (NewParentIndex == INDEX_NONE)
+	{
 		return false;
+	}
 
 	if (Joints.Contains(Node.Index))
 	{
