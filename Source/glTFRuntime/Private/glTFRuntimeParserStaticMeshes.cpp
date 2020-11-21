@@ -8,216 +8,234 @@
 #include "Editor/EditorEngine.h"
 #endif
 
-UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject> JsonMeshObject, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
-	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
-	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
-	{
-		return nullptr;
-	}
-
-	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonPrimitives, Primitives, StaticMeshConfig.MaterialsConfig))
-		return nullptr;
 
 	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(StaticMeshConfig.Outer ? StaticMeshConfig.Outer : GetTransientPackage(), NAME_None, RF_Public);
 	StaticMesh->bAllowCPUAccess = StaticMeshConfig.bAllowCPUAccess;
 
-	UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
-
-	TArray<FStaticMaterial> StaticMaterials;
-
-	TArray<uint32> CPUVertexInstancesIDs;
-
-	int32 NumUVs = 1;
-	bool bCalculateNormals = false;
-	bool bCalculateTangents = false;
 	bool bHasVertexColors = false;
-	for (FglTFRuntimePrimitive& Primitive : Primitives)
+	FVector LOD0PivotDelta = FVector::ZeroVector;
+
+	TArray<UStaticMeshDescription*> MeshDescriptions;
+
+	TArray<uint32> LOD0CPUVertexInstancesIDs;
+
+	for (TSharedRef<FJsonObject> JsonMeshObject : JsonMeshObjects)
 	{
-		if (Primitive.UVs.Num() > NumUVs)
+
+		const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
+		if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
 		{
-			NumUVs = Primitive.UVs.Num();
+			return nullptr;
 		}
 
-		if (Primitive.Normals.Num() == 0)
+		TArray<FglTFRuntimePrimitive> Primitives;
+		if (!LoadPrimitives(JsonPrimitives, Primitives, StaticMeshConfig.MaterialsConfig))
+			return nullptr;
+
+		UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
+
+		TArray<FStaticMaterial> StaticMaterials;
+
+		int32 NumUVs = 1;
+		bool bCalculateNormals = false;
+		bool bCalculateTangents = false;
+		FVector PivotDelta = FVector::ZeroVector;
+
+		for (FglTFRuntimePrimitive& Primitive : Primitives)
 		{
-			bCalculateNormals = true;
+			if (Primitive.UVs.Num() > NumUVs)
+			{
+				NumUVs = Primitive.UVs.Num();
+			}
+
+			if (Primitive.Normals.Num() == 0)
+			{
+				bCalculateNormals = true;
+			}
+
+			if (Primitive.Tangents.Num() == 0)
+			{
+				bCalculateTangents = true;
+			}
 		}
 
-		if (Primitive.Tangents.Num() == 0)
+		for (FglTFRuntimePrimitive& Primitive : Primitives)
 		{
-			bCalculateTangents = true;
-		}
-	}
+			FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
 
-	for (FglTFRuntimePrimitive& Primitive : Primitives)
-	{
-		FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
+			TPolygonGroupAttributesRef<FName> PolygonGroupMaterialSlotNames = MeshDescription->GetPolygonGroupMaterialSlotNames();
+			FName MaterialName = FName(FString::Printf(TEXT("LOD_%d_Section_%d"), MeshDescriptions.Num(), StaticMaterials.Num()));
+			PolygonGroupMaterialSlotNames[PolygonGroupID] = MaterialName;
+			FStaticMaterial StaticMaterial(Primitive.Material, MaterialName);
+			StaticMaterial.UVChannelData.bInitialized = true;
+			StaticMaterials.Add(StaticMaterial);
 
-		TPolygonGroupAttributesRef<FName> PolygonGroupMaterialSlotNames = MeshDescription->GetPolygonGroupMaterialSlotNames();
-		PolygonGroupMaterialSlotNames[PolygonGroupID] = Primitive.Material->GetFName();
-		FStaticMaterial StaticMaterial(Primitive.Material, Primitive.Material->GetFName());
-		StaticMaterial.UVChannelData.bInitialized = true;
-		StaticMaterials.Add(StaticMaterial);
+			TVertexAttributesRef<FVector> PositionsAttributesRef = MeshDescription->GetVertexPositions();
+			TVertexInstanceAttributesRef<FVector> NormalsInstanceAttributesRef = MeshDescription->GetVertexInstanceNormals();
+			TVertexInstanceAttributesRef<FVector> TangentsInstanceAttributesRef = MeshDescription->GetVertexInstanceTangents();
+			TVertexInstanceAttributesRef<FVector2D> UVsInstanceAttributesRef = MeshDescription->GetVertexInstanceUVs();
+			TVertexInstanceAttributesRef<FVector4> ColorsInstanceAttributesRef = MeshDescription->GetVertexInstanceColors();
 
-		TVertexAttributesRef<FVector> PositionsAttributesRef = MeshDescription->GetVertexPositions();
-		TVertexInstanceAttributesRef<FVector> NormalsInstanceAttributesRef = MeshDescription->GetVertexInstanceNormals();
-		TVertexInstanceAttributesRef<FVector> TangentsInstanceAttributesRef = MeshDescription->GetVertexInstanceTangents();
-		TVertexInstanceAttributesRef<FVector2D> UVsInstanceAttributesRef = MeshDescription->GetVertexInstanceUVs();
-		TVertexInstanceAttributesRef<FVector4> ColorsInstanceAttributesRef = MeshDescription->GetVertexInstanceColors();
+			UVsInstanceAttributesRef.SetNumIndices(NumUVs);
 
-		UVsInstanceAttributesRef.SetNumIndices(NumUVs);
-
-		TArray<FVertexInstanceID> VertexInstancesIDs;
-		TArray<FVertexID> VerticesIDs;
-		TArray<FVertexID> TriangleVerticesIDs;
+			TArray<FVertexInstanceID> VertexInstancesIDs;
+			TArray<FVertexID> VerticesIDs;
+			TArray<FVertexID> TriangleVerticesIDs;
 
 
-		for (FVector& Position : Primitive.Positions)
-		{
-			FVertexID VertexID = MeshDescription->CreateVertex();
-			PositionsAttributesRef[VertexID] = Position;
-			VerticesIDs.Add(VertexID);
-		}
-
-		for (uint32 VertexIndex : Primitive.Indices)
-		{
-			if (VertexIndex >= (uint32)VerticesIDs.Num())
-				return nullptr;
-
-			FVertexInstanceID NewVertexInstanceID = MeshDescription->CreateVertexInstance(VerticesIDs[VertexIndex]);
-
-			if (StaticMesh->bAllowCPUAccess)
+			for (FVector& Position : Primitive.Positions)
 			{
-				CPUVertexInstancesIDs.Add(NewVertexInstanceID.GetValue());
+				FVertexID VertexID = MeshDescription->CreateVertex();
+				PositionsAttributesRef[VertexID] = Position;
+				VerticesIDs.Add(VertexID);
 			}
 
-			if (Primitive.Normals.Num() > 0)
+			for (uint32 VertexIndex : Primitive.Indices)
 			{
-				if (VertexIndex >= (uint32)Primitive.Normals.Num())
-				{
-					NormalsInstanceAttributesRef[NewVertexInstanceID] = FVector::ZeroVector;
-				}
-				else
-				{
-					NormalsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Normals[VertexIndex];
-				}
-			}
+				if (VertexIndex >= (uint32)VerticesIDs.Num())
+					return nullptr;
 
-			if (Primitive.Tangents.Num() > 0)
-			{
-				if (VertexIndex >= (uint32)Primitive.Tangents.Num())
-				{
-					TangentsInstanceAttributesRef[NewVertexInstanceID] = FVector::ZeroVector;
-				}
-				else
-				{
-					TangentsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Tangents[VertexIndex];
-				}
-			}
+				FVertexInstanceID NewVertexInstanceID = MeshDescription->CreateVertexInstance(VerticesIDs[VertexIndex]);
 
-			if (Primitive.Colors.Num() > 0)
-			{
-				if (VertexIndex >= (uint32)Primitive.Colors.Num())
+				// LOD0 ?
+				if (StaticMesh->bAllowCPUAccess && MeshDescriptions.Num() == 0)
 				{
-					ColorsInstanceAttributesRef[NewVertexInstanceID] = FVector4(0, 0, 0, 0);
+					LOD0CPUVertexInstancesIDs.Add(NewVertexInstanceID.GetValue());
 				}
-				else
-				{
-					ColorsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Colors[VertexIndex];
-				}
-				bHasVertexColors = true;
-			}
 
-			for (int32 UVIndex = 0; UVIndex < Primitive.UVs.Num(); UVIndex++)
-			{
-				if (VertexIndex >= (uint32)Primitive.UVs[UVIndex].Num())
+				if (Primitive.Normals.Num() > 0)
 				{
-					UVsInstanceAttributesRef.Set(NewVertexInstanceID, UVIndex, FVector2D::ZeroVector);
+					if (VertexIndex >= (uint32)Primitive.Normals.Num())
+					{
+						NormalsInstanceAttributesRef[NewVertexInstanceID] = FVector::ZeroVector;
+					}
+					else
+					{
+						NormalsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Normals[VertexIndex];
+					}
 				}
-				else
+
+				if (Primitive.Tangents.Num() > 0)
 				{
-					UVsInstanceAttributesRef.Set(NewVertexInstanceID, UVIndex, Primitive.UVs[UVIndex][VertexIndex]);
+					if (VertexIndex >= (uint32)Primitive.Tangents.Num())
+					{
+						TangentsInstanceAttributesRef[NewVertexInstanceID] = FVector::ZeroVector;
+					}
+					else
+					{
+						TangentsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Tangents[VertexIndex];
+					}
 				}
-			}
 
-			VertexInstancesIDs.Add(NewVertexInstanceID);
-			TriangleVerticesIDs.Add(VerticesIDs[VertexIndex]);
-
-			if (VertexInstancesIDs.Num() == 3)
-			{
-				// degenerate ?
-				if (TriangleVerticesIDs[0] == TriangleVerticesIDs[1] ||
-					TriangleVerticesIDs[1] == TriangleVerticesIDs[2] ||
-					TriangleVerticesIDs[0] == TriangleVerticesIDs[2])
+				if (Primitive.Colors.Num() > 0)
 				{
+					if (VertexIndex >= (uint32)Primitive.Colors.Num())
+					{
+						ColorsInstanceAttributesRef[NewVertexInstanceID] = FVector4(0, 0, 0, 0);
+					}
+					else
+					{
+						ColorsInstanceAttributesRef[NewVertexInstanceID] = Primitive.Colors[VertexIndex];
+					}
+					bHasVertexColors = true;
+				}
+
+				for (int32 UVIndex = 0; UVIndex < Primitive.UVs.Num(); UVIndex++)
+				{
+					if (VertexIndex >= (uint32)Primitive.UVs[UVIndex].Num())
+					{
+						UVsInstanceAttributesRef.Set(NewVertexInstanceID, UVIndex, FVector2D::ZeroVector);
+					}
+					else
+					{
+						UVsInstanceAttributesRef.Set(NewVertexInstanceID, UVIndex, Primitive.UVs[UVIndex][VertexIndex]);
+					}
+				}
+
+				VertexInstancesIDs.Add(NewVertexInstanceID);
+				TriangleVerticesIDs.Add(VerticesIDs[VertexIndex]);
+
+				if (VertexInstancesIDs.Num() == 3)
+				{
+					// degenerate ?
+					if (TriangleVerticesIDs[0] == TriangleVerticesIDs[1] ||
+						TriangleVerticesIDs[1] == TriangleVerticesIDs[2] ||
+						TriangleVerticesIDs[0] == TriangleVerticesIDs[2])
+					{
+						VertexInstancesIDs.Reset();
+						TriangleVerticesIDs.Reset();
+						continue;
+					}
+
+					TArray<FEdgeID> Edges;
+					// fix winding ?
+					if (StaticMeshConfig.bReverseWinding)
+					{
+						VertexInstancesIDs.Swap(1, 2);
+					}
+					FTriangleID TriangleID = MeshDescription->CreateTriangle(PolygonGroupID, VertexInstancesIDs, Edges);
+					if (TriangleID == FTriangleID::Invalid)
+					{
+						return nullptr;
+					}
 					VertexInstancesIDs.Reset();
 					TriangleVerticesIDs.Reset();
-					continue;
 				}
+			}
 
-				TArray<FEdgeID> Edges;
-				// fix winding ?
-				if (StaticMeshConfig.bReverseWinding)
-				{
-					VertexInstancesIDs.Swap(1, 2);
-				}
-				FTriangleID TriangleID = MeshDescription->CreateTriangle(PolygonGroupID, VertexInstancesIDs, Edges);
-				if (TriangleID == FTriangleID::Invalid)
-				{
-					return nullptr;
-				}
-				VertexInstancesIDs.Reset();
-				TriangleVerticesIDs.Reset();
+		}
+
+
+		if (StaticMeshConfig.PivotPosition != EglTFRuntimePivotPosition::Asset)
+		{
+			FBoxSphereBounds MeshBounds = MeshDescription->GetMeshDescription().GetBounds();
+			TVertexAttributesRef<FVector> VertexPositions = MeshDescription->GetVertexPositions();
+
+			if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Center)
+			{
+				PivotDelta = MeshBounds.GetSphere().Center;
+			}
+			else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Top)
+			{
+				PivotDelta = MeshBounds.GetBox().GetCenter() + FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
+			}
+			else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Bottom)
+			{
+				PivotDelta = MeshBounds.GetBox().GetCenter() - FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
+			}
+
+			for (const FVertexID VertexID : MeshDescription->Vertices().GetElementIDs())
+			{
+				VertexPositions[VertexID] -= PivotDelta;
+			}
+
+			if (MeshDescriptions.Num() == 0)
+			{
+				LOD0PivotDelta = PivotDelta;
 			}
 		}
 
+		StaticMesh->StaticMaterials.Append(StaticMaterials);
+
+		FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription->GetMeshDescription());
+		if (bCalculateNormals || bCalculateTangents)
+		{
+			EComputeNTBsFlags NTPBsFlags = EComputeNTBsFlags::None;
+			if (bCalculateNormals)
+			{
+				NTPBsFlags |= EComputeNTBsFlags::Normals;
+			}
+			if (bCalculateTangents)
+			{
+				NTPBsFlags |= EComputeNTBsFlags::Tangents;
+			}
+			FStaticMeshOperations::ComputeTangentsAndNormals(MeshDescription->GetMeshDescription(), NTPBsFlags);
+		}
+
+		MeshDescriptions.Add(MeshDescription);
 	}
-
-	FVector PivotDelta = FVector::ZeroVector;
-	if (StaticMeshConfig.PivotPosition != EglTFRuntimePivotPosition::Asset)
-	{
-		FBoxSphereBounds MeshBounds = MeshDescription->GetMeshDescription().GetBounds();
-		TVertexAttributesRef<FVector> VertexPositions = MeshDescription->GetVertexPositions();
-
-		if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Center)
-		{
-			PivotDelta = MeshBounds.GetSphere().Center;
-		}
-		else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Top)
-		{
-			PivotDelta = MeshBounds.GetBox().GetCenter() + FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
-		}
-		else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Bottom)
-		{
-			PivotDelta = MeshBounds.GetBox().GetCenter() - FVector(0, 0, MeshBounds.GetBox().GetExtent().Z);
-		}
-
-		for (const FVertexID VertexID : MeshDescription->Vertices().GetElementIDs())
-		{
-			VertexPositions[VertexID] -= PivotDelta;
-		}
-	}
-
-	StaticMesh->StaticMaterials = StaticMaterials;
-
-	FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription->GetMeshDescription());
-	if (bCalculateNormals || bCalculateTangents)
-	{
-		EComputeNTBsFlags NTPBsFlags = EComputeNTBsFlags::None;
-		if (bCalculateNormals)
-		{
-			NTPBsFlags |= EComputeNTBsFlags::Normals;
-		}
-		if (bCalculateTangents)
-		{
-			NTPBsFlags |= EComputeNTBsFlags::Tangents;
-		}
-		FStaticMeshOperations::ComputeTangentsAndNormals(MeshDescription->GetMeshDescription(), NTPBsFlags);
-	}
-
-	TArray<UStaticMeshDescription*> MeshDescriptions = { MeshDescription };
 
 	StaticMesh->BuildFromStaticMeshDescriptions(MeshDescriptions, false);
 
@@ -230,7 +248,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	if ((bHasVertexColors || bIsMobile) && StaticMesh->RenderData && StaticMesh->RenderData->LODResources.Num() > 0)
 	{
 		StaticMesh->ReleaseResources();
-		StaticMesh->RenderData->LODResources[0].bHasColorVertexData = true;
+		for (int32 LODIndex = 0; LODIndex < StaticMesh->RenderData->LODResources.Num(); LODIndex++)
+		{
+			StaticMesh->RenderData->LODResources[LODIndex].bHasColorVertexData = true;
+		}
 		StaticMesh->InitResources();
 	}
 
@@ -250,16 +271,16 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	{
 		FStaticMeshLODResources& LOD = StaticMesh->RenderData->LODResources[0];
 		ENQUEUE_RENDER_COMMAND(FixIndexBufferOnCPUCommand)(
-			[&LOD, &CPUVertexInstancesIDs](FRHICommandListImmediate& RHICmdList)
+			[&LOD, &LOD0CPUVertexInstancesIDs](FRHICommandListImmediate& RHICmdList)
 		{
 			LOD.IndexBuffer.ReleaseResource();
 			LOD.IndexBuffer = FRawStaticIndexBuffer(true);
-			LOD.IndexBuffer.SetIndices(CPUVertexInstancesIDs, EIndexBufferStride::AutoDetect);
+			LOD.IndexBuffer.SetIndices(LOD0CPUVertexInstancesIDs, EIndexBufferStride::AutoDetect);
 			LOD.IndexBuffer.InitResource();
 		});
 
 		FlushRenderingCommands();
-	}
+}
 #endif
 
 	if (StaticMeshConfig.bBuildSimpleCollision)
@@ -307,7 +328,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FJsonObject>
 	{
 		UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
 		Socket->SocketName = FName(StaticMeshConfig.ExportOriginalPivotToSocket);
-		Socket->RelativeLocation = -PivotDelta;
+		Socket->RelativeLocation = -LOD0PivotDelta;
 		StaticMesh->AddSocket(Socket);
 	}
 
@@ -355,7 +376,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const Fgl
 		return StaticMeshesCache[MeshIndex];
 	}
 
-	UStaticMesh* StaticMesh = LoadStaticMesh_Internal(JsonMeshObject.ToSharedRef(), StaticMeshConfig);
+	TArray<TSharedRef<FJsonObject>> JsonMeshObjects;
+	JsonMeshObjects.Add(JsonMeshObject.ToSharedRef());
+
+	UStaticMesh* StaticMesh = LoadStaticMesh_Internal(JsonMeshObjects, StaticMeshConfig);
 	if (!StaticMesh)
 	{
 		return nullptr;
@@ -367,6 +391,24 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const Fgl
 	}
 
 	return StaticMesh;
+}
+
+UStaticMesh* FglTFRuntimeParser::LoadStaticMeshLODs(const TArray<int32> MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	TArray<TSharedRef<FJsonObject>> JsonMeshObjects;
+
+	for (const int32 MeshIndex : MeshIndices)
+	{
+		TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+		if (!JsonMeshObject)
+		{
+			return nullptr;
+		}
+
+		JsonMeshObjects.Add(JsonMeshObject.ToSharedRef());
+	}
+
+	return LoadStaticMesh_Internal(JsonMeshObjects, StaticMeshConfig);
 }
 
 bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig)

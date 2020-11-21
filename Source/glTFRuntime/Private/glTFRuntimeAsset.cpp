@@ -228,6 +228,20 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMesh(const int32 MeshIndex, const FglT
 	return Parser->LoadStaticMesh(MeshIndex, StaticMeshConfig);
 }
 
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshLODs(const TArray<int32> MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadStaticMeshLODs(MeshIndices, StaticMeshConfig);
+}
+
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshLODs(const TArray<int32> MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadSkeletalMeshLODs(MeshIndices, SkinIndex, SkeletalMeshConfig);
+}
+
 UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString& MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
@@ -235,35 +249,35 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString& MeshName, co
 	return Parser->LoadStaticMeshByName(MeshName, StaticMeshConfig);
 }
 
-USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, SkeletalMeshConfig);
 }
 
-USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeName, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeName, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeletalMeshRecursive(NodeName, SkeletalMeshConfig.OverrideSkinIndex, SkeletalMeshConfig);
 }
 
-USkeleton* UglTFRuntimeAsset::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig SkeletonConfig)
+USkeleton* UglTFRuntimeAsset::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeleton(SkinIndex, SkeletonConfig);
 }
 
-UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, SkeletalAnimationConfig);
 }
 
-UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig)
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 

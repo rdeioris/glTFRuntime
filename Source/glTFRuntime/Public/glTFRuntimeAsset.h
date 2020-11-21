@@ -38,22 +38,28 @@ public:
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "StaticMeshConfig", AutoCreateRefTerm = "StaticMeshConfig"), Category = "glTFRuntime")
+	UStaticMesh* LoadStaticMeshLODs(const TArray<int32> MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "StaticMeshConfig", AutoCreateRefTerm = "StaticMeshConfig"), Category = "glTFRuntime")
 	UStaticMesh* LoadStaticMeshByName(const FString& MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalMeshConfig", AutoCreateRefTerm = "SkeletalMeshConfig"), Category = "glTFRuntime")
-	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig);
+	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalMeshConfig", AutoCreateRefTerm = "SkeletalMeshConfig"), Category = "glTFRuntime")
-	USkeletalMesh* LoadSkeletalMeshRecursive(const FString& NodeName, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig);
+	USkeletalMesh* LoadSkeletalMeshRecursive(const FString& NodeName, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletonConfig", AutoCreateRefTerm = "SkeletonConfig"), Category = "glTFRuntime")
-	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig SkeletonConfig);
+	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalMeshConfig", AutoCreateRefTerm = "SkeletalMeshConfig"), Category = "glTFRuntime")
+	USkeletalMesh* LoadSkeletalMeshLODs(const TArray<int32> MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
 	UFUNCTION(BlueprintCallable, meta=(AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
-	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
+	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
-	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig);
+	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
 	UAnimSequence* LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);

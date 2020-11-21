@@ -49,10 +49,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 {
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
 
-	int32 NewSkinIndex = SkeletalMeshConfig.OverrideSkinIndex != INDEX_NONE ? SkeletalMeshConfig.OverrideSkinIndex : SkinIndex;
+	int32 NewSkinIndex = SkeletalMeshConfig.OverrideSkinIndex > INDEX_NONE ? SkeletalMeshConfig.OverrideSkinIndex : SkinIndex;
 
 	TMap<int32, FName> BoneMap;
-	if (!SkeletalMeshConfig.bIgnoreSkin && NewSkinIndex != INDEX_NONE)
+	if (!SkeletalMeshConfig.bIgnoreSkin && NewSkinIndex > INDEX_NONE)
 	{
 		TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", NewSkinIndex);
 		if (!JsonSkinObject)
@@ -93,8 +93,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 
 	bool bHasNormals = false;
 
-#if WITH_EDITOR
+	SkeletalMesh->ResetLODInfo();
 
+#if WITH_EDITOR
 	TArray<TSet<uint32>> MorphTargetModifiedPoints;
 	TArray<FSkeletalMeshImportData> MorphTargetsData;
 	TArray<FString> MorphTargetNames;
@@ -213,7 +214,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 			PointToRawMap.Add(i);
 		}
 
-		if (SkeletalMeshConfig.bIgnoreSkin)
+		if (SkeletalMeshConfig.bIgnoreSkin || NewSkinIndex <= INDEX_NONE)
 		{
 			Influences.Empty();
 			for (int32 WedgeIndex = 0; WedgeIndex < Wedges.Num(); WedgeIndex++)
@@ -357,7 +358,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 				TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : BoneMap;
 				TMap<int32, int32>& BonesCacheInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.BonesCache : MainBonesCache;
 
-				if (!SkeletalMeshConfig.bIgnoreSkin)
+				if (!SkeletalMeshConfig.bIgnoreSkin && NewSkinIndex > INDEX_NONE)
 				{
 					for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
 					{
@@ -463,7 +464,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 #endif
 		// LOD tuning
 
-		SkeletalMesh->ResetLODInfo();
 		FSkeletalMeshLODInfo& LODInfo = SkeletalMesh->AddLODInfo();
 		LODInfo.ReductionSettings.NumOfTrianglesPercentage = 1.0f;
 		LODInfo.ReductionSettings.NumOfVertPercentage = 1.0f;
@@ -474,9 +474,20 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 		for (MatIndex = 0; MatIndex < LOD.Primitives.Num(); MatIndex++)
 		{
 			LODInfo.LODMaterialMap.Add(MatIndex);
-			SkeletalMesh->Materials.Add(LOD.Primitives[MatIndex].Material);
-			SkeletalMesh->Materials[MatIndex].UVChannelData.bInitialized = true;
+			int32 NewMatIndex = SkeletalMesh->Materials.Add(LOD.Primitives[MatIndex].Material);
+			SkeletalMesh->Materials[NewMatIndex].UVChannelData.bInitialized = true;
+			SkeletalMesh->Materials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d"), LODIndex, MatIndex));
 		}
+
+#if WITH_EDITOR
+		IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
+		if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMesh, LODIndex, false))
+		{
+			return nullptr;
+		}
+
+		SkeletalMesh->Build();
+#endif
 	}
 
 	SkeletalMesh->CalculateInvRefMatrices();
@@ -487,14 +498,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 	SkeletalMesh->bHasVertexColors = false;
 #if WITH_EDITOR
 	SkeletalMesh->VertexColorGuid = SkeletalMesh->bHasVertexColors ? FGuid::NewGuid() : FGuid();
-#endif
-
-#if WITH_EDITOR
-	IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
-	if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMesh, 0, false))
-		return nullptr;
-
-	SkeletalMesh->Build();
 #endif
 
 	if (SkeletalMeshConfig.Skeleton)
@@ -592,6 +595,41 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	return SkeletalMesh;
 }
 
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
+{
+	TArray<FglTFRuntimeLOD> LODs;
+
+	for (const int32 MeshIndex : MeshIndices)
+	{
+		TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+		if (!JsonMeshObject)
+		{
+			AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
+			return nullptr;
+		}
+
+		// get primitives
+		const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
+		if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
+		{
+			AddError("LoadSkeletalMesh", "No primitives defined in the asset.");
+			return nullptr;
+		}
+
+		TArray<FglTFRuntimePrimitive> Primitives;
+		if (!LoadPrimitives(JsonPrimitives, Primitives, SkeletalMeshConfig.MaterialsConfig))
+		{
+			return nullptr;
+		}
+
+		FglTFRuntimeLOD LOD;
+		LOD.Primitives = Primitives;
+		LODs.Add(LOD);
+	}
+
+	return CreateSkeletalMeshFromLODs(LODs, SkinIndex, SkeletalMeshConfig);
+}
+
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
 {
 	FglTFRuntimeNode Node;
@@ -610,19 +648,19 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 
 	int32 NewSkinIndex = SkinIndex;
 
-	if (NewSkinIndex == INDEX_NONE)
+	if (NewSkinIndex <= INDEX_NONE)
 	{
 		// first search for skinning
 		for (FglTFRuntimeNode& ChildNode : Nodes)
 		{
-			if (ChildNode.SkinIndex != INDEX_NONE)
+			if (ChildNode.SkinIndex > INDEX_NONE)
 			{
 				NewSkinIndex = ChildNode.SkinIndex;
 				break;
 			}
 		}
 
-		if (NewSkinIndex == INDEX_NONE)
+		if (NewSkinIndex <= INDEX_NONE)
 		{
 			AddError("LoadSkeletalMeshRecursive()", "Unable to find a valid Skin");
 			return nullptr;
@@ -661,7 +699,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 
 			// if the SkinIndex is different from the selected one,
 			// build an override bone map
-			if (ChildNode.SkinIndex != INDEX_NONE && ChildNode.SkinIndex != NewSkinIndex)
+			if (ChildNode.SkinIndex > INDEX_NONE && ChildNode.SkinIndex != NewSkinIndex)
 			{
 				TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
 				if (!JsonSkinObject)
@@ -746,7 +784,7 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 		return nullptr;
 	}
 
-	if (Node.SkinIndex < 0)
+	if (Node.SkinIndex <= INDEX_NONE)
 	{
 		AddError("LoadNodeSkeletalAnimation()", FString::Printf(TEXT("No skin defined for node %d"), NodeIndex));
 		return nullptr;
@@ -996,7 +1034,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-	}
+}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack> & Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
@@ -1078,7 +1116,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				FrameBase += FrameDelta;
 			}
 		}
-	};
+};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter);
