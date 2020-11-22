@@ -37,7 +37,11 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FS
 
 void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed)
 {
+#if ENGINE_MINOR_VERSION > 25
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+#else
 	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
+#endif
 	HttpRequest->SetURL(Url);
 	for (TPair<FString, FString> Header : Headers)
 	{

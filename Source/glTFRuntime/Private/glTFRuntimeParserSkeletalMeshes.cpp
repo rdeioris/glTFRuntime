@@ -238,7 +238,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 			}
 		}
 
+#if ENGINE_MINOR_VERSION > 25
+		FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences, FString::Printf(TEXT("LOD_%d"), ImportedResource->LODModels.Num()));
+#else
 		FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences);
+#endif
 
 		ImportData.bHasNormals = bHasNormals;
 		ImportData.bHasVertexColors = false;

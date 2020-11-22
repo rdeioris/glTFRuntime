@@ -45,6 +45,7 @@ public class glTFRuntime : ModuleRules
                 "RHI",
                 "ApplicationCore",
                 "Http",
+                "PhysicsCore"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );
