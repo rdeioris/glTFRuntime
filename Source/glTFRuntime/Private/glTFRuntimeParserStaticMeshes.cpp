@@ -255,6 +255,16 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 		StaticMesh->InitResources();
 	}
 
+	// Override LODs ScreenSize
+	for (const TPair<int32, float>& Pair : StaticMeshConfig.LODScreenSize)
+	{
+		int32 CurrentLODIndex = Pair.Key;
+		if (StaticMesh->RenderData && CurrentLODIndex >= 0 && CurrentLODIndex < StaticMesh->RenderData->LODResources.Num())
+		{
+			StaticMesh->RenderData->ScreenSize[CurrentLODIndex].Default = Pair.Value;
+		}
+	}
+
 	if (!StaticMesh->BodySetup)
 	{
 		StaticMesh->CreateBodySetup();

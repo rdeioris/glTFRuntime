@@ -51,7 +51,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 
 	int32 NewSkinIndex = SkeletalMeshConfig.OverrideSkinIndex > INDEX_NONE ? SkeletalMeshConfig.OverrideSkinIndex : SkinIndex;
 
-	TMap<int32, FName> BoneMap;
+	TMap<int32, FName> MainBoneMap;
 	if (!SkeletalMeshConfig.bIgnoreSkin && NewSkinIndex > INDEX_NONE)
 	{
 		TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", NewSkinIndex);
@@ -61,7 +61,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 			return nullptr;
 		}
 
-		if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
+		if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), SkeletalMesh->RefSkeleton, MainBoneMap, SkeletalMeshConfig.SkeletonConfig))
 		{
 			AddError("CreateSkeletalMeshFromLODs()", "Unable to fill RefSkeleton.");
 			return nullptr;
@@ -69,7 +69,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 	}
 	else
 	{
-		if (!FillFakeSkeleton(SkeletalMesh->RefSkeleton, BoneMap, SkeletalMeshConfig))
+		if (!FillFakeSkeleton(SkeletalMesh->RefSkeleton, MainBoneMap, SkeletalMeshConfig))
 		{
 			AddError("CreateSkeletalMeshFromLODs()", "Unable to fill fake RefSkeleton.");
 			return nullptr;
@@ -87,13 +87,13 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 	}
 
 	TMap<int32, int32> MainBonesCache;
-	TArray<FVector> Points;
-	TArray<int32> PointToRawMap;
 	int32 MatIndex = 0;
 
 	bool bHasNormals = false;
 
 	SkeletalMesh->ResetLODInfo();
+
+	FBox BoundingBox(EForceInit::ForceInitToZero);
 
 #if WITH_EDITOR
 	TArray<TSet<uint32>> MorphTargetModifiedPoints;
@@ -109,6 +109,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 		TArray<SkeletalMeshImportData::FTriangle> Triangles;
 		TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
 
+		TArray<FVector> Points;
+
 		for (FglTFRuntimePrimitive& Primitive : LOD.Primitives)
 		{
 			int32 Base = Points.Num();
@@ -117,7 +119,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 			int32 TriangleIndex = 0;
 			TSet<TPair<int32, int32>> InfluencesMap;
 
-			TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : BoneMap;
+			TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : MainBoneMap;
 			TMap<int32, int32>& BonesCacheInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.BonesCache : MainBonesCache;
 
 			for (int32 i = 0; i < Primitive.Indices.Num(); i++)
@@ -209,21 +211,30 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 
 		FSkeletalMeshImportData ImportData;
 
-		for (int32 i = 0; i < Points.Num(); i++)
+		TArray<int32> PointToRawMap;
+		for (int32 PointIndex = 0; PointIndex < Points.Num(); PointIndex++)
 		{
-			PointToRawMap.Add(i);
+			// update boundingbox
+			BoundingBox += Points[PointIndex] * SkeletalMeshConfig.BoundsScale;
+			PointToRawMap.Add(PointIndex);
 		}
 
 		if (SkeletalMeshConfig.bIgnoreSkin || NewSkinIndex <= INDEX_NONE)
 		{
 			Influences.Empty();
+			TSet<int32> VertexIndexHistory;
 			for (int32 WedgeIndex = 0; WedgeIndex < Wedges.Num(); WedgeIndex++)
 			{
+				if (VertexIndexHistory.Contains(Wedges[WedgeIndex].VertexIndex))
+				{
+					continue;
+				}
 				SkeletalMeshImportData::FRawBoneInfluence Influence;
 				Influence.VertexIndex = Wedges[WedgeIndex].VertexIndex;
 				Influence.BoneIndex = 0;
 				Influence.Weight = 1;
 				Influences.Add(Influence);
+				VertexIndexHistory.Add(Influence.VertexIndex);
 			}
 		}
 
@@ -305,12 +316,18 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 
 		int32 TotalVertexIndex = 0;
 
+		TArray<FVector> Points;
+
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.Primitives.Num(); PrimitiveIndex++)
 		{
 			FglTFRuntimePrimitive& Primitive = LOD.Primitives[PrimitiveIndex];
 
 			int32 Base = Points.Num();
-			Points.Append(Primitive.Positions);
+			for (FVector& Point : Primitive.Positions)
+			{
+				BoundingBox += Point * SkeletalMeshConfig.BoundsScale;
+				Points.Add(Point);
+			}
 
 			new(&LodRenderData->RenderSections[PrimitiveIndex]) FSkelMeshRenderSection();
 			FSkelMeshRenderSection& MeshSection = LodRenderData->RenderSections[PrimitiveIndex];
@@ -355,7 +372,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, ModelVertex.GetTangentY(), ModelVertex.TangentZ);
 				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
 
-				TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : BoneMap;
+				TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : MainBoneMap;
 				TMap<int32, int32>& BonesCacheInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.BonesCache : MainBonesCache;
 
 				if (!SkeletalMeshConfig.bIgnoreSkin && NewSkinIndex > INDEX_NONE)
@@ -470,6 +487,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 		LODInfo.ReductionSettings.MaxDeviationPercentage = 0.0f;
 		LODInfo.BuildSettings.bRecomputeNormals = !bHasNormals;
 		LODInfo.LODHysteresis = 0.02f;
+		if (SkeletalMeshConfig.LODScreenSize.Contains(LODIndex))
+		{
+			LODInfo.ScreenSize = SkeletalMeshConfig.LODScreenSize[LODIndex];
+		}
 
 		for (MatIndex = 0; MatIndex < LOD.Primitives.Num(); MatIndex++)
 		{
@@ -492,7 +513,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TArray<FglTFRuntim
 
 	SkeletalMesh->CalculateInvRefMatrices();
 
-	FBox BoundingBox(Points.GetData(), Points.Num());
+	if (SkeletalMeshConfig.bShiftBoundsByRootBone)
+	{
+		FVector RootBone = SkeletalMesh->RefSkeleton.GetRefBonePose()[0].GetLocation();
+		BoundingBox = BoundingBox.ShiftBy(RootBone);
+	}
+
 	SkeletalMesh->SetImportedBounds(FBoxSphereBounds(BoundingBox));
 
 	SkeletalMesh->bHasVertexColors = false;
@@ -895,7 +921,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			CompressionCodec->Tracks[BoneIndex].RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 		}
-	}
+}
 #endif
 
 	bool bHasTracks = false;
@@ -1007,8 +1033,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				{
 					Pair.Value.PosKeys[FrameIndex] = Pair.Value.PosKeys[0];
 				}
+				}
 			}
-		}
 
 #if WITH_EDITOR
 		AnimSequence->AddNewRawTrack(BoneName, &Pair.Value);
@@ -1016,7 +1042,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
 #endif
 		bHasTracks = true;
-	}
+		}
 
 	if (!bHasTracks)
 	{
@@ -1034,7 +1060,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-}
+	}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack> & Tracks, float& Duration, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
@@ -1116,7 +1142,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				FrameBase += FrameDelta;
 			}
 		}
-};
+	};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter);
