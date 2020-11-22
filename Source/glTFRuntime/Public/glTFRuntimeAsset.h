@@ -94,11 +94,11 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool BuildTransformFromNodeForward(const int32 NodeIndex, const int32 LastNodeIndex, FTransform& Transform);
 
-	bool LoadFromFilename(const FString& Filename);
-	bool LoadFromString(const FString& JsonData);
-	bool LoadFromData(const uint8* DataPtr, int64 DataNum);
-	FORCEINLINE bool LoadFromData(const TArray<uint8>& Data) { return LoadFromData(Data.GetData(), Data.Num()); }
-	FORCEINLINE bool LoadFromData(const TArray64<uint8>& Data) { return LoadFromData(Data.GetData(), Data.Num()); }
+	bool LoadFromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig);
+	bool LoadFromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig);
+	bool LoadFromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig);
+	FORCEINLINE bool LoadFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig) { return LoadFromData(Data.GetData(), Data.Num(), LoaderConfig); }
+	FORCEINLINE bool LoadFromData(const TArray64<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig) { return LoadFromData(Data.GetData(), Data.Num(), LoaderConfig); }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;

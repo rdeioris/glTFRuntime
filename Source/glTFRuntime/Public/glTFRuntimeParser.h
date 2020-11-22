@@ -19,6 +19,62 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeError, const FString, E
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnStaticMeshCreated, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnSkeletalMeshCreated, USkeletalMesh*, SkeletalMesh);
 
+UENUM()
+enum class EglTFRuntimeTransformBaseType : uint8
+{
+	Default,
+	Matrix,
+	Transform,
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeTransformBaseType TransformBaseType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FMatrix BasisMatrix;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FTransform BaseTransform;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float SceneScale;
+
+	FglTFRuntimeConfig()
+	{
+		TransformBaseType = EglTFRuntimeTransformBaseType::Default;
+		BasisMatrix = FMatrix::Identity;
+		BaseTransform = FTransform::Identity;
+		SceneScale = 100;
+	}
+
+	FMatrix GetMatrix() const
+	{
+		const FMatrix DefaultMatrix = FBasisVectorMatrix(FVector(0, 0, -1), FVector(1, 0, 0), FVector(0, 1, 0), FVector::ZeroVector);
+
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::Default)
+		{
+			return DefaultMatrix;
+		}
+
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::Matrix)
+		{
+			return BasisMatrix;
+		}
+
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::Transform)
+		{
+			return BaseTransform.ToMatrixWithScale();
+		}
+
+		return DefaultMatrix;
+	}
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeScene
 {
@@ -432,17 +488,16 @@ class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject
 {
 public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale);
-	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject);
 
-	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString& Filename);
-	static TSharedPtr<FglTFRuntimeParser> FromBinary(const uint8* DataPtr, int64 DataNum);
-	static TSharedPtr<FglTFRuntimeParser> FromString(const FString& JsonData);
-	static TSharedPtr<FglTFRuntimeParser> FromData(const uint8* DataPtr, int64 DataNum);
+	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig);
+	static TSharedPtr<FglTFRuntimeParser> FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig);
+	static TSharedPtr<FglTFRuntimeParser> FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig);
+	static TSharedPtr<FglTFRuntimeParser> FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig);
 
-	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray<uint8> Data) { return FromBinary(Data.GetData(), Data.Num()); }
-	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data) { return FromBinary(Data.GetData(), Data.Num()); }
-	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray<uint8> Data) { return FromData(Data.GetData(), Data.Num()); }
-	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data) { return FromData(Data.GetData(), Data.Num()); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromData(Data.GetData(), Data.Num(), LoaderConfig); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromData(Data.GetData(), Data.Num(), LoaderConfig); }
 
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);

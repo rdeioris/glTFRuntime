@@ -9,17 +9,17 @@
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
 	TArray64<uint8> Content;
 	if (!FFileHelper::LoadFileToArray(Content, *Filename))
 	{
 		return nullptr;
 	}
-	return FromData(Content.GetData(), Content.Num());
+	return FromData(Content.GetData(), Content.Num(), LoaderConfig);
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
 	// detect binary format
 	if (DataNum > 20)
@@ -29,19 +29,19 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 			DataPtr[2] == 0x54 &&
 			DataPtr[3] == 0x46)
 		{
-			return FromBinary(DataPtr, DataNum);
+			return FromBinary(DataPtr, DataNum, LoaderConfig);
 		}
 	}
 	if (DataNum <= INT32_MAX)
 	{
 		FString JsonData;
 		FFileHelper::BufferToString(JsonData, DataPtr, (int32)DataNum);
-		return FromString(JsonData);
+		return FromString(JsonData, LoaderConfig);
 	}
 	return nullptr;
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
 	TSharedPtr<FJsonValue> RootValue;
 
@@ -55,10 +55,10 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 	if (!JsonObject)
 		return nullptr;
 
-	return MakeShared<FglTFRuntimeParser>(JsonObject.ToSharedRef());
+	return MakeShared<FglTFRuntimeParser>(JsonObject.ToSharedRef(), LoaderConfig.GetMatrix(), LoaderConfig.SceneScale);
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
 	FString JsonData;
 	TArray64<uint8> BinaryBuffer;
@@ -104,7 +104,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 		return nullptr;
 	}
 
-	TSharedPtr<FglTFRuntimeParser> Parser = FromString(JsonData);
+	TSharedPtr<FglTFRuntimeParser> Parser = FromString(JsonData, LoaderConfig);
 
 	if (Parser && bBinaryFound)
 	{
@@ -141,11 +141,6 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 	{
 		MaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, TwoSidedTranslucentMaterial);
 	}
-}
-
-FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject) : FglTFRuntimeParser(JsonObject, FBasisVectorMatrix(FVector(0, 0, -1), FVector(1, 0, 0), FVector(0, 1, 0), FVector::ZeroVector), 100)
-{
-
 }
 
 bool FglTFRuntimeParser::LoadNodes()

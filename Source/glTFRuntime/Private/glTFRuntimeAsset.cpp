@@ -10,7 +10,7 @@
 	}\
 
 
-bool UglTFRuntimeAsset::LoadFromFilename(const FString& Filename)
+bool UglTFRuntimeAsset::LoadFromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
 	// asset already loaded ?
 	if (Parser)
@@ -18,7 +18,7 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString& Filename)
 		return false;
 	}
 
-	Parser = FglTFRuntimeParser::FromFilename(Filename);
+	Parser = FglTFRuntimeParser::FromFilename(Filename, LoaderConfig);
 	if (Parser)
 	{
 		FScriptDelegate Delegate;
@@ -32,7 +32,7 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString& Filename)
 	return Parser != nullptr;
 }
 
-bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData)
+bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
 	// asset already loaded ?
 	if (Parser)
@@ -40,7 +40,7 @@ bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData)
 		return false;
 	}
 
-	Parser = FglTFRuntimeParser::FromString(JsonData);
+	Parser = FglTFRuntimeParser::FromString(JsonData, LoaderConfig);
 	if (Parser)
 	{
 		FScriptDelegate Delegate;
@@ -54,7 +54,7 @@ bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData)
 	return Parser != nullptr;
 }
 
-bool UglTFRuntimeAsset::LoadFromData(const uint8* DataPtr, int64 DataNum)
+bool UglTFRuntimeAsset::LoadFromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
 	// asset already loaded ?
 	if (Parser)
@@ -62,7 +62,7 @@ bool UglTFRuntimeAsset::LoadFromData(const uint8* DataPtr, int64 DataNum)
 		return false;
 	}
 
-	Parser = FglTFRuntimeParser::FromData(DataPtr, DataNum);
+	Parser = FglTFRuntimeParser::FromData(DataPtr, DataNum, LoaderConfig);
 	if (Parser)
 	{
 		FScriptDelegate Delegate;

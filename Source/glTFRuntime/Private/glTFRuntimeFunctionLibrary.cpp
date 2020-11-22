@@ -6,7 +6,7 @@
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
@@ -18,24 +18,24 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const 
 		TruePath = FPaths::Combine(FPaths::ProjectContentDir(), Filename);
 	}
 
-	if (!Asset->LoadFromFilename(TruePath))
+	if (!Asset->LoadFromFilename(TruePath, LoaderConfig))
 		return nullptr;
 
 	return Asset;
 }
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FString& JsonData)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
 		return nullptr;
-	if (!Asset->LoadFromString(JsonData))
+	if (!Asset->LoadFromString(JsonData, LoaderConfig))
 		return nullptr;
 
 	return Asset;
 }
 
-void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed)
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 {
 #if ENGINE_MINOR_VERSION > 25
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
@@ -48,25 +48,25 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<
 		HttpRequest->AppendToHeader(Header.Key, Header.Value);
 	}
 
-	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed)
+	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 	{
 		UglTFRuntimeAsset* Asset = nullptr;
 		if (bSuccess)
 		{
-			Asset = glTFLoadAssetFromData(ResponsePtr->GetContent());
+			Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
 		}
 		Completed.ExecuteIfBound(Asset);
-	}, Completed);
+	}, Completed, LoaderConfig);
 
 	HttpRequest->ProcessRequest();
 }
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArray<uint8>& Data)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
 		return nullptr;
-	if (!Asset->LoadFromData(Data.GetData(), Data.Num()))
+	if (!Asset->LoadFromData(Data.GetData(), Data.Num(), LoaderConfig))
 		return nullptr;
 
 	return Asset;
