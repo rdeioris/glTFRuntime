@@ -389,33 +389,79 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(UObject* Outer, const int32 TextureI
 		Texture->PlatformData->SizeY = Height;
 		Texture->PlatformData->PixelFormat = PixelFormat;
 
-		FTexture2DMipMap* Mip = new FTexture2DMipMap();
-		Texture->PlatformData->Mips.Add(Mip);
-		Mip->SizeX = Width;
-		Mip->SizeY = Height;
+		int32 NumOfMips = 1;
+
+		TArray64<FColor> UncompressedColors;
+
+		if (MaterialsConfig.bGeneratesMipMaps && FMath::IsPowerOfTwo(Width) && FMath::IsPowerOfTwo(Height))
+		{
+			NumOfMips = FMath::FloorLog2(FMath::Max(Width, Height)) + 1;
+
+			for (int32 MipY = 0; MipY < Height; MipY++)
+			{
+				for (int32 MipX = 0; MipX < Width; MipX++)
+				{
+					int64 MipColorIndex = ((MipY * Width) + MipX) * 4;
+					uint8 MipColorB = UncompressedBytes[MipColorIndex];
+					uint8 MipColorG = UncompressedBytes[MipColorIndex + 1];
+					uint8 MipColorR = UncompressedBytes[MipColorIndex + 2];
+					uint8 MipColorA = UncompressedBytes[MipColorIndex + 3];
+					UncompressedColors.Add(FColor(MipColorR, MipColorG, MipColorB, MipColorA));
+				}
+			}
+		}
+
+		int32 MipWidth = Width;
+		int32 MipHeight = Height;
+
+		for (int32 MipIndex = 0; MipIndex < NumOfMips; MipIndex++)
+		{
+			FTexture2DMipMap* Mip = new FTexture2DMipMap();
+			Texture->PlatformData->Mips.Add(Mip);
+			Mip->SizeX = MipWidth;
+			Mip->SizeY = MipHeight;
+
 #if !WITH_EDITOR
 #if !NO_LOGGING
-		ELogVerbosity::Type CurrentLogSerializationVerbosity = LogSerialization.GetVerbosity();
-		bool bResetLogVerbosity = false;
-		if (CurrentLogSerializationVerbosity >= ELogVerbosity::Warning)
-		{
-			LogSerialization.SetVerbosity(ELogVerbosity::Error);
-			bResetLogVerbosity = true;
-		}
+			ELogVerbosity::Type CurrentLogSerializationVerbosity = LogSerialization.GetVerbosity();
+			bool bResetLogVerbosity = false;
+			if (CurrentLogSerializationVerbosity >= ELogVerbosity::Warning)
+			{
+				LogSerialization.SetVerbosity(ELogVerbosity::Error);
+				bResetLogVerbosity = true;
+			}
 #endif
 #endif
-		Mip->BulkData.Lock(LOCK_READ_WRITE);
+			int64 PixelsSize = UncompressedBytes.Num();
+			uint8* PixelsData = UncompressedBytes.GetData();
+			TArray64<FColor> ResizedMipData;
+
+			// Resize Image
+			if (MipIndex > 0)
+			{
+				ResizedMipData.AddUninitialized(MipWidth * MipHeight);
+				FImageUtils::ImageResize(Width, Height, UncompressedColors, MipWidth, MipHeight, ResizedMipData, sRGB);
+				PixelsSize = ResizedMipData.Num() * sizeof(FColor);
+				PixelsData = (uint8*)ResizedMipData.GetData();
+			}
+
+			Mip->BulkData.Lock(LOCK_READ_WRITE);
+
 #if !WITH_EDITOR
 #if !NO_LOGGING
-		if (bResetLogVerbosity)
-		{
-			LogSerialization.SetVerbosity(CurrentLogSerializationVerbosity);
+			if (bResetLogVerbosity)
+			{
+				LogSerialization.SetVerbosity(CurrentLogSerializationVerbosity);
+			}
+#endif
+#endif
+			void* Data = Mip->BulkData.Realloc(PixelsSize);
+			FMemory::Memcpy(Data, PixelsData, PixelsSize);
+			Mip->BulkData.Unlock();
+
+			MipWidth = FMath::Max(MipWidth / 2, 1);
+			MipHeight = FMath::Max(MipHeight / 2, 1);
 		}
-#endif
-#endif
-		void* Data = Mip->BulkData.Realloc(UncompressedBytes.Num());
-		FMemory::Memcpy(Data, UncompressedBytes.GetData(), UncompressedBytes.Num());
-		Mip->BulkData.Unlock();
 
 		Texture->CompressionSettings = Compression;
 		Texture->SRGB = sRGB;
