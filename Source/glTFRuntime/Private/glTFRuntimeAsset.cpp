@@ -3,10 +3,18 @@
 #include "glTFRuntimeAsset.h"
 #include "Animation/AnimSequence.h"
 
+#define GLTF_CHECK_ERROR_MESSAGE() UE_LOG(LogGLTFRuntime, Error, TEXT("No glTF Asset loaded."))
+
 #define GLTF_CHECK_PARSER(RetValue) if (!Parser)\
 	{\
-		UE_LOG(LogGLTFRuntime, Error, TEXT("No glTF Asset loaded."));\
+		GLTF_CHECK_ERROR_MESSAGE();\
 		return RetValue;\
+	}\
+
+#define GLTF_CHECK_PARSER_VOID() if (!Parser)\
+	{\
+		GLTF_CHECK_ERROR_MESSAGE();\
+		return;\
 	}\
 
 
@@ -256,11 +264,25 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const 
 	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, SkeletalMeshConfig);
 }
 
+void UglTFRuntimeAsset::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	GLTF_CHECK_PARSER_VOID();
+
+	Parser->LoadSkeletalMeshAsync(MeshIndex, SkinIndex, AsyncCallback, SkeletalMeshConfig);
+}
+
 USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeName, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeletalMeshRecursive(NodeName, SkeletalMeshConfig.OverrideSkinIndex, SkeletalMeshConfig);
+}
+
+void UglTFRuntimeAsset::LoadSkeletalMeshRecursiveAsync(const FString& NodeName, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	GLTF_CHECK_PARSER_VOID();
+
+	Parser->LoadSkeletalMeshRecursiveAsync(NodeName, SkeletalMeshConfig.OverrideSkinIndex, AsyncCallback, SkeletalMeshConfig);
 }
 
 USkeleton* UglTFRuntimeAsset::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
