@@ -233,7 +233,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 
 	if (MetallicRoughnessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 	{
-		MetallicRoughnessMaterialsMap[RuntimeMaterial.MaterialType];
+		BaseMaterial = MetallicRoughnessMaterialsMap[RuntimeMaterial.MaterialType];
 	}
 
 	if (RuntimeMaterial.bHasSpecularFactor || RuntimeMaterial.bHasGlossinessFactor)

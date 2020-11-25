@@ -1547,6 +1547,12 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
 	}
 
+	FglTFRuntimePrimitive ReducedPrimitive;
+
+	ReducePrimitive(Primitive, ReducedPrimitive, 1);
+
+	Primitive = ReducedPrimitive;
+
 	return true;
 }
 
@@ -1960,4 +1966,379 @@ float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float
 	FirstIndex = SecondIndex - 1;
 
 	return (WantedTime - FramesTimes[FirstIndex]) / FramesTimes[SecondIndex];
+}
+
+struct FglTFRuntimeReducerVertex
+{
+	const uint32 Index;
+	TArray<TSharedPtr<FglTFRuntimeReducerVertex>> Neighbors;
+	TArray<TSharedPtr<struct FglTFRuntimeReducerTriangle>> Faces;
+
+	TSharedPtr<FglTFRuntimeReducerVertex> Collapse;
+	float ObjDist;
+
+	const FVector Position;
+
+	FglTFRuntimeReducerVertex(uint32 InIndex, const FVector InPosition) : Index(InIndex), Position(InPosition)
+	{
+	}
+
+	void RemoveIfNonNeighbor(TSharedPtr<FglTFRuntimeReducerVertex> Vertex);
+};
+
+struct FglTFRuntimeReducerTriangle : TSharedFromThis<FglTFRuntimeReducerTriangle>
+{
+	TSharedPtr<FglTFRuntimeReducerVertex> Vertices[3];
+	FVector Normal;
+
+	FglTFRuntimeReducerTriangle(TSharedPtr<FglTFRuntimeReducerVertex> VertexA, TSharedPtr<FglTFRuntimeReducerVertex> VertexB, TSharedPtr<FglTFRuntimeReducerVertex> VertexC)
+	{
+		Vertices[0] = VertexA;
+		Vertices[1] = VertexB;
+		Vertices[2] = VertexC;
+
+		FVector PositionA = VertexA->Position;
+		FVector PositionB = VertexB->Position;
+		FVector PositionC = VertexC->Position;
+
+		Normal = FVector::CrossProduct(PositionB - PositionA, PositionC - PositionB).GetSafeNormal();
+	}
+
+	bool HasVertex(const TSharedPtr<FglTFRuntimeReducerVertex> Vertex) const
+	{
+		for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+		{
+			if (Vertices[VertexIndex] == Vertex)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void ReplaceVertex(TSharedPtr<FglTFRuntimeReducerVertex> VertexOld, TSharedPtr<FglTFRuntimeReducerVertex> VertexNew)
+	{
+		for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+		{
+			if (Vertices[VertexIndex] == VertexOld)
+			{
+				Vertices[VertexIndex] = VertexNew;
+				break;
+			}
+		}
+
+		VertexOld->Faces.Remove(AsShared());
+		VertexNew->Faces.AddUnique(AsShared());
+
+		for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+		{
+			VertexOld->RemoveIfNonNeighbor(Vertices[VertexIndex]);
+			Vertices[VertexIndex]->RemoveIfNonNeighbor(VertexOld);
+		}
+
+		for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+		{
+			for (int32 NeighborIndex = 0; NeighborIndex < 3; NeighborIndex++)
+			{
+				if (VertexIndex != NeighborIndex)
+				{
+					Vertices[VertexIndex]->Neighbors.AddUnique(Vertices[NeighborIndex]);
+				}
+			}
+		}
+
+		FVector PositionA = Vertices[0]->Position;
+		FVector PositionB = Vertices[0]->Position;
+		FVector PositionC = Vertices[0]->Position;
+		Normal = FVector::CrossProduct(PositionB - PositionA, PositionC - PositionB).GetSafeNormal();
+	}
+};
+
+void FglTFRuntimeReducerVertex::RemoveIfNonNeighbor(TSharedPtr<FglTFRuntimeReducerVertex> Vertex)
+{
+	if (!Neighbors.Contains(Vertex))
+	{
+		return;
+	}
+	for (TSharedPtr<FglTFRuntimeReducerTriangle> Face : Faces)
+	{
+		if (Face->HasVertex(Vertex))
+		{
+			return;
+		}
+	}
+	Neighbors.Remove(Vertex);
+}
+
+bool FglTFRuntimeParser::ReducePrimitive(const FglTFRuntimePrimitive& SourcePrimitive, FglTFRuntimePrimitive& DestinationPrimitive, const float ReductionLevel)
+{
+	TMap<uint32, TSharedPtr<FglTFRuntimeReducerVertex>> Vertices;
+	TArray<TSharedPtr<FglTFRuntimeReducerTriangle>> Triangles;
+
+	auto ComputeEdgeCollapseCost = [](TSharedPtr<FglTFRuntimeReducerVertex> VertexU, TSharedPtr<FglTFRuntimeReducerVertex> VertexV)
+	{
+		float EdgeLength = (VertexV->Position - VertexU->Position).Size();
+		float Curvature = 0;
+
+		TArray<TSharedPtr<FglTFRuntimeReducerTriangle>> Sides;
+		for (TSharedPtr<FglTFRuntimeReducerTriangle> Face : VertexU->Faces)
+		{
+			if (Face->HasVertex(VertexV))
+			{
+				Sides.Add(Face);
+			}
+		}
+
+		for (TSharedPtr<FglTFRuntimeReducerTriangle> Face : VertexU->Faces)
+		{
+			float MinCurv = 1;
+			for (TSharedPtr<FglTFRuntimeReducerTriangle> Side : Sides)
+			{
+				float Dot = FVector::DotProduct(Face->Normal, Side->Normal);
+				MinCurv = FMath::Min(MinCurv, (1 - Dot) / 2.0f);
+			}
+			Curvature = FMath::Max(Curvature, MinCurv);
+		}
+
+		return EdgeLength * Curvature;
+
+	};
+
+	for (int32 IndexIndex = 0; IndexIndex < SourcePrimitive.Indices.Num(); IndexIndex++)
+	{
+		uint32 VertexIndex = SourcePrimitive.Indices[IndexIndex];
+		TSharedPtr<FglTFRuntimeReducerVertex> Vertex = MakeShared<FglTFRuntimeReducerVertex>(VertexIndex, SourcePrimitive.Positions[VertexIndex]);
+		Vertices.Add(VertexIndex, Vertex);
+	}
+
+	for (int32 IndexIndex = 0; IndexIndex < SourcePrimitive.Indices.Num(); IndexIndex += 3)
+	{
+		TSharedPtr<FglTFRuntimeReducerVertex> VertexA = Vertices[SourcePrimitive.Indices[IndexIndex]];
+		TSharedPtr<FglTFRuntimeReducerVertex> VertexB = Vertices[SourcePrimitive.Indices[IndexIndex + 1]];
+		TSharedPtr<FglTFRuntimeReducerVertex> VertexC = Vertices[SourcePrimitive.Indices[IndexIndex + 2]];
+
+		TSharedPtr<FglTFRuntimeReducerTriangle> Triangle = MakeShared<FglTFRuntimeReducerTriangle>(VertexA, VertexB, VertexC);
+		for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+		{
+			Triangle->Vertices[VertexIndex]->Faces.AddUnique(Triangle);
+			for (int32 NeighborVertexIndex = 0; NeighborVertexIndex < 3; NeighborVertexIndex++)
+			{
+				if (NeighborVertexIndex != VertexIndex)
+				{
+					Triangle->Vertices[VertexIndex]->Neighbors.AddUnique(Triangle->Vertices[NeighborVertexIndex]);
+				}
+			}
+		}
+		Triangles.Add(Triangle);
+	}
+
+	auto MinimumCostEdge = [](TMap<uint32, TSharedPtr<FglTFRuntimeReducerVertex>>& Vertices) -> TSharedPtr<FglTFRuntimeReducerVertex>
+	{
+		TSharedPtr<FglTFRuntimeReducerVertex> CurrentVertex = nullptr;
+
+		for (TPair<uint32, TSharedPtr<FglTFRuntimeReducerVertex>>& VertexPair : Vertices)
+		{
+			TSharedPtr<FglTFRuntimeReducerVertex> Vertex = VertexPair.Value;
+			if (!CurrentVertex.IsValid() || Vertex->ObjDist < CurrentVertex->ObjDist)
+			{
+				CurrentVertex = Vertex;
+			}
+		}
+		return CurrentVertex;
+	};
+
+	for (TPair<uint32, TSharedPtr<FglTFRuntimeReducerVertex>>& VertexPair : Vertices)
+	{
+		TSharedPtr<FglTFRuntimeReducerVertex> Vertex = VertexPair.Value;
+
+		if (Vertex->Neighbors.Num() == 0)
+		{
+			Vertex->Collapse = nullptr;
+			Vertex->ObjDist = -0.01f;
+			continue;
+		}
+
+		Vertex->ObjDist = 1000000;
+		Vertex->Collapse = nullptr;
+
+		for (TSharedPtr<FglTFRuntimeReducerVertex> Neighbor : Vertex->Neighbors)
+		{
+			float Dist = ComputeEdgeCollapseCost(Vertex, Neighbor);
+			if (Dist < Vertex->ObjDist)
+			{
+				Vertex->Collapse = Neighbor;
+				Vertex->ObjDist = Dist;
+			}
+		}
+	}
+
+	auto Collapse = [ComputeEdgeCollapseCost](TArray<TSharedPtr<FglTFRuntimeReducerTriangle>>& Triangles, TMap<uint32, TSharedPtr<FglTFRuntimeReducerVertex>>& Vertices, TSharedPtr<FglTFRuntimeReducerVertex> VertexU, TSharedPtr<FglTFRuntimeReducerVertex> VertexV)
+	{
+		if (!VertexV.IsValid())
+		{
+			for (TSharedPtr<FglTFRuntimeReducerVertex> Neighbor : VertexU->Neighbors)
+			{
+				Neighbor->Neighbors.Remove(VertexU);
+			}
+			Vertices.Remove(VertexU->Index);
+			return;
+		}
+
+		TArray<TSharedPtr<FglTFRuntimeReducerVertex>> TmpNeighbors = VertexU->Neighbors;
+
+		for (int32 FaceIndex = VertexU->Faces.Num() - 1; FaceIndex >= 0; FaceIndex--)
+		{
+			if (VertexU->Faces[FaceIndex]->HasVertex(VertexV))
+			{
+				TSharedPtr<FglTFRuntimeReducerTriangle> DeadFace = VertexU->Faces[FaceIndex];
+				// destroy triangle
+				Triangles.Remove(DeadFace);
+				for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+				{
+					if (DeadFace->Vertices[VertexIndex].IsValid())
+					{
+
+						DeadFace->Vertices[VertexIndex]->Faces.Remove(DeadFace);
+					}
+				}
+				for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++) {
+					int32 VertexIndex2 = (VertexIndex + 1) % 3;
+					if (!DeadFace->Vertices[VertexIndex].IsValid() || !DeadFace->Vertices[VertexIndex2].IsValid())
+					{
+						continue;
+					}
+					DeadFace->Vertices[VertexIndex]->RemoveIfNonNeighbor(DeadFace->Vertices[VertexIndex2]);
+					DeadFace->Vertices[VertexIndex2]->RemoveIfNonNeighbor(DeadFace->Vertices[VertexIndex]);
+				}
+			}
+		}
+
+		for (int32 FaceIndex = VertexU->Faces.Num() - 1; FaceIndex >= 0; FaceIndex--)
+		{
+			VertexU->Faces[FaceIndex]->ReplaceVertex(VertexU, VertexV);
+		}
+
+		while (VertexU->Neighbors.Num() > 0)
+		{
+			VertexU->Neighbors[0]->Neighbors.Remove(VertexU);
+			if (VertexU->Neighbors.Num() > 0)
+			{
+				VertexU->Neighbors.RemoveAt(0);
+			}
+		}
+
+		Vertices.Remove(VertexU->Index);
+
+		for (TSharedPtr<FglTFRuntimeReducerVertex> TmpNeighbor : TmpNeighbors)
+		{
+			if (TmpNeighbor->Neighbors.Num() == 0)
+			{
+				TmpNeighbor->Collapse = nullptr;
+				TmpNeighbor->ObjDist = -0.01f;
+				return;
+			}
+
+			TmpNeighbor->ObjDist = 1000000;
+			TmpNeighbor->Collapse = nullptr;
+
+			for (TSharedPtr<FglTFRuntimeReducerVertex> Neighbor : TmpNeighbor->Neighbors)
+			{
+				float Dist = ComputeEdgeCollapseCost(TmpNeighbor, Neighbor);
+				if (Dist < TmpNeighbor->ObjDist)
+				{
+					TmpNeighbor->Collapse = Neighbor;
+					TmpNeighbor->ObjDist = Dist;
+				}
+			}
+		}
+	};
+
+	UE_LOG(LogTemp, Error, TEXT("Ready to collapse %d triangles"), Triangles.Num());
+
+	int32 TriangleIndex = 0;
+	for (TSharedPtr<FglTFRuntimeReducerTriangle> Triangle : Triangles)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Triangle %d [%d, %d, %d]"), TriangleIndex++, Triangle->Vertices[0]->Index, Triangle->Vertices[1]->Index, Triangle->Vertices[2]->Index);
+	}
+
+	for (TPair<uint32, TSharedPtr<FglTFRuntimeReducerVertex>>& VertexPair : Vertices)
+	{
+		FString Neighbors = "";
+		for (TSharedPtr<FglTFRuntimeReducerVertex> Neighbor : VertexPair.Value->Neighbors)
+		{
+			Neighbors += FString::FromInt(Neighbor->Index) + ", ";
+		}
+		UE_LOG(LogTemp, Warning, TEXT("Vertex %d [%s]"), VertexPair.Key, *Neighbors);
+		if (!VertexPair.Value->Collapse)
+		{
+			UE_LOG(LogTemp, Error, TEXT("OOOPS for vertex %d"), VertexPair.Value->Index);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Vertex %d To %d cost: %f"), VertexPair.Value->Index, VertexPair.Value->Collapse->Index, VertexPair.Value->ObjDist);
+		}
+	}
+
+	TMap<uint32, int32> Permutations;
+	TMap<int32, uint32> CollapseMap;
+	while (Vertices.Num() > 0)
+	{
+		TSharedPtr<FglTFRuntimeReducerVertex> MinimumVertex = MinimumCostEdge(Vertices);
+		UE_LOG(LogTemp, Warning, TEXT("Processing Vertex %d at %d"), MinimumVertex->Index, Vertices.Num() - 1);
+		Permutations.Add(MinimumVertex->Index, Vertices.Num() - 1);
+		if (MinimumVertex->Collapse)
+		{
+			CollapseMap.Add(MinimumVertex->Index, MinimumVertex->Collapse->Index);
+			UE_LOG(LogTemp, Error, TEXT("%d Vertex %d -> %d"), Vertices.Num(), MinimumVertex->Index, MinimumVertex->Collapse->Index);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("%d Vertex %d -> FAIL!"), Vertices.Num(), MinimumVertex->Index);
+			CollapseMap.Add(MinimumVertex->Index, MAX_int32);
+		}
+
+		Collapse(Triangles, Vertices, MinimumVertex, MinimumVertex->Collapse);
+	}
+
+	DestinationPrimitive = SourcePrimitive;
+
+	DestinationPrimitive.Indices.Empty();
+
+	UE_LOG(LogTemp, Error, TEXT("Collapsed to %d triangles [%d vertices]"), Triangles.Num(), Triangles.Num() * 3);
+
+	const int32 WantedVertices = 1000;
+
+	auto ReductionMap = [Permutations, CollapseMap](const uint32 Index, const int32 WantedVertices) -> uint32
+	{
+		return Index;
+		uint32 NewIndex = Index;
+		while (NewIndex >= (uint32)WantedVertices)
+		{
+			if (NewIndex == CollapseMap[NewIndex])
+			{
+				break;
+			}
+			NewIndex = CollapseMap[NewIndex];
+		}
+		return NewIndex;
+	};
+
+	for (int32 IndexIndex = 0; IndexIndex < SourcePrimitive.Indices.Num(); IndexIndex += 3)
+	{
+		uint32 IndexA = ReductionMap(SourcePrimitive.Indices[IndexIndex], WantedVertices);
+		uint32 IndexB = ReductionMap(SourcePrimitive.Indices[IndexIndex + 1], WantedVertices);
+		uint32 IndexC = ReductionMap(SourcePrimitive.Indices[IndexIndex + 2], WantedVertices);
+
+		if (IndexA == IndexB || IndexB == IndexC || IndexA == IndexC)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Skipping %d"), IndexIndex);
+			continue;
+		}
+		DestinationPrimitive.Indices.Add(IndexA);
+		DestinationPrimitive.Indices.Add(IndexB);
+		DestinationPrimitive.Indices.Add(IndexC);
+	}
+
+	return true;
 }
