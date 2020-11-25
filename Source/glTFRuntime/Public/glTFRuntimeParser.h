@@ -547,9 +547,9 @@ struct FglTFRuntimeMaterial
 	int32 BaseColorTexCoord;
 
 	bool bHasMetallicFactor;
-	float MetallicFactor;
+	double MetallicFactor;
 	bool bHasRoughnessFactor;
-	float RoughnessFactor;
+	double RoughnessFactor;
 
 	TArray<FglTFRuntimeMipMap> MetallicRoughnessTextureMips;
 	UTexture2D* MetallicRoughnessTextureCache;
@@ -569,6 +569,17 @@ struct FglTFRuntimeMaterial
 	TArray<FglTFRuntimeMipMap> EmissiveTextureMips;
 	UTexture2D* EmissiveTextureCache;
 	int32 EmissiveTexCoord;
+
+	bool bHasSpecularFactor;
+	FLinearColor SpecularFactor;
+	
+	bool bHasGlossinessFactor;
+	double GlossinessFactor;
+
+	TArray<FglTFRuntimeMipMap> SpecularGlossinessTextureMips;
+	UTexture2D* SpecularGlossinessTextureCache;
+	int32 SpecularGlossinessTexCoord;
+
 
 	FglTFRuntimeMaterial()
 	{
@@ -590,6 +601,10 @@ struct FglTFRuntimeMaterial
 		bHasEmissiveFactor = false;
 		EmissiveTextureCache = nullptr;
 		EmissiveTexCoord = 0;
+		bHasSpecularFactor = false;
+		bHasGlossinessFactor = false;
+		SpecularGlossinessTextureCache = nullptr;
+		SpecularGlossinessTexCoord = 0;
 	}
 };
 
@@ -684,6 +699,7 @@ public:
 
 	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
 
+	bool ReducePrimitive(const FglTFRuntimePrimitive& SourcePrimitive, FglTFRuntimePrimitive& DestinationPrimitive, const float ReductionLevel);
 protected:
 	TSharedRef<FJsonObject> Root;
 
@@ -746,7 +762,8 @@ protected:
 	FMatrix SceneBasis;
 	float SceneScale;
 
-	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MetallicRoughnessMaterialsMap;
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SpecularGlossinessMaterialsMap;
 
 	TArray<FString> Errors;
 

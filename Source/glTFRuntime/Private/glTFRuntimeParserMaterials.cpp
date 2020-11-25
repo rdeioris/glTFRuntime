@@ -60,169 +60,102 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		RuntimeMaterial.MaterialType = EglTFRuntimeMaterialType::TwoSided;
 	}
 
-	if (!MaterialsMap.Contains(RuntimeMaterial.MaterialType))
+	auto GetMaterialVector = [](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, const int32 Fields, bool& bHasParam, FLinearColor& ParamValue)
 	{
-		return nullptr;
-	}
+		const TArray<TSharedPtr<FJsonValue>>* JsonValues;
+		if (JsonMaterialObject->TryGetArrayField(ParamName, JsonValues))
+		{
+			if (JsonValues->Num() != Fields)
+			{
+				return;
+			}
+
+			double Values[4];
+			// default alpha
+			Values[3] = 1;
+
+			for (int32 Index = 0; Index < Fields; Index++)
+			{
+				(*JsonValues)[Index]->TryGetNumber(Values[Index]);
+			}
+
+			bHasParam = true;
+			ParamValue = FLinearColor(Values[0], Values[1], Values[2], Values[3]);
+		}
+	};
+
+	auto GetMaterialTexture = [this, MaterialsConfig](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, const bool sRGB, UTexture2D*& ParamTextureCache, TArray<FglTFRuntimeMipMap>& ParamMips, int32& ParamTexCoord)
+	{
+		const TSharedPtr<FJsonObject>* JsonTextureObject;
+		if (JsonMaterialObject->TryGetObjectField(ParamName, JsonTextureObject))
+		{
+			int64 TextureIndex;
+			if (!(*JsonTextureObject)->TryGetNumberField("index", TextureIndex))
+			{
+				return;
+			}
+
+			if (!(*JsonTextureObject)->TryGetNumberField("texCoord", ParamTexCoord))
+			{
+				ParamTexCoord = 0;
+			}
+
+			if (ParamTexCoord < 0 || ParamTexCoord > 3)
+			{
+				AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for %s: %d"), *ParamName, ParamTexCoord));
+				return;
+			}
+
+			ParamTextureCache = LoadTexture(TextureIndex, ParamMips, sRGB, MaterialsConfig);
+		}
+	};
 
 	const TSharedPtr<FJsonObject>* JsonPBRObject;
 	if (JsonMaterialObject->TryGetObjectField("pbrMetallicRoughness", JsonPBRObject))
 	{
-		const TArray<TSharedPtr<FJsonValue>>* baseColorFactorValues;
-		if ((*JsonPBRObject)->TryGetArrayField("baseColorFactor", baseColorFactorValues))
-		{
-			if (baseColorFactorValues->Num() != 4)
-				return nullptr;
+		GetMaterialVector(JsonPBRObject->ToSharedRef(), "baseColorFactor", 4, RuntimeMaterial.bHasBaseColorFactor, RuntimeMaterial.BaseColorFactor);
+		GetMaterialTexture(JsonPBRObject->ToSharedRef(), "baseColorTexture", true, RuntimeMaterial.BaseColorTextureCache, RuntimeMaterial.BaseColorTextureMips, RuntimeMaterial.BaseColorTexCoord);
 
-			double R, G, B, A;
-			if (!(*baseColorFactorValues)[0]->TryGetNumber(R))
-				return nullptr;
-			if (!(*baseColorFactorValues)[1]->TryGetNumber(G))
-				return nullptr;
-			if (!(*baseColorFactorValues)[2]->TryGetNumber(B))
-				return nullptr;
-			if (!(*baseColorFactorValues)[3]->TryGetNumber(A))
-				return nullptr;
-
-			//Material->SetVectorParameterValue("baseColorFactor", FLinearColor(R, G, B, A));
-			RuntimeMaterial.bHasBaseColorFactor = true;
-			RuntimeMaterial.BaseColorFactor = FLinearColor(R, G, B, A);
-		}
-
-		const TSharedPtr<FJsonObject>* JsonBaseColorTextureObject;
-		if ((*JsonPBRObject)->TryGetObjectField("baseColorTexture", JsonBaseColorTextureObject))
-		{
-			int64 TextureIndex;
-			if (!(*JsonBaseColorTextureObject)->TryGetNumberField("index", TextureIndex))
-				return nullptr;
-
-			RuntimeMaterial.BaseColorTextureCache = LoadTexture(TextureIndex, RuntimeMaterial.BaseColorTextureMips, true, MaterialsConfig);
-
-			if (!(*JsonBaseColorTextureObject)->TryGetNumberField("texCoord", RuntimeMaterial.BaseColorTexCoord))
-			{
-				RuntimeMaterial.BaseColorTexCoord = 0;
-			}
-
-			if (RuntimeMaterial.BaseColorTexCoord < 0 || RuntimeMaterial.BaseColorTexCoord > 3)
-			{
-				AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for baseColorTexture: %d"), RuntimeMaterial.BaseColorTexCoord));
-				return nullptr;
-			}
-		}
-
-
-		if ((*JsonPBRObject)->TryGetNumberField("metallicFactor", (double&)RuntimeMaterial.MetallicFactor))
+		if ((*JsonPBRObject)->TryGetNumberField("metallicFactor", RuntimeMaterial.MetallicFactor))
 		{
 			RuntimeMaterial.bHasMetallicFactor = true;
 		}
 
-		if ((*JsonPBRObject)->TryGetNumberField("roughnessFactor", (double&)RuntimeMaterial.RoughnessFactor))
+		if ((*JsonPBRObject)->TryGetNumberField("roughnessFactor", RuntimeMaterial.RoughnessFactor))
 		{
 			RuntimeMaterial.bHasRoughnessFactor = true;
 		}
 
-		const TSharedPtr<FJsonObject>* JsonMetallicRoughnessTextureObject;
-		if ((*JsonPBRObject)->TryGetObjectField("metallicRoughnessTexture", JsonMetallicRoughnessTextureObject))
+		GetMaterialTexture(JsonPBRObject->ToSharedRef(), "metallicRoughnessTexture", false, RuntimeMaterial.MetallicRoughnessTextureCache, RuntimeMaterial.MetallicRoughnessTextureMips, RuntimeMaterial.MetallicRoughnessTexCoord);
+	}
+
+	GetMaterialTexture(JsonMaterialObject, "normalTexture", false, RuntimeMaterial.NormalTextureCache, RuntimeMaterial.NormalTextureMips, RuntimeMaterial.NormalTexCoord);
+
+	GetMaterialTexture(JsonMaterialObject, "occlusionTexture", false, RuntimeMaterial.OcclusionTextureCache, RuntimeMaterial.OcclusionTextureMips, RuntimeMaterial.OcclusionTexCoord);
+
+	GetMaterialVector(JsonMaterialObject, "emissiveFactor", 3, RuntimeMaterial.bHasEmissiveFactor, RuntimeMaterial.EmissiveFactor);
+
+	GetMaterialTexture(JsonMaterialObject, "emissiveTexture", true, RuntimeMaterial.EmissiveTextureCache, RuntimeMaterial.EmissiveTextureMips, RuntimeMaterial.EmissiveTexCoord);
+
+	const TSharedPtr<FJsonObject>* JsonExtensions;
+	if (JsonMaterialObject->TryGetObjectField("extensions", JsonExtensions))
+	{
+		// KHR_materials_pbrSpecularGlossiness
+		const TSharedPtr<FJsonObject>* JsonPbrSpecularGlossiness;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_pbrSpecularGlossiness", JsonPbrSpecularGlossiness))
 		{
-			int64 TextureIndex;
-			if (!(*JsonMetallicRoughnessTextureObject)->TryGetNumberField("index", TextureIndex))
-				return nullptr;
+			GetMaterialVector(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseFactor", 4, RuntimeMaterial.bHasBaseColorFactor, RuntimeMaterial.BaseColorFactor);
+			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseTexture", true, RuntimeMaterial.BaseColorTextureCache, RuntimeMaterial.BaseColorTextureMips, RuntimeMaterial.BaseColorTexCoord);
 
-			RuntimeMaterial.MetallicRoughnessTextureCache = LoadTexture(TextureIndex, RuntimeMaterial.MetallicRoughnessTextureMips, false, MaterialsConfig);
+			GetMaterialVector(JsonPbrSpecularGlossiness->ToSharedRef(), "specularFactor", 3, RuntimeMaterial.bHasSpecularFactor, RuntimeMaterial.SpecularFactor);
 
-			if (!(*JsonMetallicRoughnessTextureObject)->TryGetNumberField("texCoord", RuntimeMaterial.MetallicRoughnessTexCoord))
+			if ((*JsonPbrSpecularGlossiness)->TryGetNumberField("glossinessFactor", RuntimeMaterial.GlossinessFactor))
 			{
-				RuntimeMaterial.MetallicRoughnessTexCoord = 0;
+				RuntimeMaterial.bHasGlossinessFactor = true;
 			}
 
-			if (RuntimeMaterial.MetallicRoughnessTexCoord < 0 || RuntimeMaterial.MetallicRoughnessTexCoord > 3)
-			{
-				AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for metallicRoughnessTexture: %d"), RuntimeMaterial.MetallicRoughnessTexCoord));
-				return nullptr;
-			}
+			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "specularGlossinessTexture", true, RuntimeMaterial.SpecularGlossinessTextureCache, RuntimeMaterial.SpecularGlossinessTextureMips, RuntimeMaterial.SpecularGlossinessTexCoord);
 		}
-	}
-
-	const TSharedPtr<FJsonObject>* JsonNormalTextureObject;
-	if (JsonMaterialObject->TryGetObjectField("normalTexture", JsonNormalTextureObject))
-	{
-		int64 TextureIndex;
-		if (!(*JsonNormalTextureObject)->TryGetNumberField("index", TextureIndex))
-			return nullptr;
-
-		RuntimeMaterial.NormalTextureCache = LoadTexture(TextureIndex, RuntimeMaterial.NormalTextureMips, false, MaterialsConfig);
-
-		if (!(*JsonNormalTextureObject)->TryGetNumberField("texCoord", RuntimeMaterial.NormalTexCoord))
-		{
-			RuntimeMaterial.NormalTexCoord = 0;
-		}
-
-		if (RuntimeMaterial.NormalTexCoord < 0 || RuntimeMaterial.NormalTexCoord > 3)
-		{
-			AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for normalTexture: %d"), RuntimeMaterial.NormalTexCoord));
-			return nullptr;
-		}
-	}
-
-	const TSharedPtr<FJsonObject>* JsonOcclusionTextureObject;
-	if (JsonMaterialObject->TryGetObjectField("occlusionTexture", JsonOcclusionTextureObject))
-	{
-		int64 TextureIndex;
-		if (!(*JsonOcclusionTextureObject)->TryGetNumberField("index", TextureIndex))
-			return nullptr;
-
-		RuntimeMaterial.OcclusionTextureCache = LoadTexture(TextureIndex, RuntimeMaterial.OcclusionTextureMips, false, MaterialsConfig);
-
-		if (!(*JsonOcclusionTextureObject)->TryGetNumberField("texCoord", RuntimeMaterial.OcclusionTexCoord))
-		{
-			RuntimeMaterial.OcclusionTexCoord = 0;
-		}
-
-		if (RuntimeMaterial.OcclusionTexCoord < 0 || RuntimeMaterial.OcclusionTexCoord > 3)
-		{
-			AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for occlisionTexture: %d"), RuntimeMaterial.OcclusionTexCoord));
-			return nullptr;
-		}
-	}
-
-	const TArray<TSharedPtr<FJsonValue>>* emissiveFactorValues;
-	if (JsonMaterialObject->TryGetArrayField("emissiveFactor", emissiveFactorValues))
-	{
-		if (emissiveFactorValues->Num() != 3)
-			return nullptr;
-
-		double R, G, B;
-		if (!(*emissiveFactorValues)[0]->TryGetNumber(R))
-			return nullptr;
-		if (!(*emissiveFactorValues)[1]->TryGetNumber(G))
-			return nullptr;
-		if (!(*emissiveFactorValues)[2]->TryGetNumber(B))
-			return nullptr;
-
-		RuntimeMaterial.bHasEmissiveFactor = true;
-		RuntimeMaterial.EmissiveFactor = FLinearColor(R, G, B);
-	}
-
-	const TSharedPtr<FJsonObject>* JsonEmissiveTextureObject;
-	if (JsonMaterialObject->TryGetObjectField("emissiveTexture", JsonEmissiveTextureObject))
-	{
-		int64 TextureIndex;
-		if (!(*JsonEmissiveTextureObject)->TryGetNumberField("index", TextureIndex))
-			return nullptr;
-
-		RuntimeMaterial.EmissiveTextureCache = LoadTexture(TextureIndex, RuntimeMaterial.EmissiveTextureMips, true, MaterialsConfig);
-
-		if (!(*JsonEmissiveTextureObject)->TryGetNumberField("texCoord", RuntimeMaterial.EmissiveTexCoord))
-		{
-			RuntimeMaterial.EmissiveTexCoord = 0;
-		}
-
-		if (RuntimeMaterial.EmissiveTexCoord < 0 || RuntimeMaterial.EmissiveTexCoord > 3)
-		{
-			AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for emissiveTexture: %d"), RuntimeMaterial.EmissiveTexCoord));
-			return nullptr;
-		}
-
 	}
 
 	if (IsInGameThread())
@@ -296,7 +229,21 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
-	UMaterialInterface* BaseMaterial = MaterialsMap[RuntimeMaterial.MaterialType];
+	UMaterialInterface* BaseMaterial = nullptr;
+
+	if (MetallicRoughnessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+	{
+		MetallicRoughnessMaterialsMap[RuntimeMaterial.MaterialType];
+	}
+
+	if (RuntimeMaterial.bHasSpecularFactor || RuntimeMaterial.bHasGlossinessFactor)
+	{
+		if (SpecularGlossinessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = SpecularGlossinessMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
 		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[RuntimeMaterial.MaterialType];
