@@ -17,6 +17,7 @@
 #include "Model.h"
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
+#include "glTFRuntimeMeshReducer.h"
 
 struct FglTFRuntimeSkeletalMeshContextFinalizer
 {
@@ -119,15 +120,16 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	SkeletalMeshContext->SkeletalMesh->ResetLODInfo();
 
 #if WITH_EDITOR
-	TArray<TSet<uint32>> MorphTargetModifiedPoints;
-	TArray<FSkeletalMeshImportData> MorphTargetsData;
-	TArray<FString> MorphTargetNames;
 
 	FSkeletalMeshModel* ImportedResource = SkeletalMeshContext->SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
 
 	for (FglTFRuntimeLOD& LOD : SkeletalMeshContext->LODs)
 	{
+		TArray<TSet<uint32>> MorphTargetModifiedPoints;
+		TArray<FSkeletalMeshImportData> MorphTargetsData;
+		TArray<FString> MorphTargetNames;
+
 		TArray<SkeletalMeshImportData::FVertex> Wedges;
 		TArray<SkeletalMeshImportData::FTriangle> Triangles;
 		TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
@@ -238,7 +240,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			// update boundingbox
 			SkeletalMeshContext->BoundingBox += Points[PointIndex] * SkeletalMeshContext->SkeletalMeshConfig.BoundsScale;
 			PointToRawMap.Add(PointIndex);
-	}
+		}
 
 		if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreSkin || SkeletalMeshContext->SkinIndex <= INDEX_NONE)
 		{
@@ -458,7 +460,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
 		}
 #endif
-}
+	}
 
 	return SkeletalMeshContext->SkeletalMesh;
 }
@@ -599,7 +601,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalSocket->RelativeScale = Pair.Value.Transform.GetScale3D();
 			SkeletalMeshContext->SkeletalMesh->Skeleton->Sockets.Add(SkeletalSocket);
 		}
-		}
+	}
 
 #if !WITH_EDITOR
 	SkeletalMeshContext->SkeletalMesh->PostLoad();
@@ -611,7 +613,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 
 	return SkeletalMeshContext->SkeletalMesh;
-	}
+}
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
@@ -648,6 +650,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
 
+	GenerateAutoLODs(SkeletalMeshConfig.AutoLODs, LODs, LOD0);
+
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 	SkeletalMeshContext->LODs = LODs;
@@ -671,6 +675,22 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	}
 
 	return SkeletalMesh;
+}
+
+void FglTFRuntimeParser::GenerateAutoLODs(const TArray<float>& Factors, TArray<FglTFRuntimeLOD>& LODs, FglTFRuntimeLOD& LOD0)
+{
+	for (float ReduceFactor : Factors)
+	{
+		FglTFRuntimeLOD NewLOD;
+		for (FglTFRuntimePrimitive& Primitive : LOD0.Primitives)
+		{
+			FglTFRuntimePrimitive DestinationPrimitive;
+			FglTFRuntimeMeshReducer MeshReducer(Primitive);
+			MeshReducer.SimplifyMesh(DestinationPrimitive, ReduceFactor);
+			NewLOD.Primitives.Add(DestinationPrimitive);
+		}
+		LODs.Add(NewLOD);
+	}
 }
 
 void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
@@ -707,6 +727,8 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 		FglTFRuntimeLOD LOD0;
 		LOD0.Primitives = Primitives;
 		LODs.Add(LOD0);
+
+		GenerateAutoLODs(SkeletalMeshContext->SkeletalMeshConfig.AutoLODs, LODs, LOD0);
 
 		SkeletalMeshContext->LODs = LODs;
 
@@ -870,6 +892,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
 
+	GenerateAutoLODs(SkeletalMeshConfig.AutoLODs, LODs, LOD0);
+
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = NewSkinIndex;
 	SkeletalMeshContext->LODs = LODs;
@@ -989,6 +1013,8 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 		FglTFRuntimeLOD LOD0;
 		LOD0.Primitives = Primitives;
 		LODs.Add(LOD0);
+
+		GenerateAutoLODs(SkeletalMeshContext->SkeletalMeshConfig.AutoLODs, LODs, LOD0);
 
 		SkeletalMeshContext->SkinIndex = NewSkinIndex;
 		SkeletalMeshContext->LODs = LODs;
