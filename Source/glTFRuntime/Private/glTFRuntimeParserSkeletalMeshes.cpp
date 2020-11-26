@@ -18,6 +18,31 @@
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
 
+struct FglTFRuntimeSkeletalMeshContextFinalizer
+{
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext;
+	FglTFRuntimeSkeletalMeshAsync AsyncCallback;
+
+	FglTFRuntimeSkeletalMeshContextFinalizer(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> InSkeletalMeshContext, FglTFRuntimeSkeletalMeshAsync InAsyncCallback) :
+		SkeletalMeshContext(InSkeletalMeshContext),
+		AsyncCallback(InAsyncCallback)
+	{
+	}
+
+	~FglTFRuntimeSkeletalMeshContextFinalizer()
+	{
+		FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this]()
+		{
+			if (SkeletalMeshContext->SkeletalMesh)
+			{
+				SkeletalMeshContext->SkeletalMesh = SkeletalMeshContext->Parser->FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
+			}
+			AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
+		}, TStatId(), nullptr, ENamedThreads::GameThread);
+		FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+	}
+};
+
 void FglTFRuntimeParser::NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton)
 {
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
@@ -213,7 +238,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			// update boundingbox
 			SkeletalMeshContext->BoundingBox += Points[PointIndex] * SkeletalMeshContext->SkeletalMeshConfig.BoundsScale;
 			PointToRawMap.Add(PointIndex);
-		}
+	}
 
 		if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreSkin || SkeletalMeshContext->SkinIndex <= INDEX_NONE)
 		{
@@ -433,7 +458,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
 		}
 #endif
-	}
+}
 
 	return SkeletalMeshContext->SkeletalMesh;
 }
@@ -574,7 +599,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalSocket->RelativeScale = Pair.Value.Transform.GetScale3D();
 			SkeletalMeshContext->SkeletalMesh->Skeleton->Sockets.Add(SkeletalSocket);
 		}
-	}
+		}
 
 #if !WITH_EDITOR
 	SkeletalMeshContext->SkeletalMesh->PostLoad();
@@ -586,7 +611,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 
 	return SkeletalMeshContext->SkeletalMesh;
-}
+	}
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
@@ -623,7 +648,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
 
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 	SkeletalMeshContext->LODs = LODs;
 
@@ -650,15 +675,17 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 
 void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, MeshIndex, AsyncCallback]()
 	{
+		FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
+
 		TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 		if (!JsonMeshObject)
 		{
-			AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
+			AddError("LoadSkeletalMeshAsync()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
 			return;
 		}
 
@@ -666,7 +693,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 		const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
 		if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
 		{
-			AddError("LoadSkeletalMesh", "No primitives defined in the asset.");
+			AddError("LoadSkeletalMeshAsync", "No primitives defined in the asset.");
 			return;
 		}
 
@@ -729,7 +756,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> Mesh
 		LODs.Add(LOD);
 	}
 
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 	SkeletalMeshContext->LODs = LODs;
 
@@ -843,7 +870,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
 
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = NewSkinIndex;
 	SkeletalMeshContext->LODs = LODs;
 
@@ -857,10 +884,12 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 
 void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
 {
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, NodeName, SkinIndex, AsyncCallback]()
 	{
+		FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
+
 		FglTFRuntimeNode Node;
 		if (!LoadNodeByName(NodeName, Node))
 		{
@@ -965,16 +994,6 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 		SkeletalMeshContext->LODs = LODs;
 
 		SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
-
-		if (SkeletalMeshContext->SkeletalMesh)
-		{
-			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, SkeletalMeshContext, AsyncCallback]()
-			{
-				SkeletalMeshContext->SkeletalMesh = FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
-				AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
-			}, TStatId(), nullptr, ENamedThreads::GameThread);
-			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
-		}
 	});
 }
 

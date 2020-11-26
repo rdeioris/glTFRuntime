@@ -498,8 +498,12 @@ struct FglTFRuntimeLOD
 	}
 };
 
-struct FglTFRuntimeSkeletalMeshContext
+struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 {
+	TSharedRef<class FglTFRuntimeParser> Parser;
+
+	const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig;
+
 	USkeletalMesh* SkeletalMesh;
 
 	TArray<FglTFRuntimeLOD> LODs;
@@ -508,13 +512,16 @@ struct FglTFRuntimeSkeletalMeshContext
 
 	FBox BoundingBox;
 
-	const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig;
-
-	FglTFRuntimeSkeletalMeshContext(const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : SkeletalMeshConfig(InSkeletalMeshConfig)
+	FglTFRuntimeSkeletalMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : Parser(InParser), SkeletalMeshConfig(InSkeletalMeshConfig)
 	{
 		SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
 		BoundingBox = FBox(EForceInit::ForceInitToZero);
 		SkinIndex = -1;
+	}
+
+	void AddReferencedObjects(FReferenceCollector& Collector)
+	{
+		Collector.AddReferencedObject(SkeletalMesh);
 	}
 };
 
@@ -614,7 +621,7 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*,
 /**
  *
  */
-class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject
+class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject, public TSharedFromThis<FglTFRuntimeParser>
 {
 public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale);
@@ -699,6 +706,8 @@ public:
 
 	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
 
+	USkeletalMesh* FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext);
+
 	bool ReducePrimitive(const FglTFRuntimePrimitive& SourcePrimitive, FglTFRuntimePrimitive& DestinationPrimitive, const float ReductionLevel);
 protected:
 	TSharedRef<FJsonObject> Root;
@@ -728,8 +737,6 @@ protected:
 	bool LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter);
 
 	USkeletalMesh* CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext);
-
-	USkeletalMesh* FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext);
 
 	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 	bool FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
@@ -936,5 +943,5 @@ protected:
 		}
 
 		return true;
-	}
+	} 
 };

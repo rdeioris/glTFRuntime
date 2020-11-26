@@ -1549,9 +1549,9 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 
 	FglTFRuntimePrimitive ReducedPrimitive;
 
-	ReducePrimitive(Primitive, ReducedPrimitive, 1);
+	//ReducePrimitive(Primitive, ReducedPrimitive, 1);
 
-	Primitive = ReducedPrimitive;
+	//Primitive = ReducedPrimitive;
 
 	return true;
 }
@@ -2002,6 +2002,7 @@ struct FglTFRuntimeReducerTriangle : TSharedFromThis<FglTFRuntimeReducerTriangle
 		FVector PositionC = VertexC->Position;
 
 		Normal = FVector::CrossProduct(PositionB - PositionA, PositionC - PositionB).GetSafeNormal();
+		UE_LOG(LogTemp, Error, TEXT("Normal: %s"), *Normal.ToString());
 	}
 
 	bool HasVertex(const TSharedPtr<FglTFRuntimeReducerVertex> Vertex) const
@@ -2096,7 +2097,7 @@ bool FglTFRuntimeParser::ReducePrimitive(const FglTFRuntimePrimitive& SourcePrim
 			for (TSharedPtr<FglTFRuntimeReducerTriangle> Side : Sides)
 			{
 				float Dot = FVector::DotProduct(Face->Normal, Side->Normal);
-				MinCurv = FMath::Min(MinCurv, (1 - Dot) / 2.0f);
+				MinCurv = FMath::Min(MinCurv, (1.0f - Dot) / 2.0f);
 			}
 			Curvature = FMath::Max(Curvature, MinCurv);
 		}
@@ -2177,9 +2178,13 @@ bool FglTFRuntimeParser::ReducePrimitive(const FglTFRuntimePrimitive& SourcePrim
 	{
 		if (!VertexV.IsValid())
 		{
-			for (TSharedPtr<FglTFRuntimeReducerVertex> Neighbor : VertexU->Neighbors)
+			while (VertexU->Neighbors.Num() > 0)
 			{
-				Neighbor->Neighbors.Remove(VertexU);
+				VertexU->Neighbors[0]->Neighbors.Remove(VertexU);
+				if (VertexU->Neighbors.Num() > 0)
+				{
+					VertexU->Neighbors.RemoveAt(0);
+				}
 			}
 			Vertices.Remove(VertexU->Index);
 			return;
@@ -2294,8 +2299,7 @@ bool FglTFRuntimeParser::ReducePrimitive(const FglTFRuntimePrimitive& SourcePrim
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("%d Vertex %d -> FAIL!"), Vertices.Num(), MinimumVertex->Index);
-			CollapseMap.Add(MinimumVertex->Index, MAX_int32);
+			Permutations[MinimumVertex->Index] = -1;
 		}
 
 		Collapse(Triangles, Vertices, MinimumVertex, MinimumVertex->Collapse);
@@ -2307,19 +2311,20 @@ bool FglTFRuntimeParser::ReducePrimitive(const FglTFRuntimePrimitive& SourcePrim
 
 	UE_LOG(LogTemp, Error, TEXT("Collapsed to %d triangles [%d vertices]"), Triangles.Num(), Triangles.Num() * 3);
 
-	const int32 WantedVertices = 1000;
+	const int32 WantedVertices = 10000;
 
 	auto ReductionMap = [Permutations, CollapseMap](const uint32 Index, const int32 WantedVertices) -> uint32
 	{
-		return Index;
 		uint32 NewIndex = Index;
-		while (NewIndex >= (uint32)WantedVertices)
+		int32 NumVertices = Permutations[Index];
+		while (NumVertices >= WantedVertices)
 		{
-			if (NewIndex == CollapseMap[NewIndex])
+			if (!CollapseMap.Contains(NewIndex))
 			{
 				break;
 			}
 			NewIndex = CollapseMap[NewIndex];
+			NumVertices = Permutations[NewIndex];
 		}
 		return NewIndex;
 	};

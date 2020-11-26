@@ -167,6 +167,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 
 	FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, &Material, &RuntimeMaterial, MaterialsConfig, bUseVertexColors]()
 	{
+		// this is mainly for editor ...
+		if (IsGarbageCollecting())
+		{
+			return;
+		}
 		Material = BuildMaterial(RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 	}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
