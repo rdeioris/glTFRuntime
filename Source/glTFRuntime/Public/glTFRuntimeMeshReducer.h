@@ -127,30 +127,30 @@ public:
 
 	// Check if a triangle flips when this edge is removed
 
-	bool IsFlipped(FVector p, int i0, int i1, FVertex& v0, FVertex& v1, std::vector<int>& deleted)
+	bool IsFlipped(FVector p, int i0, int i1, FVertex& v0, FVertex& v1, TArray<int32>& Deleted)
 	{
 
 		for (int32 k = 0; k < v0.tcount; k++)
 		{
-			FTriangle& t = triangles[refs[v0.tstart + k].tid];
-			if (t.deleted)continue;
+			FTriangle& Triangle = triangles[refs[v0.tstart + k].tid];
+			if (Triangle.deleted)continue;
 
 			int s = refs[v0.tstart + k].tvertex;
-			int id1 = t.v[(s + 1) % 3];
-			int id2 = t.v[(s + 2) % 3];
+			int id1 = Triangle.v[(s + 1) % 3];
+			int id2 = Triangle.v[(s + 2) % 3];
 
 			if (id1 == i1 || id2 == i1) // delete ?
 			{
 
-				deleted[k] = 1;
+				Deleted[k] = 1;
 				continue;
 			}
 			FVector d1 = Vertices[id1].Position - p; d1.Normalize();
 			FVector d2 = Vertices[id2].Position - p; d2.Normalize();
 			if (FMath::Abs(FVector::DotProduct(d1, d2)) > 0.999) return true;
 			FVector n = FVector::CrossProduct(d1, d2).GetSafeNormal();
-			deleted[k] = 0;
-			if (FVector::DotProduct(n, t.Normal) < 0.2) return true;
+			Deleted[k] = 0;
+			if (FVector::DotProduct(n, Triangle.Normal) < 0.2) return true;
 		}
 		return false;
 	}
@@ -182,14 +182,14 @@ public:
 		return out;
 	}
 
-	void UpdateVertexUVs(int i0, const FVertex& v, const FVector& p, std::vector<int>& deleted)
+	void UpdateVertexUVs(int i0, const FVertex& v, const FVector& p, const TArray<int32>& Deleted)
 	{
 		for (int32 k = 0; k < v.tcount; k++)
 		{
 			FRef& r = refs[v.tstart + k];
 			FTriangle& t = triangles[r.tid];
 			if (t.deleted)continue;
-			if (deleted[k])continue;
+			if (Deleted[k])continue;
 			FVector p1 = Vertices[t.v[0]].Position;
 			FVector p2 = Vertices[t.v[1]].Position;
 			FVector p3 = Vertices[t.v[2]].Position;
@@ -197,14 +197,14 @@ public:
 		}
 	}
 
-	void UpdateVertexNormals(int i0, const FVertex& v, const FVector& p, std::vector<int>& deleted)
+	void UpdateVertexNormals(int i0, const FVertex& v, const FVector& p, const TArray<int32>& Deleted)
 	{
 		for (int32 k = 0; k < v.tcount; k++)
 		{
 			FRef& r = refs[v.tstart + k];
 			FTriangle& t = triangles[r.tid];
 			if (t.deleted)continue;
-			if (deleted[k])continue;
+			if (Deleted[k])continue;
 			FVector p1 = Vertices[t.v[0]].Position;
 			FVector p2 = Vertices[t.v[1]].Position;
 			FVector p3 = Vertices[t.v[2]].Position;
@@ -212,14 +212,14 @@ public:
 		}
 	}
 
-	void UpdateVertexTangents(int i0, const FVertex& v, const FVector& p, std::vector<int>& deleted)
+	void UpdateVertexTangents(int i0, const FVertex& v, const FVector& p, const TArray<int32>& Deleted)
 	{
 		for (int32 k = 0; k < v.tcount; k++)
 		{
 			FRef& r = refs[v.tstart + k];
 			FTriangle& t = triangles[r.tid];
 			if (t.deleted)continue;
-			if (deleted[k])continue;
+			if (Deleted[k])continue;
 			FVector p1 = Vertices[t.v[0]].Position;
 			FVector p2 = Vertices[t.v[1]].Position;
 			FVector p3 = Vertices[t.v[2]].Position;
@@ -227,14 +227,14 @@ public:
 		}
 	}
 
-	void UpdateVertexColors(int i0, const FVertex& v, const FVector& p, std::vector<int>& deleted)
+	void UpdateVertexColors(int i0, const FVertex& v, const FVector& p, const TArray<int32>& Deleted)
 	{
 		for (int32 k = 0; k < v.tcount; k++)
 		{
 			FRef& r = refs[v.tstart + k];
 			FTriangle& t = triangles[r.tid];
 			if (t.deleted)continue;
-			if (deleted[k])continue;
+			if (Deleted[k])continue;
 			FVector p1 = Vertices[t.v[0]].Position;
 			FVector p2 = Vertices[t.v[1]].Position;
 			FVector p3 = Vertices[t.v[2]].Position;
@@ -244,7 +244,7 @@ public:
 
 	// Update triangle connections and edge error after a edge is collapsed
 
-	void update_triangles(int i0, FVertex& v, std::vector<int>& deleted, int& deleted_triangles)
+	void UpdateTriangles(int i0, FVertex& v, const TArray<int32>& Deleted, int32& DeletedTriangles)
 	{
 		FVector p;
 		for (int32 k = 0; k < v.tcount; k++)
@@ -252,10 +252,10 @@ public:
 			FRef& r = refs[v.tstart + k];
 			FTriangle& t = triangles[r.tid];
 			if (t.deleted)continue;
-			if (deleted[k])
+			if (Deleted[k])
 			{
 				t.deleted = 1;
-				deleted_triangles++;
+				DeletedTriangles++;
 				continue;
 			}
 			t.v[r.tvertex] = i0;
@@ -388,35 +388,35 @@ public:
 
 	// Finally compact mesh before exiting
 
-	void compact_mesh()
+	void CompactMesh()
 	{
-		int dst = 0;
-		loopi(0, Vertices.Num())
+		int32 NewSize = 0;
+		for (FVertex& Vertex : Vertices)
 		{
-			Vertices[i].tcount = 0;
+			Vertex.tcount = 0;
 		}
 		loopi(0, triangles.size())
 			if (!triangles[i].deleted)
 			{
 				FTriangle& t = triangles[i];
-				triangles[dst++] = t;
+				triangles[NewSize++] = t;
 				loopj(0, 3)Vertices[t.v[j]].tcount = 1;
 			}
-		triangles.resize(dst);
-		dst = 0;
+		triangles.resize(NewSize);
+		NewSize = 0;
 		loopi(0, Vertices.Num())
 			if (Vertices[i].tcount)
 			{
-				Vertices[i].tstart = dst;
-				Vertices[dst].Position = Vertices[i].Position;
-				dst++;
+				Vertices[i].tstart = NewSize;
+				Vertices[NewSize].Position = Vertices[i].Position;
+				NewSize++;
 			}
 		loopi(0, triangles.size())
 		{
 			FTriangle& t = triangles[i];
 			loopj(0, 3)t.v[j] = Vertices[t.v[j]].tstart;
 		}
-		Vertices.SetNum(dst);
+		Vertices.SetNum(NewSize);
 	}
 
 	// Error between vertex and Quadric

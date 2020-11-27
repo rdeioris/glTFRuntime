@@ -69,13 +69,15 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 	}
 
 	// main iteration loop
-	int deleted_triangles = 0;
-	std::vector<int> deleted0, deleted1;
-	int triangle_count = triangles.size();
+	int32 DeletedTriangles = 0;
+	TArray<int32> Deleted0;
+	TArray<int32> Deleted1;
+
+	int32 TriangleCount = triangles.size();
 
 	for (int iteration = 0; iteration < 100; iteration++)
 	{
-		if (triangle_count - deleted_triangles <= TargetCount)break;
+		if (TriangleCount - DeletedTriangles <= TargetCount)break;
 
 		// update mesh once in a while
 		if (iteration % 5 == 0)
@@ -113,35 +115,35 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 				// Compute vertex to collapse to
 				FVector p;
 				CalculateError(i0, i1, p);
-				deleted0.resize(v0.tcount); // normals temporarily
-				deleted1.resize(v1.tcount); // normals temporarily
+				Deleted0.SetNum(v0.tcount); // normals temporarily
+				Deleted1.SetNum(v1.tcount); // normals temporarily
 				// don't remove if flipped
-				if (IsFlipped(p, i0, i1, v0, v1, deleted0)) continue;
+				if (IsFlipped(p, i0, i1, v0, v1, Deleted0)) continue;
 
-				if (IsFlipped(p, i1, i0, v1, v0, deleted1)) continue;
+				if (IsFlipped(p, i1, i0, v1, v0, Deleted1)) continue;
 
 				if (SourcePrimitive.Normals.Num() > 0)
 				{
-					UpdateVertexNormals(i0, v0, p, deleted0);
-					UpdateVertexNormals(i0, v1, p, deleted1);
+					UpdateVertexNormals(i0, v0, p, Deleted0);
+					UpdateVertexNormals(i0, v1, p, Deleted1);
 				}
 
 				if (SourcePrimitive.Tangents.Num() > 0)
 				{
-					UpdateVertexTangents(i0, v0, p, deleted0);
-					UpdateVertexTangents(i0, v1, p, deleted1);
+					UpdateVertexTangents(i0, v0, p, Deleted0);
+					UpdateVertexTangents(i0, v1, p, Deleted1);
 				}
 
 				if (SourcePrimitive.Colors.Num() > 0)
 				{
-					UpdateVertexColors(i0, v0, p, deleted0);
-					UpdateVertexColors(i0, v1, p, deleted1);
+					UpdateVertexColors(i0, v0, p, Deleted0);
+					UpdateVertexColors(i0, v1, p, Deleted1);
 				}
 
 				if (SourcePrimitive.UVs.Num() > 0)
 				{
-					UpdateVertexUVs(i0, v0, p, deleted0);
-					UpdateVertexUVs(i0, v1, p, deleted1);
+					UpdateVertexUVs(i0, v0, p, Deleted0);
+					UpdateVertexUVs(i0, v1, p, Deleted1);
 				}
 
 
@@ -150,8 +152,8 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 				v0.q = v1.q + v0.q;
 				int tstart = refs.size();
 
-				update_triangles(i0, v0, deleted0, deleted_triangles);
-				update_triangles(i0, v1, deleted1, deleted_triangles);
+				UpdateTriangles(i0, v0, Deleted0, DeletedTriangles);
+				UpdateTriangles(i0, v1, Deleted1, DeletedTriangles);
 
 				int tcount = refs.size() - tstart;
 
@@ -168,11 +170,11 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 				break;
 			}
 			// done?
-			if (triangle_count - deleted_triangles <= TargetCount)break;
+			if (TriangleCount - DeletedTriangles <= TargetCount)break;
 		}
 	}
-	// clean up mesh
-	compact_mesh();
+
+	CompactMesh();
 
 	if (SourcePrimitive.Joints.Num() > 0 && SourcePrimitive.Weights.Num())
 	{
@@ -180,7 +182,7 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 		DestinationPrimitive.Weights.AddZeroed();
 	}
 
-	for (FVertex& Vertex : Vertices)
+	for (const FVertex& Vertex : Vertices)
 	{
 		DestinationPrimitive.Positions.Add(Vertex.Position);
 		if (SourcePrimitive.Joints.Num() > 0 && SourcePrimitive.Weights.Num())
@@ -211,7 +213,7 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 		DestinationPrimitive.UVs[0].AddZeroed(Vertices.Num());
 	}
 
-	for (FTriangle& Triangle : triangles)
+	for (const FTriangle& Triangle : triangles)
 	{
 		DestinationPrimitive.Indices.Add(Triangle.v[0]);
 		DestinationPrimitive.Indices.Add(Triangle.v[1]);
