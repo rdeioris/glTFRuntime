@@ -17,6 +17,32 @@
 #include "Model.h"
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
+#include "glTFRuntimeMeshReducer.h"
+
+struct FglTFRuntimeSkeletalMeshContextFinalizer
+{
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext;
+	FglTFRuntimeSkeletalMeshAsync AsyncCallback;
+
+	FglTFRuntimeSkeletalMeshContextFinalizer(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> InSkeletalMeshContext, FglTFRuntimeSkeletalMeshAsync InAsyncCallback) :
+		SkeletalMeshContext(InSkeletalMeshContext),
+		AsyncCallback(InAsyncCallback)
+	{
+	}
+
+	~FglTFRuntimeSkeletalMeshContextFinalizer()
+	{
+		FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this]()
+		{
+			if (SkeletalMeshContext->SkeletalMesh)
+			{
+				SkeletalMeshContext->SkeletalMesh = SkeletalMeshContext->Parser->FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
+			}
+			AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
+		}, TStatId(), nullptr, ENamedThreads::GameThread);
+		FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+	}
+};
 
 void FglTFRuntimeParser::NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton)
 {
@@ -94,15 +120,16 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	SkeletalMeshContext->SkeletalMesh->ResetLODInfo();
 
 #if WITH_EDITOR
-	TArray<TSet<uint32>> MorphTargetModifiedPoints;
-	TArray<FSkeletalMeshImportData> MorphTargetsData;
-	TArray<FString> MorphTargetNames;
 
 	FSkeletalMeshModel* ImportedResource = SkeletalMeshContext->SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
 
 	for (FglTFRuntimeLOD& LOD : SkeletalMeshContext->LODs)
 	{
+		TArray<TSet<uint32>> MorphTargetModifiedPoints;
+		TArray<FSkeletalMeshImportData> MorphTargetsData;
+		TArray<FString> MorphTargetNames;
+
 		TArray<SkeletalMeshImportData::FVertex> Wedges;
 		TArray<SkeletalMeshImportData::FTriangle> Triangles;
 		TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
@@ -623,7 +650,9 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
 
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	GenerateAutoLODs(SkeletalMeshConfig.AutoLODs, LODs, LOD0);
+
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 	SkeletalMeshContext->LODs = LODs;
 
@@ -648,17 +677,35 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	return SkeletalMesh;
 }
 
+void FglTFRuntimeParser::GenerateAutoLODs(const TArray<float>& Factors, TArray<FglTFRuntimeLOD>& LODs, FglTFRuntimeLOD& LOD0)
+{
+	for (float ReduceFactor : Factors)
+	{
+		FglTFRuntimeLOD NewLOD;
+		for (FglTFRuntimePrimitive& Primitive : LOD0.Primitives)
+		{
+			FglTFRuntimePrimitive DestinationPrimitive;
+			FglTFRuntimeMeshReducer MeshReducer(Primitive);
+			MeshReducer.SimplifyMesh(DestinationPrimitive, ReduceFactor);
+			NewLOD.Primitives.Add(DestinationPrimitive);
+		}
+		LODs.Add(NewLOD);
+	}
+}
+
 void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, MeshIndex, AsyncCallback]()
 	{
+		FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
+
 		TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 		if (!JsonMeshObject)
 		{
-			AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
+			AddError("LoadSkeletalMeshAsync()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
 			return;
 		}
 
@@ -666,7 +713,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 		const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
 		if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
 		{
-			AddError("LoadSkeletalMesh", "No primitives defined in the asset.");
+			AddError("LoadSkeletalMeshAsync", "No primitives defined in the asset.");
 			return;
 		}
 
@@ -680,6 +727,8 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 		FglTFRuntimeLOD LOD0;
 		LOD0.Primitives = Primitives;
 		LODs.Add(LOD0);
+
+		GenerateAutoLODs(SkeletalMeshContext->SkeletalMeshConfig.AutoLODs, LODs, LOD0);
 
 		SkeletalMeshContext->LODs = LODs;
 
@@ -729,7 +778,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> Mesh
 		LODs.Add(LOD);
 	}
 
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 	SkeletalMeshContext->LODs = LODs;
 
@@ -843,7 +892,9 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
 
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	GenerateAutoLODs(SkeletalMeshConfig.AutoLODs, LODs, LOD0);
+
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = NewSkinIndex;
 	SkeletalMeshContext->LODs = LODs;
 
@@ -857,10 +908,12 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 
 void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
 {
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(SkeletalMeshConfig);
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, NodeName, SkinIndex, AsyncCallback]()
 	{
+		FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
+
 		FglTFRuntimeNode Node;
 		if (!LoadNodeByName(NodeName, Node))
 		{
@@ -961,20 +1014,12 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 		LOD0.Primitives = Primitives;
 		LODs.Add(LOD0);
 
+		GenerateAutoLODs(SkeletalMeshContext->SkeletalMeshConfig.AutoLODs, LODs, LOD0);
+
 		SkeletalMeshContext->SkinIndex = NewSkinIndex;
 		SkeletalMeshContext->LODs = LODs;
 
 		SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
-
-		if (SkeletalMeshContext->SkeletalMesh)
-		{
-			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, SkeletalMeshContext, AsyncCallback]()
-			{
-				SkeletalMeshContext->SkeletalMesh = FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
-				AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
-			}, TStatId(), nullptr, ENamedThreads::GameThread);
-			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
-		}
 	});
 }
 

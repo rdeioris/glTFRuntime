@@ -35,17 +35,17 @@ struct FglTFRuntimeConfig
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		EglTFRuntimeTransformBaseType TransformBaseType;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeTransformBaseType TransformBaseType;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FMatrix BasisMatrix;
+	FMatrix BasisMatrix;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FTransform BaseTransform;
+	FTransform BaseTransform;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		float SceneScale;
+	float SceneScale;
 
 	FglTFRuntimeConfig()
 	{
@@ -83,14 +83,14 @@ struct FglTFRuntimeScene
 {
 	GENERATED_BODY()
 
-		UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		int32 Index;
+	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
+	int32 Index;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		FString Name;
+	FString Name;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		TArray<int32> RootNodesIndices;
+	TArray<int32> RootNodesIndices;
 };
 
 
@@ -99,29 +99,29 @@ struct FglTFRuntimeNode
 {
 	GENERATED_BODY()
 
-		UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		int32 Index;
+	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
+	int32 Index;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		FString Name;
+	FString Name;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		FTransform Transform;
+	FTransform Transform;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		int32 MeshIndex;
+	int32 MeshIndex;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		int32 SkinIndex;
+	int32 SkinIndex;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		int32 CameraIndex;
+	int32 CameraIndex;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		TArray<int32> ChildrenIndices;
+	TArray<int32> ChildrenIndices;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-		int32 ParentIndex;
+	int32 ParentIndex;
 
 	FglTFRuntimeNode()
 	{
@@ -166,11 +166,11 @@ struct FglTFRuntimeSocket
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FString BoneName;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString BoneName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FTransform Transform;
+	FTransform Transform;
 };
 
 USTRUCT(BlueprintType)
@@ -178,14 +178,14 @@ struct FglTFRuntimeBone
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FString BoneName;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString BoneName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		int32 ParentIndex;
+	int32 ParentIndex;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FTransform Transform;
+	FTransform Transform;
 };
 
 USTRUCT(BlueprintType)
@@ -193,11 +193,11 @@ struct FglTFRuntimeMorphTarget
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TArray<FVector> Positions;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FVector> Positions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TArray<FVector> Normals;
+	TArray<FVector> Normals;
 };
 
 USTRUCT(BlueprintType)
@@ -205,23 +205,26 @@ struct FglTFRuntimeMaterialsConfig
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UberMaterialsOverrideMap;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UberMaterialsOverrideMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<int32, UMaterialInterface*> MaterialsOverrideMap;
+	TMap<int32, UMaterialInterface*> MaterialsOverrideMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<int32, UTexture2D*> TexturesOverrideMap;
+	TMap<int32, UTexture2D*> TexturesOverrideMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<int32, UTexture2D*> ImagesOverrideMap;
+	TMap<int32, UTexture2D*> ImagesOverrideMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bDisableVertexColors;
+	bool bDisableVertexColors;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bGeneratesMipMaps;
+	bool bGeneratesMipMaps;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bMergeSectionsByMaterial;
 };
 
 USTRUCT(BlueprintType)
@@ -229,44 +232,44 @@ struct FglTFRuntimeStaticMeshConfig
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		EglTFRuntimeCacheMode CacheMode;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeCacheMode CacheMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bReverseWinding;
+	bool bReverseWinding;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bBuildSimpleCollision;
+	bool bBuildSimpleCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TArray<FBox> BoxCollisions;
+	TArray<FBox> BoxCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TArray<FVector4> SphereCollisions;
+	TArray<FVector4> SphereCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TEnumAsByte<ECollisionTraceFlag> CollisionComplexity;
+	TEnumAsByte<ECollisionTraceFlag> CollisionComplexity;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bAllowCPUAccess;
+	bool bAllowCPUAccess;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		EglTFRuntimePivotPosition PivotPosition;
+	EglTFRuntimePivotPosition PivotPosition;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		UObject* Outer;
+	UObject* Outer;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FglTFRuntimeMaterialsConfig MaterialsConfig;
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<FString, FTransform> Sockets;
+	TMap<FString, FTransform> Sockets;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FString ExportOriginalPivotToSocket;
+	FString ExportOriginalPivotToSocket;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<int32, float> LODScreenSize;
+	TMap<int32, float> LODScreenSize;
 
 	FglTFRuntimeStaticMeshConfig()
 	{
@@ -285,26 +288,26 @@ struct FglTFRuntimeProceduralMeshConfig
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bReverseWinding;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bReverseWinding;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bBuildSimpleCollision;
+	bool bBuildSimpleCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TArray<FBox> BoxCollisions;
+	TArray<FBox> BoxCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TArray<FVector4> SphereCollisions;
+	TArray<FVector4> SphereCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bUseComplexAsSimpleCollision;
+	bool bUseComplexAsSimpleCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		EglTFRuntimePivotPosition PivotPosition;
+	EglTFRuntimePivotPosition PivotPosition;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FglTFRuntimeMaterialsConfig MaterialsConfig;
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
 
 	FglTFRuntimeProceduralMeshConfig()
 	{
@@ -320,29 +323,29 @@ struct FglTFRuntimeSkeletonConfig
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		EglTFRuntimeCacheMode CacheMode;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeCacheMode CacheMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bAddRootBone;
+	bool bAddRootBone;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FString RootBoneName;
+	FString RootBoneName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<FString, FString> BonesNameMap;
+	TMap<FString, FString> BonesNameMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<FString, FTransform> BonesTransformMap;
+	TMap<FString, FTransform> BonesTransformMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bNormalizeSkeletonScale;
+	bool bNormalizeSkeletonScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		int32 RootNodeIndex;
+	int32 RootNodeIndex;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<FString, FglTFRuntimeSocket> Sockets;
+	TMap<FString, FglTFRuntimeSocket> Sockets;
 
 	FglTFRuntimeSkeletonConfig()
 	{
@@ -358,38 +361,41 @@ struct FglTFRuntimeSkeletalMeshConfig
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		EglTFRuntimeCacheMode CacheMode;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeCacheMode CacheMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		USkeleton* Skeleton;
+	USkeleton* Skeleton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bOverwriteRefSkeleton;
+	bool bOverwriteRefSkeleton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TArray<FglTFRuntimeBone> CustomSkeleton;
+	TArray<FglTFRuntimeBone> CustomSkeleton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bIgnoreSkin;
+	bool bIgnoreSkin;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		int32 OverrideSkinIndex;
+	int32 OverrideSkinIndex;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FglTFRuntimeSkeletonConfig SkeletonConfig;
+	FglTFRuntimeSkeletonConfig SkeletonConfig;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FglTFRuntimeMaterialsConfig MaterialsConfig;
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		TMap<int32, float> LODScreenSize;
+	TMap<int32, float> LODScreenSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		FVector BoundsScale;
+	FVector BoundsScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bShiftBoundsByRootBone;
+	bool bShiftBoundsByRootBone;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<float> AutoLODs;
 
 	FglTFRuntimeSkeletalMeshConfig()
 	{
@@ -408,17 +414,17 @@ struct FglTFRuntimeSkeletalAnimationConfig
 {
 	GENERATED_BODY()
 
-		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		EglTFRuntimeCacheMode CacheMode;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeCacheMode CacheMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		int32 RootNodeIndex;
+	int32 RootNodeIndex;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bRootMotion;
+	bool bRootMotion;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-		bool bRemoveRootMotion;
+	bool bRemoveRootMotion;
 
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
@@ -484,7 +490,7 @@ struct FglTFRuntimeLOD
 {
 	GENERATED_BODY()
 
-		TArray<FglTFRuntimePrimitive> Primitives;
+	TArray<FglTFRuntimePrimitive> Primitives;
 
 	bool bHasNormals;
 
@@ -498,8 +504,12 @@ struct FglTFRuntimeLOD
 	}
 };
 
-struct FglTFRuntimeSkeletalMeshContext
+struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 {
+	TSharedRef<class FglTFRuntimeParser> Parser;
+
+	const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig;
+
 	USkeletalMesh* SkeletalMesh;
 
 	TArray<FglTFRuntimeLOD> LODs;
@@ -508,13 +518,16 @@ struct FglTFRuntimeSkeletalMeshContext
 
 	FBox BoundingBox;
 
-	const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig;
-
-	FglTFRuntimeSkeletalMeshContext(const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : SkeletalMeshConfig(InSkeletalMeshConfig)
+	FglTFRuntimeSkeletalMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : Parser(InParser), SkeletalMeshConfig(InSkeletalMeshConfig)
 	{
 		SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
 		BoundingBox = FBox(EForceInit::ForceInitToZero);
 		SkinIndex = -1;
+	}
+
+	void AddReferencedObjects(FReferenceCollector& Collector)
+	{
+		Collector.AddReferencedObject(SkeletalMesh);
 	}
 };
 
@@ -614,7 +627,7 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*,
 /**
  *
  */
-class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject
+class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject, public TSharedFromThis<FglTFRuntimeParser>
 {
 public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale);
@@ -699,6 +712,8 @@ public:
 
 	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
 
+	USkeletalMesh* FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext);
+
 	bool ReducePrimitive(const FglTFRuntimePrimitive& SourcePrimitive, FglTFRuntimePrimitive& DestinationPrimitive, const float ReductionLevel);
 protected:
 	TSharedRef<FJsonObject> Root;
@@ -728,8 +743,6 @@ protected:
 	bool LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter);
 
 	USkeletalMesh* CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext);
-
-	USkeletalMesh* FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext);
 
 	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 	bool FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
@@ -937,4 +950,7 @@ protected:
 
 		return true;
 	}
+
+	bool MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive);
+	void GenerateAutoLODs(const TArray<float>& Factors, TArray<FglTFRuntimeLOD>& LODs, FglTFRuntimeLOD& LOD0);
 };
