@@ -25,68 +25,68 @@ FglTFRuntimeMeshReducer::FglTFRuntimeMeshReducer(FglTFRuntimePrimitive& InSource
 	for (int32 VertexIndex = 0; VertexIndex < SourcePrimitive.Indices.Num(); VertexIndex += 3)
 	{
 		FTriangle NewTriangle;
-		NewTriangle.v[0] = SourcePrimitive.Indices[VertexIndex];
-		NewTriangle.v[1] = SourcePrimitive.Indices[VertexIndex + 1];
-		NewTriangle.v[2] = SourcePrimitive.Indices[VertexIndex + 2];
+		NewTriangle.Vertices[0] = SourcePrimitive.Indices[VertexIndex];
+		NewTriangle.Vertices[1] = SourcePrimitive.Indices[VertexIndex + 1];
+		NewTriangle.Vertices[2] = SourcePrimitive.Indices[VertexIndex + 2];
 
 		for (int32 Index = 0; Index < 3; Index++)
 		{
-			if (NewTriangle.v[Index] < (uint32)SourcePrimitive.Normals.Num())
+			if (NewTriangle.Vertices[Index] < (uint32)SourcePrimitive.Normals.Num())
 			{
-				NewTriangle.Normals[Index] = SourcePrimitive.Normals[NewTriangle.v[Index]];
+				NewTriangle.Normals[Index] = SourcePrimitive.Normals[NewTriangle.Vertices[Index]];
 			}
 
-			if (NewTriangle.v[Index] < (uint32)SourcePrimitive.Tangents.Num())
+			if (NewTriangle.Vertices[Index] < (uint32)SourcePrimitive.Tangents.Num())
 			{
-				NewTriangle.Tangents[Index] = SourcePrimitive.Tangents[NewTriangle.v[Index]];
+				NewTriangle.Tangents[Index] = SourcePrimitive.Tangents[NewTriangle.Vertices[Index]];
 			}
 
-			if (NewTriangle.v[Index] < (uint32)SourcePrimitive.Colors.Num())
+			if (NewTriangle.Vertices[Index] < (uint32)SourcePrimitive.Colors.Num())
 			{
-				NewTriangle.Colors[Index] = SourcePrimitive.Colors[NewTriangle.v[Index]];
+				NewTriangle.Colors[Index] = SourcePrimitive.Colors[NewTriangle.Vertices[Index]];
 			}
 
 			if (SourcePrimitive.UVs.Num() > 0)
 			{
-				if (NewTriangle.v[Index] < (uint32)SourcePrimitive.UVs[0].Num())
+				if (NewTriangle.Vertices[Index] < (uint32)SourcePrimitive.UVs[0].Num())
 				{
-					NewTriangle.UV[Index] = FVector(SourcePrimitive.UVs[0][NewTriangle.v[Index]].X, SourcePrimitive.UVs[0][NewTriangle.v[Index]].Y, 0);
+					NewTriangle.UV[Index] = FVector(SourcePrimitive.UVs[0][NewTriangle.Vertices[Index]].X, SourcePrimitive.UVs[0][NewTriangle.Vertices[Index]].Y, 0);
 				}
 			}
 		}
-		triangles.push_back(NewTriangle);
+		Triangles.Add(NewTriangle);
 	}
 }
 
 void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPrimitive, const float ReductionFactor, const double Aggressiveness)
 {
-	const int32 TargetCount = (int32)((float)triangles.size() * FMath::Clamp(ReductionFactor, 0.0f, 1.0f));
+	const int32 TargetCount = (int32)((float)Triangles.Num() * FMath::Clamp(ReductionFactor, 0.0f, 1.0f));
 
-	// init
-	loopi(0, triangles.size())
+	for (FTriangle& Triangle : Triangles)
 	{
-		triangles[i].deleted = 0;
+		Triangle.bDeleted = false;
 	}
 
-	// main iteration loop
 	int32 DeletedTriangles = 0;
 	TArray<int32> Deleted0;
 	TArray<int32> Deleted1;
 
-	int32 TriangleCount = triangles.size();
+	int32 TriangleCount = Triangles.Num();
 
-	for (int iteration = 0; iteration < 100; iteration++)
+	for (int32 Iteration = 0; Iteration < 100; Iteration++)
 	{
 		if (TriangleCount - DeletedTriangles <= TargetCount)break;
 
 		// update mesh once in a while
-		if (iteration % 5 == 0)
+		if (Iteration % 5 == 0)
 		{
-			update_mesh(iteration);
+			UpdateMesh(Iteration);
 		}
 
-		// clear dirty flag
-		loopi(0, triangles.size()) triangles[i].dirty = 0;
+		for (FTriangle& Triangle : Triangles)
+		{
+			Triangle.bDirty = false;
+		}
 
 		//
 		// All triangles with edges below the threshold will be removed
@@ -94,80 +94,88 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 		// The following numbers works well for most models.
 		// If it does not, try to adjust the 3 parameters
 		//
-		double threshold = 0.000000001 * pow(double(iteration + 3), Aggressiveness);
+		double Threshold = 0.000000001 * pow(double(Iteration + 3), Aggressiveness);
 
 		// remove vertices & mark deleted triangles
-		loopi(0, triangles.size())
+		for (FTriangle& Triangle : Triangles)
 		{
-			FTriangle& t = triangles[i];
-			if (t.err[3] > threshold) continue;
-			if (t.deleted) continue;
-			if (t.dirty) continue;
-
-			loopj(0, 3)if (t.err[j] < threshold)
+			if (Triangle.err[3] > Threshold) continue;
+			if (Triangle.bDeleted)
 			{
+				continue;
+			}
 
-				int i0 = t.v[j]; FVertex& v0 = Vertices[i0];
-				int i1 = t.v[(j + 1) % 3]; FVertex& v1 = Vertices[i1];
-				// Border check
-				if (v0.border != v1.border)  continue;
+			if (Triangle.bDirty)
+			{
+				continue;
+			}
 
-				// Compute vertex to collapse to
-				FVector p;
-				CalculateError(i0, i1, p);
-				Deleted0.SetNum(v0.tcount); // normals temporarily
-				Deleted1.SetNum(v1.tcount); // normals temporarily
-				// don't remove if flipped
-				if (IsFlipped(p, i0, i1, v0, v1, Deleted0)) continue;
-
-				if (IsFlipped(p, i1, i0, v1, v0, Deleted1)) continue;
-
-				if (SourcePrimitive.Normals.Num() > 0)
+			for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+			{
+				if (Triangle.err[VertexIndex] < Threshold)
 				{
-					UpdateVertexNormals(i0, v0, p, Deleted0);
-					UpdateVertexNormals(i0, v1, p, Deleted1);
+
+					int i0 = Triangle.Vertices[VertexIndex]; FVertex& v0 = Vertices[i0];
+					int i1 = Triangle.Vertices[(VertexIndex + 1) % 3]; FVertex& v1 = Vertices[i1];
+					// Border check
+					if (v0.bIsBorder != v1.bIsBorder)  continue;
+
+					// Compute vertex to collapse to
+					FVector p;
+					CalculateError(i0, i1, p);
+					Deleted0.SetNum(v0.tcount); // normals temporarily
+					Deleted1.SetNum(v1.tcount); // normals temporarily
+					// don't remove if flipped
+					if (IsFlipped(p, i0, i1, v0, v1, Deleted0)) continue;
+
+					if (IsFlipped(p, i1, i0, v1, v0, Deleted1)) continue;
+
+					if (SourcePrimitive.Normals.Num() > 0)
+					{
+						UpdateVertexNormals(i0, v0, p, Deleted0);
+						UpdateVertexNormals(i0, v1, p, Deleted1);
+					}
+
+					if (SourcePrimitive.Tangents.Num() > 0)
+					{
+						UpdateVertexTangents(i0, v0, p, Deleted0);
+						UpdateVertexTangents(i0, v1, p, Deleted1);
+					}
+
+					if (SourcePrimitive.Colors.Num() > 0)
+					{
+						UpdateVertexColors(i0, v0, p, Deleted0);
+						UpdateVertexColors(i0, v1, p, Deleted1);
+					}
+
+					if (SourcePrimitive.UVs.Num() > 0)
+					{
+						UpdateVertexUVs(i0, v0, p, Deleted0);
+						UpdateVertexUVs(i0, v1, p, Deleted1);
+					}
+
+					// not flipped, so remove edge
+					v0.Position = p;
+					v0.q = v1.q + v0.q;
+					int tstart = Refs.Num();
+
+					UpdateTriangles(i0, v0, Deleted0, DeletedTriangles);
+					UpdateTriangles(i0, v1, Deleted1, DeletedTriangles);
+
+					int tcount = Refs.Num() - tstart;
+
+					if (tcount <= v0.tcount)
+					{
+						// save ram
+						if (tcount)memcpy(&Refs[v0.tstart], &Refs[tstart], tcount * sizeof(FRef));
+					}
+					else
+						// append
+						v0.tstart = tstart;
+
+					v0.tcount = tcount;
+					break;
 				}
-
-				if (SourcePrimitive.Tangents.Num() > 0)
-				{
-					UpdateVertexTangents(i0, v0, p, Deleted0);
-					UpdateVertexTangents(i0, v1, p, Deleted1);
-				}
-
-				if (SourcePrimitive.Colors.Num() > 0)
-				{
-					UpdateVertexColors(i0, v0, p, Deleted0);
-					UpdateVertexColors(i0, v1, p, Deleted1);
-				}
-
-				if (SourcePrimitive.UVs.Num() > 0)
-				{
-					UpdateVertexUVs(i0, v0, p, Deleted0);
-					UpdateVertexUVs(i0, v1, p, Deleted1);
-				}
-
-
-				// not flipped, so remove edge
-				v0.Position = p;
-				v0.q = v1.q + v0.q;
-				int tstart = refs.size();
-
-				UpdateTriangles(i0, v0, Deleted0, DeletedTriangles);
-				UpdateTriangles(i0, v1, Deleted1, DeletedTriangles);
-
-				int tcount = refs.size() - tstart;
-
-				if (tcount <= v0.tcount)
-				{
-					// save ram
-					if (tcount)memcpy(&refs[v0.tstart], &refs[tstart], tcount * sizeof(FRef));
-				}
-				else
-					// append
-					v0.tstart = tstart;
-
-				v0.tcount = tcount;
-				break;
 			}
 			// done?
 			if (TriangleCount - DeletedTriangles <= TargetCount)break;
@@ -213,41 +221,68 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 		DestinationPrimitive.UVs[0].AddZeroed(Vertices.Num());
 	}
 
-	for (const FTriangle& Triangle : triangles)
+	for (const FTriangle& Triangle : Triangles)
 	{
-		DestinationPrimitive.Indices.Add(Triangle.v[0]);
-		DestinationPrimitive.Indices.Add(Triangle.v[1]);
-		DestinationPrimitive.Indices.Add(Triangle.v[2]);
+		DestinationPrimitive.Indices.Add(Triangle.Vertices[0]);
+		DestinationPrimitive.Indices.Add(Triangle.Vertices[1]);
+		DestinationPrimitive.Indices.Add(Triangle.Vertices[2]);
 
 		if (SourcePrimitive.Normals.Num() > 0)
 		{
-			DestinationPrimitive.Normals[Triangle.v[0]] = Triangle.Normals[0];
-			DestinationPrimitive.Normals[Triangle.v[1]] = Triangle.Normals[1];
-			DestinationPrimitive.Normals[Triangle.v[2]] = Triangle.Normals[2];
+			DestinationPrimitive.Normals[Triangle.Vertices[0]] = Triangle.Normals[0];
+			DestinationPrimitive.Normals[Triangle.Vertices[1]] = Triangle.Normals[1];
+			DestinationPrimitive.Normals[Triangle.Vertices[2]] = Triangle.Normals[2];
 		}
 
 		if (SourcePrimitive.Tangents.Num() > 0)
 		{
-			DestinationPrimitive.Tangents[Triangle.v[0]] = Triangle.Tangents[0];
-			DestinationPrimitive.Tangents[Triangle.v[1]] = Triangle.Tangents[1];
-			DestinationPrimitive.Tangents[Triangle.v[2]] = Triangle.Tangents[2];
+			DestinationPrimitive.Tangents[Triangle.Vertices[0]] = Triangle.Tangents[0];
+			DestinationPrimitive.Tangents[Triangle.Vertices[1]] = Triangle.Tangents[1];
+			DestinationPrimitive.Tangents[Triangle.Vertices[2]] = Triangle.Tangents[2];
 		}
 
 		if (SourcePrimitive.Colors.Num() > 0)
 		{
-			DestinationPrimitive.Colors[Triangle.v[0]] = Triangle.Colors[0];
-			DestinationPrimitive.Colors[Triangle.v[1]] = Triangle.Colors[1];
-			DestinationPrimitive.Colors[Triangle.v[2]] = Triangle.Colors[2];
+			DestinationPrimitive.Colors[Triangle.Vertices[0]] = Triangle.Colors[0];
+			DestinationPrimitive.Colors[Triangle.Vertices[1]] = Triangle.Colors[1];
+			DestinationPrimitive.Colors[Triangle.Vertices[2]] = Triangle.Colors[2];
 		}
 
 		if (SourcePrimitive.UVs.Num() > 0)
 		{
-			DestinationPrimitive.UVs[0][Triangle.v[0]] = FVector2D(Triangle.UV[0].X, Triangle.UV[0].Y);
-			DestinationPrimitive.UVs[0][Triangle.v[1]] = FVector2D(Triangle.UV[1].X, Triangle.UV[1].Y);
-			DestinationPrimitive.UVs[0][Triangle.v[2]] = FVector2D(Triangle.UV[2].X, Triangle.UV[2].Y);
+			DestinationPrimitive.UVs[0][Triangle.Vertices[0]] = FVector2D(Triangle.UV[0].X, Triangle.UV[0].Y);
+			DestinationPrimitive.UVs[0][Triangle.Vertices[1]] = FVector2D(Triangle.UV[1].X, Triangle.UV[1].Y);
+			DestinationPrimitive.UVs[0][Triangle.Vertices[2]] = FVector2D(Triangle.UV[2].X, Triangle.UV[2].Y);
 		}
 
 	}
 
 	DestinationPrimitive.Material = SourcePrimitive.Material;
+}
+
+void FglTFRuntimeMeshReducer::UpdateTriangles(int i0, FVertex& Vertex, const TArray<int32>& Deleted, int32& DeletedTriangles)
+{
+	FVector Point;
+	for (int32 Index = 0; Index < Vertex.tcount; Index++)
+	{
+		FRef RefCopy = Refs[Vertex.tstart + Index];
+		FTriangle& Triangle = Triangles[RefCopy.TriangleId];
+		if (Triangle.bDeleted)
+		{
+			continue;
+		}
+		if (Deleted[Index])
+		{
+			Triangle.bDeleted = true;
+			DeletedTriangles++;
+			continue;
+		}
+		Triangle.Vertices[RefCopy.TriangleVertexId] = i0;
+		Triangle.bDirty = true;
+		Triangle.err[0] = CalculateError(Triangle.Vertices[0], Triangle.Vertices[1], Point);
+		Triangle.err[1] = CalculateError(Triangle.Vertices[1], Triangle.Vertices[2], Point);
+		Triangle.err[2] = CalculateError(Triangle.Vertices[2], Triangle.Vertices[0], Point);
+		Triangle.err[3] = FMath::Min(Triangle.err[0], FMath::Min(Triangle.err[1], Triangle.err[2]));
+		Refs.Add(RefCopy);
+	}
 }

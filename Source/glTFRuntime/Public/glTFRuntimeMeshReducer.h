@@ -1,12 +1,20 @@
 // Copyright 2020, Roberto De Ioris.
 
+/*
+	This is a reimplementation + search&replace of
+	Sven Fortsmann's https://github.com/sp4cerat/Fast-Quadric-Mesh-Simplification
+
+	Main modifications are usage of Unreal structures and renaming variables
+	to "meaningful" names.
+
+*/
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "glTFRuntimeParser.h"
 
 #define loopi(start_l,end_l) for ( int i=start_l;i<end_l;++i )
-#define loopj(start_l,end_l) for ( int j=start_l;j<end_l;++j )
 
 /**
  *
@@ -77,9 +85,10 @@ public:
 
 	struct FTriangle
 	{
-		uint32 v[3];
+		uint32 Vertices[3];
 		double err[4];
-		int deleted, dirty;
+		bool bDeleted;
+		bool bDirty;
 		FVector Normal;
 
 		FVector UV[3];
@@ -98,7 +107,7 @@ public:
 		FVector Position;
 		int tstart, tcount;
 		FQuadricMatrix q;
-		int border;
+		bool bIsBorder;
 
 		FglTFRuntimeUInt16Vector4 Joints;
 		FVector4 Weights;
@@ -109,35 +118,32 @@ public:
 		}
 	};
 
-	struct FRef { int tid, tvertex; };
-	std::vector<FTriangle> triangles;
-	TArray<FVertex> Vertices;
-	std::vector<FRef> refs;
+	struct FRef
+	{
+		int32 TriangleId;
+		int32 TriangleVertexId;
+	};
 
-	//
-	// Main simplification function
-	//
-	// target_count  : target nr. of triangles
-	// agressiveness : sharpness to increase the threshold.
-	//                 5..8 are good numbers
-	//                 more iterations yield higher quality
-	//
+	TArray<FTriangle> Triangles;
+	TArray<FVertex> Vertices;
+	TArray<FRef> Refs;
 
 	void SimplifyMesh(FglTFRuntimePrimitive& DestinationPrimitive, const float ReductionFactor, const double Aggressiveness = 7);
-
-	// Check if a triangle flips when this edge is removed
 
 	bool IsFlipped(FVector p, int i0, int i1, FVertex& v0, FVertex& v1, TArray<int32>& Deleted)
 	{
 
 		for (int32 k = 0; k < v0.tcount; k++)
 		{
-			FTriangle& Triangle = triangles[refs[v0.tstart + k].tid];
-			if (Triangle.deleted)continue;
+			FTriangle& Triangle = Triangles[Refs[v0.tstart + k].TriangleId];
+			if (Triangle.bDeleted)
+			{
+				continue;
+			}
 
-			int s = refs[v0.tstart + k].tvertex;
-			int id1 = Triangle.v[(s + 1) % 3];
-			int id2 = Triangle.v[(s + 2) % 3];
+			int s = Refs[v0.tstart + k].TriangleVertexId;
+			int id1 = Triangle.Vertices[(s + 1) % 3];
+			int id2 = Triangle.Vertices[(s + 2) % 3];
 
 			if (id1 == i1 || id2 == i1) // delete ?
 			{
@@ -186,14 +192,17 @@ public:
 	{
 		for (int32 k = 0; k < v.tcount; k++)
 		{
-			FRef& r = refs[v.tstart + k];
-			FTriangle& t = triangles[r.tid];
-			if (t.deleted)continue;
+			FRef& r = Refs[v.tstart + k];
+			FTriangle& t = Triangles[r.TriangleId];
+			if (t.bDeleted)
+			{
+				continue;
+			}
 			if (Deleted[k])continue;
-			FVector p1 = Vertices[t.v[0]].Position;
-			FVector p2 = Vertices[t.v[1]].Position;
-			FVector p3 = Vertices[t.v[2]].Position;
-			t.UV[r.tvertex] = Interpolate(p, p1, p2, p3, t.UV);
+			FVector p1 = Vertices[t.Vertices[0]].Position;
+			FVector p2 = Vertices[t.Vertices[1]].Position;
+			FVector p3 = Vertices[t.Vertices[2]].Position;
+			t.UV[r.TriangleVertexId] = Interpolate(p, p1, p2, p3, t.UV);
 		}
 	}
 
@@ -201,14 +210,17 @@ public:
 	{
 		for (int32 k = 0; k < v.tcount; k++)
 		{
-			FRef& r = refs[v.tstart + k];
-			FTriangle& t = triangles[r.tid];
-			if (t.deleted)continue;
+			FRef& r = Refs[v.tstart + k];
+			FTriangle& t = Triangles[r.TriangleId];
+			if (t.bDeleted)
+			{
+				continue;
+			}
 			if (Deleted[k])continue;
-			FVector p1 = Vertices[t.v[0]].Position;
-			FVector p2 = Vertices[t.v[1]].Position;
-			FVector p3 = Vertices[t.v[2]].Position;
-			t.UV[r.tvertex] = Interpolate(p, p1, p2, p3, t.UV);
+			FVector p1 = Vertices[t.Vertices[0]].Position;
+			FVector p2 = Vertices[t.Vertices[1]].Position;
+			FVector p3 = Vertices[t.Vertices[2]].Position;
+			t.UV[r.TriangleVertexId] = Interpolate(p, p1, p2, p3, t.UV);
 		}
 	}
 
@@ -216,14 +228,17 @@ public:
 	{
 		for (int32 k = 0; k < v.tcount; k++)
 		{
-			FRef& r = refs[v.tstart + k];
-			FTriangle& t = triangles[r.tid];
-			if (t.deleted)continue;
+			FRef& r = Refs[v.tstart + k];
+			FTriangle& t = Triangles[r.TriangleId];
+			if (t.bDeleted)
+			{
+				continue;
+			}
 			if (Deleted[k])continue;
-			FVector p1 = Vertices[t.v[0]].Position;
-			FVector p2 = Vertices[t.v[1]].Position;
-			FVector p3 = Vertices[t.v[2]].Position;
-			t.Tangents[r.tvertex] = Interpolate(p, p1, p2, p3, t.Tangents);
+			FVector p1 = Vertices[t.Vertices[0]].Position;
+			FVector p2 = Vertices[t.Vertices[1]].Position;
+			FVector p3 = Vertices[t.Vertices[2]].Position;
+			t.Tangents[r.TriangleVertexId] = Interpolate(p, p1, p2, p3, t.Tangents);
 		}
 	}
 
@@ -231,162 +246,153 @@ public:
 	{
 		for (int32 k = 0; k < v.tcount; k++)
 		{
-			FRef& r = refs[v.tstart + k];
-			FTriangle& t = triangles[r.tid];
-			if (t.deleted)continue;
-			if (Deleted[k])continue;
-			FVector p1 = Vertices[t.v[0]].Position;
-			FVector p2 = Vertices[t.v[1]].Position;
-			FVector p3 = Vertices[t.v[2]].Position;
-			t.Colors[r.tvertex] = Interpolate(p, p1, p2, p3, t.Colors);
-		}
-	}
-
-	// Update triangle connections and edge error after a edge is collapsed
-
-	void UpdateTriangles(int i0, FVertex& v, const TArray<int32>& Deleted, int32& DeletedTriangles)
-	{
-		FVector p;
-		for (int32 k = 0; k < v.tcount; k++)
-		{
-			FRef& r = refs[v.tstart + k];
-			FTriangle& t = triangles[r.tid];
-			if (t.deleted)continue;
-			if (Deleted[k])
+			FRef& r = Refs[v.tstart + k];
+			FTriangle& t = Triangles[r.TriangleId];
+			if (t.bDeleted)
 			{
-				t.deleted = 1;
-				DeletedTriangles++;
 				continue;
 			}
-			t.v[r.tvertex] = i0;
-			t.dirty = 1;
-			t.err[0] = CalculateError(t.v[0], t.v[1], p);
-			t.err[1] = CalculateError(t.v[1], t.v[2], p);
-			t.err[2] = CalculateError(t.v[2], t.v[0], p);
-			t.err[3] = FMath::Min(t.err[0], FMath::Min(t.err[1], t.err[2]));
-			refs.push_back(r);
+			if (Deleted[k])continue;
+			FVector p1 = Vertices[t.Vertices[0]].Position;
+			FVector p2 = Vertices[t.Vertices[1]].Position;
+			FVector p3 = Vertices[t.Vertices[2]].Position;
+			t.Colors[r.TriangleVertexId] = Interpolate(p, p1, p2, p3, t.Colors);
 		}
 	}
 
-	// compact triangles, compute edge error and build reference list
+	void UpdateTriangles(int i0, FVertex& Vertex, const TArray<int32>& Deleted, int32& DeletedTriangles);
 
-	void update_mesh(int iteration)
+	void UpdateMesh(int32 Iteration)
 	{
-		if (iteration > 0) // compact triangles
+		if (Iteration > 0) // compact triangles
 		{
 			int dst = 0;
-			loopi(0, triangles.size())
-				if (!triangles[i].deleted)
+			loopi(0, Triangles.Num())
+				if (!Triangles[i].bDeleted)
 				{
-					triangles[dst++] = triangles[i];
+					Triangles[dst++] = Triangles[i];
 				}
-			triangles.resize(dst);
-		}
-		//
-		// Init Quadrics by Plane & Edge Errors
-		//
-		// required at the beginning ( iteration == 0 )
-		// recomputing during the simplification is not required,
-		// but mostly improves the result for closed meshes
-		//
-		if (iteration == 0)
-		{
-			loopi(0, Vertices.Num())
-				Vertices[i].q = FQuadricMatrix(0.0);
-
-			loopi(0, triangles.size())
-			{
-				FTriangle& t = triangles[i];
-				FVector p[3];
-				loopj(0, 3) p[j] = Vertices[t.v[j]].Position;
-				t.Normal = FVector::CrossProduct(p[1] - p[0], p[2] - p[0]).GetSafeNormal();
-				loopj(0, 3) Vertices[t.v[j]].q =
-					Vertices[t.v[j]].q + FQuadricMatrix(t.Normal.X, t.Normal.Y, t.Normal.Z, FVector::DotProduct(-t.Normal, p[0]));
-			}
-			loopi(0, triangles.size())
-			{
-				// Calc Edge Error
-				FTriangle& t = triangles[i]; FVector p;
-				loopj(0, 3) t.err[j] = CalculateError(t.v[j], t.v[(j + 1) % 3], p);
-				t.err[3] = FMath::Min(t.err[0], FMath::Min(t.err[1], t.err[2]));
-			}
+			Triangles.SetNum(dst);
 		}
 
-		// Init Reference ID list
-		loopi(0, Vertices.Num())
+		if (Iteration == 0)
 		{
-			Vertices[i].tstart = 0;
-			Vertices[i].tcount = 0;
+			for (FVertex& Vertex : Vertices)
+			{
+				Vertex.q = FQuadricMatrix(0.0);
+			}
+
+			for (FTriangle& Triangle : Triangles)
+			{
+				FVector Points[3];
+				for (int32 PointIndex = 0; PointIndex < 3; PointIndex++)
+				{
+					Points[PointIndex] = Vertices[Triangle.Vertices[PointIndex]].Position;
+				}
+				Triangle.Normal = FVector::CrossProduct(Points[1] - Points[0], Points[2] - Points[0]).GetSafeNormal();
+				for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+				{
+					Vertices[Triangle.Vertices[VertexIndex]].q =
+						Vertices[Triangle.Vertices[VertexIndex]].q + FQuadricMatrix(Triangle.Normal.X, Triangle.Normal.Y, Triangle.Normal.Z, FVector::DotProduct(-Triangle.Normal, Points[0]));
+				}
+			}
+
+			for (FTriangle& Triangle : Triangles)
+			{
+				FVector Point;
+				for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+				{
+					Triangle.err[VertexIndex] = CalculateError(Triangle.Vertices[VertexIndex], Triangle.Vertices[(VertexIndex + 1) % 3], Point);
+				}
+				Triangle.err[3] = FMath::Min(Triangle.err[0], FMath::Min(Triangle.err[1], Triangle.err[2]));
+			}
 		}
-		loopi(0, triangles.size())
+
+		for (FVertex& Vertex : Vertices)
 		{
-			FTriangle& t = triangles[i];
-			loopj(0, 3) Vertices[t.v[j]].tcount++;
+			Vertex.tstart = 0;
+			Vertex.tcount = 0;
 		}
+
+		for (FTriangle& Triangle : Triangles)
+		{
+			for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+			{
+				Vertices[Triangle.Vertices[VertexIndex]].tcount++;
+			}
+		}
+
 		int tstart = 0;
-		loopi(0, Vertices.Num())
+		for (FVertex& Vertex : Vertices)
 		{
-			FVertex& v = Vertices[i];
-			v.tstart = tstart;
-			tstart += v.tcount;
-			v.tcount = 0;
+			Vertex.tstart = tstart;
+			tstart += Vertex.tcount;
+			Vertex.tcount = 0;
 		}
 
-		// Write References
-		refs.resize(triangles.size() * 3);
-		loopi(0, triangles.size())
+		Refs.SetNum(Triangles.Num() * 3);
+		for (int32 TriangleIndex = 0; TriangleIndex < Triangles.Num(); TriangleIndex++)
 		{
-			FTriangle& t = triangles[i];
-			loopj(0, 3)
+			FTriangle& Triangle = Triangles[TriangleIndex];
+			for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
 			{
-				FVertex& v = Vertices[t.v[j]];
-				refs[v.tstart + v.tcount].tid = i;
-				refs[v.tstart + v.tcount].tvertex = j;
-				v.tcount++;
+				FVertex& Vertex = Vertices[Triangle.Vertices[VertexIndex]];
+				Refs[Vertex.tstart + Vertex.tcount].TriangleId = TriangleIndex;
+				Refs[Vertex.tstart + Vertex.tcount].TriangleVertexId = VertexIndex;
+				Vertex.tcount++;
 			}
 		}
 
 		// Identify boundary : vertices[].border=0,1
-		if (iteration == 0)
+		if (Iteration == 0)
 		{
-			std::vector<int> vcount, vids;
+			TArray<int32> vcount;
+			TArray<int32>	vids;
 
-			loopi(0, Vertices.Num())
-				Vertices[i].border = 0;
+			for (FVertex& Vertex : Vertices)
+			{
+				Vertex.bIsBorder = false;
+			}
 
 			loopi(0, Vertices.Num())
 			{
 				FVertex& v = Vertices[i];
-				vcount.clear();
-				vids.clear();
-				loopj(0, v.tcount)
+				vcount.Empty();
+				vids.Empty();
+				for (int32 TriangleIndex = 0; TriangleIndex < v.tcount; TriangleIndex++)
 				{
-					int k = refs[v.tstart + j].tid;
-					FTriangle& t = triangles[k];
+					int k = Refs[v.tstart + TriangleIndex].TriangleId;
+					FTriangle& t = Triangles[k];
 					for (int32 Index = 0; Index < 3; Index++)
 					{
-						int ofs = 0, id = t.v[Index];
-						while (ofs < vcount.size())
+						int ofs = 0, id = t.Vertices[Index];
+						while (ofs < vcount.Num())
 						{
-							if (vids[ofs] == id)break;
+							if (vids[ofs] == id)
+							{
+								break;
+							}
 							ofs++;
 						}
-						if (ofs == vcount.size())
+						if (ofs == vcount.Num())
 						{
-							vcount.push_back(1);
-							vids.push_back(id);
+							vcount.Add(1);
+							vids.Add(id);
 						}
 						else
 							vcount[ofs]++;
 					}
 				}
-				loopj(0, vcount.size()) if (vcount[j] == 1)
-					Vertices[vids[j]].border = 1;
+				for (int32 VertexIndex = 0; VertexIndex < vcount.Num(); VertexIndex++)
+				{
+					if (vcount[VertexIndex] == 1)
+					{
+						Vertices[vids[VertexIndex]].bIsBorder = true;
+					}
+				}
 			}
 		}
 	}
-
-	// Finally compact mesh before exiting
 
 	void CompactMesh()
 	{
@@ -395,14 +401,17 @@ public:
 		{
 			Vertex.tcount = 0;
 		}
-		loopi(0, triangles.size())
-			if (!triangles[i].deleted)
+		loopi(0, Triangles.Num())
+			if (!Triangles[i].bDeleted)
 			{
-				FTriangle& t = triangles[i];
-				triangles[NewSize++] = t;
-				loopj(0, 3)Vertices[t.v[j]].tcount = 1;
+				FTriangle& t = Triangles[i];
+				Triangles[NewSize++] = t;
+				for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+				{
+					Vertices[t.Vertices[VertexIndex]].tcount = 1;
+				}
 			}
-		triangles.resize(NewSize);
+		Triangles.SetNum(NewSize);
 		NewSize = 0;
 		loopi(0, Vertices.Num())
 			if (Vertices[i].tcount)
@@ -411,10 +420,13 @@ public:
 				Vertices[NewSize].Position = Vertices[i].Position;
 				NewSize++;
 			}
-		loopi(0, triangles.size())
+		loopi(0, Triangles.Num())
 		{
-			FTriangle& t = triangles[i];
-			loopj(0, 3)t.v[j] = Vertices[t.v[j]].tstart;
+			FTriangle& t = Triangles[i];
+			for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+			{
+				t.Vertices[VertexIndex] = Vertices[t.Vertices[VertexIndex]].tstart;
+			}
 		}
 		Vertices.SetNum(NewSize);
 	}
@@ -434,10 +446,10 @@ public:
 		// compute interpolated vertex
 
 		FQuadricMatrix q = Vertices[id_v1].q + Vertices[id_v2].q;
-		bool   border = Vertices[id_v1].border & Vertices[id_v2].border;
+		bool bIsBorder = Vertices[id_v1].bIsBorder && Vertices[id_v2].bIsBorder;
 		double error = 0;
 		double det = q.det(0, 1, 2, 1, 4, 5, 2, 5, 7);
-		if (det != 0 && !border)
+		if (det != 0 && !bIsBorder)
 		{
 
 			// q_delta is invertible

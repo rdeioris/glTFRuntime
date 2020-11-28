@@ -1294,6 +1294,46 @@ bool FglTFRuntimeParser::LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* Js
 
 		Primitives.Add(Primitive);
 	}
+
+	if (MaterialsConfig.bMergeSectionsByMaterial)
+	{
+		TMap<UMaterialInterface*, TArray<FglTFRuntimePrimitive>> PrimitivesMap;
+		for (FglTFRuntimePrimitive& Primitive : Primitives)
+		{
+			if (PrimitivesMap.Contains(Primitive.Material))
+			{
+				PrimitivesMap[Primitive.Material].Add(Primitive);
+			}
+			else
+			{
+				TArray<FglTFRuntimePrimitive> NewPrimitives;
+				NewPrimitives.Add(Primitive);
+				PrimitivesMap.Add(Primitive.Material, NewPrimitives);
+			}
+		}
+
+		TArray<FglTFRuntimePrimitive> MergedPrimitives;
+		for (TPair<UMaterialInterface*, TArray<FglTFRuntimePrimitive>>& Pair : PrimitivesMap)
+		{
+			FglTFRuntimePrimitive MergedPrimitive;
+			if (MergePrimitives(Pair.Value, MergedPrimitive))
+			{
+				MergedPrimitives.Add(MergedPrimitive);
+			}
+			else
+			{
+				// unable to merge, just leave as is
+				for (FglTFRuntimePrimitive& Primitive : Pair.Value)
+				{
+					MergedPrimitives.Add(Primitive);
+				}
+			}
+		}
+
+		Primitives = MergedPrimitives;
+
+	}
+
 	return true;
 }
 
@@ -1960,4 +2000,107 @@ float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float
 	FirstIndex = SecondIndex - 1;
 
 	return (WantedTime - FramesTimes[FirstIndex]) / FramesTimes[SecondIndex];
+}
+
+bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive)
+{
+	if (SourcePrimitives.Num() < 1)
+	{
+		return false;
+	}
+
+	FglTFRuntimePrimitive& MainPrimitive = SourcePrimitives[0];
+	for (FglTFRuntimePrimitive& SourcePrimitive : SourcePrimitives)
+	{
+		if (FMath::Clamp(SourcePrimitive.Positions.Num(), 0, 1) != FMath::Clamp(MainPrimitive.Positions.Num(), 0, 1))
+		{
+			return false;
+		}
+
+		if (FMath::Clamp(SourcePrimitive.Normals.Num(), 0, 1) != FMath::Clamp(MainPrimitive.Normals.Num(), 0, 1))
+		{
+			return false;
+		}
+
+		if (FMath::Clamp(SourcePrimitive.Tangents.Num(), 0, 1) != FMath::Clamp(MainPrimitive.Tangents.Num(), 0, 1))
+		{
+			return false;
+		}
+
+		if (FMath::Clamp(SourcePrimitive.Colors.Num(), 0, 1) != FMath::Clamp(MainPrimitive.Colors.Num(), 0, 1))
+		{
+			return false;
+		}
+
+		if (SourcePrimitive.UVs.Num() != MainPrimitive.UVs.Num())
+		{
+			return false;
+		}
+
+		if (SourcePrimitive.Joints.Num() != MainPrimitive.Joints.Num())
+		{
+			return false;
+		}
+
+		if (SourcePrimitive.Weights.Num() != MainPrimitive.Weights.Num())
+		{
+			return false;
+		}
+
+		if (SourcePrimitive.MorphTargets.Num() != MainPrimitive.MorphTargets.Num())
+		{
+			return false;
+		}
+	}
+
+	uint32 BaseIndex = 0;
+	for (FglTFRuntimePrimitive& SourcePrimitive : SourcePrimitives)
+	{
+		OutPrimitive.Material = SourcePrimitive.Material;
+		for (uint32 Index : SourcePrimitive.Indices)
+		{
+			OutPrimitive.Indices.Add(Index + BaseIndex);
+		}
+
+		if (BaseIndex == 0)
+		{
+			OutPrimitive.UVs = SourcePrimitive.UVs;
+			OutPrimitive.Joints = SourcePrimitive.Joints;
+			OutPrimitive.Weights = SourcePrimitive.Weights;
+			OutPrimitive.MorphTargets = SourcePrimitive.MorphTargets;
+		}
+		else
+		{
+			for (int32 UVChannel = 0; UVChannel < OutPrimitive.UVs.Num(); UVChannel++)
+			{
+				OutPrimitive.UVs[UVChannel].Append(SourcePrimitive.UVs[UVChannel]);
+			}
+
+			for (int32 JointsIndex = 0; JointsIndex < OutPrimitive.Joints.Num(); JointsIndex++)
+			{
+				OutPrimitive.Joints[JointsIndex].Append(SourcePrimitive.Joints[JointsIndex]);
+
+			}
+
+			for (int32 WeightsIndex = 0; WeightsIndex < OutPrimitive.Weights.Num(); WeightsIndex++)
+			{
+				OutPrimitive.Weights[WeightsIndex].Append(SourcePrimitive.Weights[WeightsIndex]);
+			}
+
+			for (int32 MorphTargetsIndex = 0; MorphTargetsIndex < OutPrimitive.MorphTargets.Num(); MorphTargetsIndex++)
+			{
+				OutPrimitive.MorphTargets[MorphTargetsIndex].Positions.Append(SourcePrimitive.MorphTargets[MorphTargetsIndex].Positions);
+				OutPrimitive.MorphTargets[MorphTargetsIndex].Normals.Append(SourcePrimitive.MorphTargets[MorphTargetsIndex].Normals);
+			}
+		}
+
+		OutPrimitive.Positions.Append(SourcePrimitive.Positions);
+		OutPrimitive.Normals.Append(SourcePrimitive.Normals);
+		OutPrimitive.Tangents.Append(SourcePrimitive.Tangents);
+		OutPrimitive.Colors.Append(SourcePrimitive.Colors);
+
+		BaseIndex += SourcePrimitive.Positions.Num();
+	}
+
+	return true;
 }
