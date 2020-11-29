@@ -536,7 +536,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 		}
 
 		TArray<FVector4> Values;
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", Values, { 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, true))
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", Values, { 1, 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, true))
 		{
 			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"output\" from sampler %d"), SamplerIndex));
 			return false;
@@ -549,7 +549,10 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 		}
 
 		if (Timeline.Num() != Values.Num())
+		{
+			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for sampler %d"), Timeline.Num(), Values.Num(), SamplerIndex));
 			return false;
+		}
 
 		// get animation valid duration
 		for (float Time : Timeline)

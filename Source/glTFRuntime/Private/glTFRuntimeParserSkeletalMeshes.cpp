@@ -161,41 +161,44 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 				int32 WedgeIndex = Wedges.Add(Wedge);
 
-				for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
+				if (!SkeletalMeshContext->SkeletalMeshConfig.bIgnoreSkin && SkeletalMeshContext->SkinIndex > INDEX_NONE)
 				{
-					FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][PrimitiveIndex];
-					FVector4 Weights = Primitive.Weights[JointsIndex][PrimitiveIndex];
-					// 4 bones for each joints list
-					for (int32 JointPartIndex = 0; JointPartIndex < 4; JointPartIndex++)
+					for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
 					{
-						if (BoneMapInUse.Contains(Joints[JointPartIndex]))
+						FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][PrimitiveIndex];
+						FVector4 Weights = Primitive.Weights[JointsIndex][PrimitiveIndex];
+						// 4 bones for each joints list
+						for (int32 JointPartIndex = 0; JointPartIndex < 4; JointPartIndex++)
 						{
-							SkeletalMeshImportData::FRawBoneInfluence Influence;
-							Influence.VertexIndex = Wedge.VertexIndex;
-							int32 BoneIndex = INDEX_NONE;
-							if (BonesCacheInUse.Contains(Joints[JointPartIndex]))
+							if (BoneMapInUse.Contains(Joints[JointPartIndex]))
 							{
-								BoneIndex = BonesCacheInUse[Joints[JointPartIndex]];
+								SkeletalMeshImportData::FRawBoneInfluence Influence;
+								Influence.VertexIndex = Wedge.VertexIndex;
+								int32 BoneIndex = INDEX_NONE;
+								if (BonesCacheInUse.Contains(Joints[JointPartIndex]))
+								{
+									BoneIndex = BonesCacheInUse[Joints[JointPartIndex]];
+								}
+								else
+								{
+									BoneIndex = SkeletalMeshContext->SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMapInUse[Joints[JointPartIndex]]);
+									BonesCacheInUse.Add(Joints[JointPartIndex], BoneIndex);
+								}
+								Influence.BoneIndex = BoneIndex;
+								Influence.Weight = Weights[JointPartIndex];
+								TPair<int32, int32> InfluenceKey = TPair<int32, int32>(Influence.VertexIndex, Influence.BoneIndex);
+								// do not waste cpu time processing zero influences
+								if (!FMath::IsNearlyZero(Influence.Weight, KINDA_SMALL_NUMBER) && !InfluencesMap.Contains(InfluenceKey))
+								{
+									Influences.Add(Influence);
+									InfluencesMap.Add(InfluenceKey);
+								}
 							}
 							else
 							{
-								BoneIndex = SkeletalMeshContext->SkeletalMesh->RefSkeleton.FindBoneIndex(BoneMapInUse[Joints[JointPartIndex]]);
-								BonesCacheInUse.Add(Joints[JointPartIndex], BoneIndex);
+								AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[JointPartIndex]));
+								return nullptr;
 							}
-							Influence.BoneIndex = BoneIndex;
-							Influence.Weight = Weights[JointPartIndex];
-							TPair<int32, int32> InfluenceKey = TPair<int32, int32>(Influence.VertexIndex, Influence.BoneIndex);
-							// do not waste cpu time processing zero influences
-							if (!FMath::IsNearlyZero(Influence.Weight, KINDA_SMALL_NUMBER) && !InfluencesMap.Contains(InfluenceKey))
-							{
-								Influences.Add(Influence);
-								InfluencesMap.Add(InfluenceKey);
-							}
-						}
-						else
-						{
-							AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[JointPartIndex]));
-							return nullptr;
 						}
 					}
 				}
@@ -294,6 +297,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				FSkeletalMeshImportData MorphTargetImportData;
 				LOD.ImportData.CopyDataNeedByMorphTargetImport(MorphTargetImportData);
 				MorphTargetImportData.Points = MorphTargetPositions;
+				UE_LOG(LogTemp, Error, TEXT("MorphTargets positions for %d: %d"), MorphTargetIndex, MorphTargetPositions.Num());
 				MorphTargetsData.Add(MorphTargetImportData);
 				const FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
 				MorphTargetNames.Add(MorphTargetName);
@@ -304,7 +308,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		LOD.ImportData.MorphTargetModifiedPoints = MorphTargetModifiedPoints;
 		LOD.ImportData.MorphTargets = MorphTargetsData;
 		LOD.ImportData.MorphTargetNames = MorphTargetNames;
-
 
 		ImportedResource->LODModels.Add(new FSkeletalMeshLODModel());
 #else
@@ -677,7 +680,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	return SkeletalMesh;
 }
 
-void FglTFRuntimeParser::GenerateAutoLODs(const TArray<float>& Factors, TArray<FglTFRuntimeLOD>& LODs, FglTFRuntimeLOD& LOD0)
+void FglTFRuntimeParser::GenerateAutoLODs(const TArray<float> & Factors, TArray<FglTFRuntimeLOD> & LODs, FglTFRuntimeLOD & LOD0)
 {
 	for (float ReduceFactor : Factors)
 	{
@@ -1305,6 +1308,14 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 		bHasTracks = true;
 	}
+
+	/*
+		TODO: add float curves
+	
+	FSmartName NewTrackName;
+	AnimSequence->GetSkeleton()->VerifySmartName(Name, NewTrackName);
+	AnimSequence->RawCurveData.AddFloatCurveKey(NewTrackName, 0, Time, Value);
+	*/
 
 	if (!bHasTracks)
 	{

@@ -118,7 +118,10 @@ void FglTFRuntimeMeshReducer::SimplifyMesh(FglTFRuntimePrimitive& DestinationPri
 					int i0 = Triangle.Vertices[VertexIndex]; FVertex& v0 = Vertices[i0];
 					int i1 = Triangle.Vertices[(VertexIndex + 1) % 3]; FVertex& v1 = Vertices[i1];
 					// Border check
-					if (v0.bIsBorder != v1.bIsBorder)  continue;
+					if (v0.bIsBorder != v1.bIsBorder)
+					{
+						continue;
+					}
 
 					// Compute vertex to collapse to
 					FVector p;
