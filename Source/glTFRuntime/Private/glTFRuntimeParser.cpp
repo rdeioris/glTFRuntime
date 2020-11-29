@@ -6,6 +6,7 @@
 #include "Animation/Skeleton.h"
 #include "Materials/Material.h"
 #include "Misc/Base64.h"
+#include "Misc/Compression.h"
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
@@ -21,6 +22,91 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
+	// required for Gzip;
+	TArray<uint8> UncompressedData;
+
+	// Gzip Compressed ? 10 bytes header and 8 bytes footer
+	if (DataNum > 18 && DataPtr[0] == 0x1F && DataPtr[1] == 0x8B && DataPtr[2] == 0x08)
+	{
+		uint32* GzipOriginalSize = (uint32*)(&DataPtr[DataNum - 4]);
+		int64 StartOfBuffer = 10;
+		// FEXTRA
+		if (DataPtr[3] & 0x04)
+		{
+			uint16* FExtraXLen = (uint16*)(&DataPtr[StartOfBuffer]);
+			if (StartOfBuffer + 2 >= DataNum)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid Gzip FEXTRA header."));
+				return nullptr;
+			}
+			StartOfBuffer += 2 + *FExtraXLen;
+			if (StartOfBuffer >= DataNum)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid Gzip FEXTRA XLEN."));
+				return nullptr;
+			}
+		}
+
+		// FNAME
+		if (DataPtr[3] & 0x08)
+		{
+			while (DataPtr[StartOfBuffer] != 0)
+			{
+				StartOfBuffer++;
+				if (StartOfBuffer >= DataNum)
+				{
+					UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid Gzip FNAME header."));
+					return nullptr;
+				}
+			}
+			if (++StartOfBuffer >= DataNum)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid Gzip FNAME header."));
+				return nullptr;
+			}
+		}
+
+		// FCOMMENT
+		if (DataPtr[3] & 0x10)
+		{
+			while (DataPtr[StartOfBuffer] != 0)
+			{
+				StartOfBuffer++;
+				if (StartOfBuffer >= DataNum)
+				{
+					UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid Gzip FCOMMENT header."));
+					return nullptr;
+				}
+			}
+			if (++StartOfBuffer >= DataNum)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid Gzip FCOMMENT header."));
+				return nullptr;
+			}
+		}
+
+		// FHCRC
+		if (DataPtr[3] & 0x02)
+		{
+			if (StartOfBuffer + 2 >= DataNum)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid Gzip FHCRC header."));
+				return nullptr;
+			}
+			StartOfBuffer += 2;
+		}
+
+		UncompressedData.AddUninitialized(*GzipOriginalSize);
+		if (!FCompression::UncompressMemory(NAME_Zlib, UncompressedData.GetData(), *GzipOriginalSize, &DataPtr[StartOfBuffer], DataNum - StartOfBuffer - 8, COMPRESS_NoFlags, -15))
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to uncompress Gzip data."));
+			return nullptr;
+		}
+
+		DataPtr = UncompressedData.GetData();
+		DataNum = *GzipOriginalSize;
+	}
+
 	// detect binary format
 	if (DataNum > 20)
 	{
