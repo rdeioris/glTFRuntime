@@ -297,7 +297,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				FSkeletalMeshImportData MorphTargetImportData;
 				LOD.ImportData.CopyDataNeedByMorphTargetImport(MorphTargetImportData);
 				MorphTargetImportData.Points = MorphTargetPositions;
-				UE_LOG(LogTemp, Error, TEXT("MorphTargets positions for %d: %d"), MorphTargetIndex, MorphTargetPositions.Num());
 				MorphTargetsData.Add(MorphTargetImportData);
 				const FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
 				MorphTargetNames.Add(MorphTargetName);
@@ -1311,7 +1310,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 	/*
 		TODO: add float curves
-	
+
 	FSmartName NewTrackName;
 	AnimSequence->GetSkeleton()->VerifySmartName(Name, NewTrackName);
 	AnimSequence->RawCurveData.AddFloatCurveKey(NewTrackName, 0, Time, Value);
