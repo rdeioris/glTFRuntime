@@ -7,6 +7,7 @@
 #if WITH_EDITOR
 #include "Editor/EditorEngine.h"
 #endif
+#include "PhysicsEngine/BodySetup.h"
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
