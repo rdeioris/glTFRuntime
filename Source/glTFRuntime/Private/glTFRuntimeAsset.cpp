@@ -257,6 +257,19 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByName(const FString& MeshName, co
 	return Parser->LoadStaticMeshByName(MeshName, StaticMeshConfig);
 }
 
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshByNodeName(const FString& NodeName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	FglTFRuntimeNode Node;
+	if (!Parser->LoadNodeByName(NodeName, Node))
+	{
+		return nullptr;
+	}
+
+	return Parser->LoadStaticMesh(Node.MeshIndex, StaticMeshConfig);
+}
+
 USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
