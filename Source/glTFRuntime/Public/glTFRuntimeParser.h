@@ -194,6 +194,9 @@ struct FglTFRuntimeMorphTarget
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString Name;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FVector> Positions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -397,6 +400,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<float> AutoLODs;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bIgnoreMissingBones;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -406,6 +412,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		OverrideSkinIndex = -1;
 		BoundsScale = FVector::OneVector;
 		bShiftBoundsByRootBone = false;
+		bIgnoreMissingBones = false;
 	}
 };
 
@@ -693,7 +700,7 @@ public:
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
 
-	bool LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	bool LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	void AddError(const FString& ErrorContext, const FString& ErrorMessage);

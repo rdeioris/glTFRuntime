@@ -25,14 +25,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	for (TSharedRef<FJsonObject> JsonMeshObject : JsonMeshObjects)
 	{
 
-		const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
-		if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
-		{
-			return nullptr;
-		}
-
 		TArray<FglTFRuntimePrimitive> Primitives;
-		if (!LoadPrimitives(JsonPrimitives, Primitives, StaticMeshConfig.MaterialsConfig))
+		if (!LoadPrimitives(JsonMeshObject, Primitives, StaticMeshConfig.MaterialsConfig))
 			return nullptr;
 
 		UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
@@ -435,14 +429,8 @@ bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 M
 		return false;
 	}
 
-	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
-	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
-	{
-		return false;
-	}
-
 	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonPrimitives, Primitives, ProceduralMeshConfig.MaterialsConfig))
+	if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, ProceduralMeshConfig.MaterialsConfig))
 	{
 		return false;
 	}

@@ -1369,8 +1369,18 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+	// get primitives
+	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
+	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
+	{
+		AddError("LoadPrimitives()", "No primitives defined in the asset.");
+		return false;
+	}
+
+	int32 FirstPrimitive = Primitives.Num();
+
 	for (TSharedPtr<FJsonValue> JsonPrimitive : *JsonPrimitives)
 	{
 		TSharedPtr<FJsonObject> JsonPrimitiveObject = JsonPrimitive->AsObject();
@@ -1382,6 +1392,37 @@ bool FglTFRuntimeParser::LoadPrimitives(const TArray<TSharedPtr<FJsonValue>>* Js
 			return false;
 
 		Primitives.Add(Primitive);
+	}
+
+	const TSharedPtr<FJsonObject>* JsonExtrasObject;
+	if (JsonMeshObject->TryGetObjectField("extras", JsonExtrasObject))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* JsonTargetNamesArray;
+		if ((*JsonExtrasObject)->TryGetArrayField("targetNames", JsonTargetNamesArray))
+		{
+			auto ApplyTargetName = [FirstPrimitive, &Primitives](const int32 TargetNameIndex, const FString& TargetName)
+			{
+				int32 MorphTargetCounter = 0;
+				for (int32 PrimitiveIndex = FirstPrimitive; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
+				{
+					FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
+					for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
+					{
+						if (MorphTargetCounter == TargetNameIndex)
+						{
+							MorphTarget.Name = TargetName;
+							return;
+						}
+						MorphTargetCounter++;
+					}
+				}
+			};
+			for (int32 TargetNameIndex = 0; TargetNameIndex < JsonTargetNamesArray->Num(); TargetNameIndex++)
+			{
+				const FString TargetName = (*JsonTargetNamesArray)[TargetNameIndex]->AsString();
+				ApplyTargetName(TargetNameIndex, TargetName);
+			}
+		}
 	}
 
 	if (MaterialsConfig.bMergeSectionsByMaterial)
@@ -1814,10 +1855,17 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 		return false;
 
 	bool bInitWithZeros = false;
+	bool bHasSparse = false;
 
 	int64 BufferViewIndex;
 	if (!JsonAccessorObject->TryGetNumberField("bufferView", BufferViewIndex))
 		bInitWithZeros = true;
+
+	const TSharedPtr<FJsonObject>* JsonSparseObject = nullptr;
+	if (JsonAccessorObject->TryGetObjectField("sparse", JsonSparseObject))
+	{
+		bHasSparse = true;
+	}
 
 	int64 ByteOffset;
 	if (!JsonAccessorObject->TryGetNumberField("byteOffset", ByteOffset))
@@ -1846,37 +1894,41 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 	if (bInitWithZeros)
 	{
 		Bytes.AddZeroed(FinalSize);
-		return true;
+		if (!bHasSparse)
+		{
+			return true;
+		}
 	}
-
-	if (!GetBufferView(BufferViewIndex, Bytes, Stride))
+	else
 	{
-		return false;
-	}
+		if (!GetBufferView(BufferViewIndex, Bytes, Stride))
+		{
+			return false;
+		}
 
-	if (Stride == 0)
-	{
-		Stride = ElementSize * Elements;
-	}
+		FinalSize = Stride * Count;
 
-	FinalSize = Stride * Count;
+		if (ByteOffset > 0)
+		{
+			TArray64<uint8> OffsetBytes;
+			OffsetBytes.Append(&Bytes[ByteOffset], FinalSize);
+			Bytes = OffsetBytes;
+		}
 
-	if (ByteOffset > 0)
-	{
-		TArray64<uint8> OffsetBytes;
-		OffsetBytes.Append(&Bytes[ByteOffset], FinalSize);
-		Bytes = OffsetBytes;
-	}
+		if (FinalSize > (uint64)Bytes.Num())
+		{
+			return false;
+		}
 
-	if (FinalSize > (uint64)Bytes.Num())
-	{
-		return false;
-	}
+		if (Stride == 0)
+		{
+			Stride = ElementSize * Elements;
+		}
 
-	const TSharedPtr<FJsonObject>* JsonSparseObject = nullptr;
-	if (!JsonAccessorObject->TryGetObjectField("sparse", JsonSparseObject))
-	{
-		return true;
+		if (!bHasSparse)
+		{
+			return true;
+		}
 	}
 
 	int64 SparseCount;
@@ -1985,10 +2037,13 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 	{
 		return false;
 	}
+
 	if (SparseBufferViewValuesStride == 0)
 	{
 		SparseBufferViewValuesStride = ElementSize * Elements;
 	}
+
+	Stride = SparseBufferViewValuesStride;
 
 	for (int32 IndexToChange = 0; IndexToChange < SparseCount; IndexToChange++)
 	{
