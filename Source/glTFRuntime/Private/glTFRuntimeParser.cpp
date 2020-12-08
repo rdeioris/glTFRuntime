@@ -634,12 +634,6 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			SamplerInterpolation = "LINEAR";
 		}
 
-		if (Timeline.Num() != Values.Num())
-		{
-			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for sampler %d"), Timeline.Num(), Values.Num(), SamplerIndex));
-			return false;
-		}
-
 		// get animation valid duration
 		for (float Time : Timeline)
 		{
@@ -758,6 +752,11 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 	{
 		if (Path == "translation")
 		{
+			if (Timeline.Num() != Values.Num())
+			{
+				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				return;
+			}
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
 				AnimationCurve->AddLocationValue(Timeline[TimeIndex], Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
@@ -765,6 +764,11 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 		}
 		else if (Path == "rotation")
 		{
+			if (Timeline.Num() != Values.Num())
+			{
+				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				return;
+			}
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
 				FVector4 RotationValue = Values[TimeIndex];
@@ -775,6 +779,11 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 		}
 		else if (Path == "scale")
 		{
+			if (Timeline.Num() != Values.Num())
+			{
+				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				return;
+			}
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
 				AnimationCurve->AddScaleValue(Timeline[TimeIndex], Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
@@ -832,6 +841,11 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 	{
 		if (Path == "translation")
 		{
+			if (Timeline.Num() != Values.Num())
+			{
+				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				return;
+			}
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
 				AnimationCurve->AddLocationValue(Timeline[TimeIndex], Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
@@ -839,6 +853,11 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 		}
 		else if (Path == "rotation")
 		{
+			if (Timeline.Num() != Values.Num())
+			{
+				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				return;
+			}
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
 				FVector4 RotationValue = Values[TimeIndex];
@@ -849,6 +868,11 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 		}
 		else if (Path == "scale")
 		{
+			if (Timeline.Num() != Values.Num())
+			{
+				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				return;
+			}
 			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
 			{
 				AnimationCurve->AddScaleValue(Timeline[TimeIndex], Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
