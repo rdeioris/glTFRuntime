@@ -535,9 +535,10 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 						Delta.PositionDelta = FVector::ZeroVector;
 					}
 					Delta.SourceIdx = BaseIndex + Index;
-					Delta.TangentZDelta = FVector(0, 0, 0);
+					Delta.TangentZDelta = FVector::ZeroVector;
 					MorphTargetLODModel.Vertices.Add(Delta);
 				}
+
 				MorphTarget->MorphLODModels.Add(MorphTargetLODModel);
 				SkeletalMeshContext->SkeletalMesh->RegisterMorphTarget(MorphTarget, false);
 				bHasMorphTargets = true;
@@ -630,7 +631,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 
 	return SkeletalMeshContext->SkeletalMesh;
-}
+	}
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
@@ -686,7 +687,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	return SkeletalMesh;
 }
 
-void FglTFRuntimeParser::GenerateAutoLODs(const TArray<float> &Factors, TArray<FglTFRuntimeLOD> &LODs, FglTFRuntimeLOD & LOD0)
+void FglTFRuntimeParser::GenerateAutoLODs(const TArray<float>&Factors, TArray<FglTFRuntimeLOD>&LODs, FglTFRuntimeLOD & LOD0)
 {
 	for (float ReduceFactor : Factors)
 	{
@@ -783,7 +784,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> Mesh
 	return nullptr;
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	FglTFRuntimeNode Node;
 	if (!LoadNodeByName(NodeName, Node))
@@ -806,6 +807,10 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 		// first search for skinning
 		for (FglTFRuntimeNode& ChildNode : Nodes)
 		{
+			if (ExcludeNodes.Contains(ChildNode.Name))
+			{
+				continue;
+			}
 			if (ChildNode.SkinIndex > INDEX_NONE)
 			{
 				NewSkinIndex = ChildNode.SkinIndex;
@@ -825,6 +830,10 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 	// now search for all meshes (will be all merged in the same primitives list)
 	for (FglTFRuntimeNode& ChildNode : Nodes)
 	{
+		if (ExcludeNodes.Contains(ChildNode.Name))
+		{
+			continue;
+		}
 		if (ChildNode.MeshIndex != INDEX_NONE)
 		{
 			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", ChildNode.MeshIndex);
@@ -891,11 +900,11 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 	return nullptr;
 }
 
-void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig)
+void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes,FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 
-	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, NodeName, SkinIndex, AsyncCallback]()
+	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, ExcludeNodes, NodeName, SkinIndex, AsyncCallback]()
 	{
 		FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
 
@@ -920,6 +929,10 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 			// first search for skinning
 			for (FglTFRuntimeNode& ChildNode : Nodes)
 			{
+				if (ExcludeNodes.Contains(ChildNode.Name))
+				{
+					continue;
+				}
 				if (ChildNode.SkinIndex > INDEX_NONE)
 				{
 					NewSkinIndex = ChildNode.SkinIndex;
@@ -939,6 +952,10 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 		// now search for all meshes (will be all merged in the same primitives list)
 		for (FglTFRuntimeNode& ChildNode : Nodes)
 		{
+			if (ExcludeNodes.Contains(ChildNode.Name))
+			{
+				continue;
+			}
 			if (ChildNode.MeshIndex != INDEX_NONE)
 			{
 				TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", ChildNode.MeshIndex);
@@ -1283,7 +1300,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
 #endif
 		bHasTracks = true;
-	}
+}
 
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
@@ -1338,9 +1355,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-	}
+}
 
-bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack> &Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
@@ -1382,7 +1399,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.RotKeys.Add(AnimQuat);
 				FrameBase += FrameDelta;
 			}
-		}
+	}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 		{
 			if (Timeline.Num() != Values.Num())
@@ -1465,7 +1482,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-	};
+};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter);
