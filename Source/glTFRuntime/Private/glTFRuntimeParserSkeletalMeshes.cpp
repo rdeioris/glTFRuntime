@@ -17,6 +17,7 @@
 #include "Model.h"
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
+#include "Animation/AnimCurveTypes.h"
 #include "glTFRuntimeMeshReducer.h"
 
 struct FglTFRuntimeSkeletalMeshContextFinalizer
@@ -1093,8 +1094,9 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 			return nullptr;
 		float Duration;
 		TMap<FString, FRawAnimSequenceTrack> Tracks;
+		TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
 		bool bAnimationFound = false;
-		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration, SkeletalAnimationConfig, [Joints, &bAnimationFound](const FglTFRuntimeNode& Node) -> bool
+		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [Joints, &bAnimationFound](const FglTFRuntimeNode& Node) -> bool
 		{
 			bAnimationFound = Joints.Contains(Node.Index);
 			return bAnimationFound;
@@ -1131,7 +1133,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 	float Duration;
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
-	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, Duration, SkeletalAnimationConfig, [](const FglTFRuntimeNode& Node) -> bool { return true; }))
+	TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
+	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [](const FglTFRuntimeNode& Node) -> bool { return true; }))
 	{
 		return nullptr;
 	}
@@ -1282,18 +1285,46 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		bHasTracks = true;
 	}
 
-	/*
-		TODO: add float curves */
+	// add MorphTarget curves
+	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
+	{
+		FSmartName SmartName;
+		if (!AnimSequence->GetSkeleton()->GetSmartNameByName(USkeleton::AnimCurveMappingName, Pair.Key, SmartName))
+		{
+			SmartName.DisplayName = Pair.Key;
+			AnimSequence->GetSkeleton()->VerifySmartName(USkeleton::AnimCurveMappingName, SmartName);
+		}
 
-	/*FSmartName NewTrackName;
-	AnimSequence->GetSkeleton()->VerifySmartName("face_shapes.ai_browDown_L", NewTrackName);
-	AnimSequence->RawCurveData.AddFloatCurveKey(NewTrackName, 0, 0.1, 0.5);
-	AnimSequence->morp*/
-	bHasTracks = true;
+		AnimSequence->RawCurveData.AddCurveData(SmartName);
+
+		FFloatCurve* NewCurve = (FFloatCurve*)AnimSequence->RawCurveData.GetCurveData(SmartName.UID, ERawCurveTrackTypes::RCT_Float);
+
+		for (TPair<float, float>& CurvePair : Pair.Value)
+		{
+			FKeyHandle NewKeyHandle = NewCurve->FloatCurve.AddKey(CurvePair.Key, CurvePair.Value, false);
+
+			ERichCurveInterpMode NewInterpMode = RCIM_Linear;
+			ERichCurveTangentMode NewTangentMode = RCTM_Auto;
+			ERichCurveTangentWeightMode NewTangentWeightMode = RCTWM_WeightedNone;
+
+			float LeaveTangent = 0.f;
+			float ArriveTangent = 0.f;
+			float LeaveTangentWeight = 0.f;
+			float ArriveTangentWeight = 0.f;
+
+			NewCurve->FloatCurve.SetKeyInterpMode(NewKeyHandle, NewInterpMode);
+			NewCurve->FloatCurve.SetKeyTangentMode(NewKeyHandle, NewTangentMode);
+			NewCurve->FloatCurve.SetKeyTangentWeightMode(NewKeyHandle, NewTangentWeightMode);
+		}
+
+		AnimSequence->GetSkeleton()->AccumulateCurveMetaData(Pair.Key, false, true);
+
+		bHasTracks = true;
+	}
 
 	if (!bHasTracks)
 	{
-		AddError("LoadSkeletalAnimation()", "No Bone Tracks found in animation");
+		AddError("LoadSkeletalAnimation()", "No Bone or MorphTarget Tracks found in animation");
 		return nullptr;
 	}
 
@@ -1307,9 +1338,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-}
+	}
 
-bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack> &Tracks, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack> &Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
@@ -1407,9 +1438,32 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				FrameBase += FrameDelta;
 			}
 		}
-		else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveScales)
+		else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
 		{
+			TArray<FName> MorphTargetNames;
+			if (!GetMorphTargetNames(Node.MeshIndex, MorphTargetNames))
+			{
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Mesh %d has no MorphTargets"), Node.Index));
+				return;
+			}
 
+			if (Timeline.Num() != Values.Num() / MorphTargetNames.Num())
+			{
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for weights on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				return;
+			}
+
+			for (int32 MorphTargetIndex = 0; MorphTargetIndex < MorphTargetNames.Num(); MorphTargetIndex++)
+			{
+				FName MorphTargetName = MorphTargetNames[MorphTargetIndex];
+				TArray<TPair<float, float>> Curves;
+				for (int32 TimelineIndex = 0; TimelineIndex < Timeline.Num(); TimelineIndex++)
+				{
+					TPair<float, float> Curve = TPair<float, float>(Timeline[TimelineIndex], Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
+					Curves.Add(Curve);
+				}
+				MorphTargetCurves.Add(MorphTargetName, Curves);
+			}
 		}
 	};
 

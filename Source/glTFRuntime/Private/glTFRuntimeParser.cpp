@@ -2272,3 +2272,61 @@ bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePri
 
 	return true;
 }
+
+bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName>& MorphTargetNames)
+{
+	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+	if (!JsonMeshObject)
+	{
+		AddError("GetMorphTargetNames()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
+		return nullptr;
+	}
+	// get primitives
+	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
+	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
+	{
+		AddError("GetMorphTargetNames()", "No primitives defined in the asset.");
+		return false;
+	}
+
+	int32 MorphTargetIndex = 0;
+
+	for (TSharedPtr<FJsonValue> JsonPrimitive : *JsonPrimitives)
+	{
+		TSharedPtr<FJsonObject> JsonPrimitiveObject = JsonPrimitive->AsObject();
+		if (!JsonPrimitiveObject)
+			return false;
+
+		const TArray<TSharedPtr<FJsonValue>>* JsonTargetsArray;
+		if (!JsonPrimitiveObject->TryGetArrayField("targets", JsonTargetsArray))
+		{
+			AddError("GetMorphTargetNames()", "No MorphTarget defined in the asset.");
+			return false;
+		}
+
+		for (int32 MorphIndex = 0; MorphIndex < JsonTargetsArray->Num(); MorphIndex++)
+		{
+			FName MorphTargetName = FName(FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++));
+			MorphTargetNames.Add(MorphTargetName);
+		}
+	}
+
+	// eventually cleanup names using targetNames extras
+	const TSharedPtr<FJsonObject>* JsonExtrasObject;
+	if (JsonMeshObject->TryGetObjectField("extras", JsonExtrasObject))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* JsonTargetNamesArray;
+		if ((*JsonExtrasObject)->TryGetArrayField("targetNames", JsonTargetNamesArray))
+		{
+			for (int32 TargetNameIndex = 0; TargetNameIndex < JsonTargetNamesArray->Num(); TargetNameIndex++)
+			{
+				if (MorphTargetNames.IsValidIndex(TargetNameIndex))
+				{
+					MorphTargetNames[TargetNameIndex] = FName((*JsonTargetNamesArray)[TargetNameIndex]->AsString());
+				}
+			}
+		}
+	}
+
+	return true;
+}
