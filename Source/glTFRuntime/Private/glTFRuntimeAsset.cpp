@@ -449,3 +449,9 @@ bool UglTFRuntimeAsset::LoadStaticMeshIntoProceduralMeshComponent(const int32 Me
 
 	return Parser->LoadStaticMeshIntoProceduralMeshComponent(MeshIndex, ProceduralMeshComponent, ProceduralMeshConfig);
 }
+
+UMaterialInterface* UglTFRuntimeAsset::LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	return Parser->LoadMaterial(MaterialIndex, MaterialsConfig, bUseVertexColors);
+}
