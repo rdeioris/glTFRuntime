@@ -516,6 +516,8 @@ struct FglTFRuntimeLOD
 	TArray<FglTFRuntimePrimitive> Primitives;
 
 	bool bHasNormals;
+	bool bHasTangents;
+	bool bHasUV;
 
 #if WITH_EDITOR
 	FSkeletalMeshImportData ImportData;
@@ -524,6 +526,8 @@ struct FglTFRuntimeLOD
 	FglTFRuntimeLOD()
 	{
 		bHasNormals = false;
+		bHasTangents = false;
+		bHasUV = false;
 	}
 };
 

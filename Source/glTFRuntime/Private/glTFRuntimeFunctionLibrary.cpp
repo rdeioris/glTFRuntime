@@ -65,9 +65,14 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
+	{
 		return nullptr;
+	}
+
 	if (!Asset->LoadFromData(Data.GetData(), Data.Num(), LoaderConfig))
+	{
 		return nullptr;
+	}
 
 	return Asset;
 }
