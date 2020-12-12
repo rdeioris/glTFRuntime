@@ -18,7 +18,6 @@
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
 #include "Animation/AnimCurveTypes.h"
-#include "glTFRuntimeMeshReducer.h"
 
 struct FglTFRuntimeSkeletalMeshContextFinalizer
 {
@@ -692,9 +691,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 
 	return SkeletalMeshContext->SkeletalMesh;
-	}
+}
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 
 	// first check cache
@@ -721,8 +720,6 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
 
-	GenerateAutoLODs(SkeletalMeshConfig.AutoLODs, LODs, LOD0);
-
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 	SkeletalMeshContext->LODs = LODs;
@@ -746,22 +743,6 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	}
 
 	return SkeletalMesh;
-}
-
-void FglTFRuntimeParser::GenerateAutoLODs(const TArray<float>&Factors, TArray<FglTFRuntimeLOD>&LODs, FglTFRuntimeLOD & LOD0)
-{
-	for (float ReduceFactor : Factors)
-	{
-		FglTFRuntimeLOD NewLOD;
-		for (FglTFRuntimePrimitive& Primitive : LOD0.Primitives)
-		{
-			FglTFRuntimePrimitive DestinationPrimitive;
-			FglTFRuntimeMeshReducer MeshReducer(Primitive);
-			MeshReducer.SimplifyMesh(DestinationPrimitive, ReduceFactor);
-			NewLOD.Primitives.Add(DestinationPrimitive);
-		}
-		LODs.Add(NewLOD);
-	}
 }
 
 void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
@@ -790,8 +771,6 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 		FglTFRuntimeLOD LOD0;
 		LOD0.Primitives = Primitives;
 		LODs.Add(LOD0);
-
-		GenerateAutoLODs(SkeletalMeshContext->SkeletalMeshConfig.AutoLODs, LODs, LOD0);
 
 		SkeletalMeshContext->LODs = LODs;
 
@@ -947,8 +926,6 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
 
-	GenerateAutoLODs(SkeletalMeshConfig.AutoLODs, LODs, LOD0);
-
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = NewSkinIndex;
 	SkeletalMeshContext->LODs = LODs;
@@ -1068,8 +1045,6 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 		FglTFRuntimeLOD LOD0;
 		LOD0.Primitives = Primitives;
 		LODs.Add(LOD0);
-
-		GenerateAutoLODs(SkeletalMeshContext->SkeletalMeshConfig.AutoLODs, LODs, LOD0);
 
 		SkeletalMeshContext->SkinIndex = NewSkinIndex;
 		SkeletalMeshContext->LODs = LODs;
@@ -1239,8 +1214,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			CompressionCodec->Tracks[BoneIndex].PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
 			CompressionCodec->Tracks[BoneIndex].RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
-}
-}
+		}
+	}
 #endif
 
 	bool bHasTracks = false;

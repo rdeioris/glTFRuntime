@@ -398,9 +398,6 @@ struct FglTFRuntimeSkeletalMeshConfig
 	bool bShiftBoundsByRootBone;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TArray<float> AutoLODs;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bIgnoreMissingBones;
 
 	FglTFRuntimeSkeletalMeshConfig()
@@ -981,5 +978,4 @@ protected:
 	}
 
 	bool MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive);
-	void GenerateAutoLODs(const TArray<float>& Factors, TArray<FglTFRuntimeLOD>& LODs, FglTFRuntimeLOD& LOD0);
 };
