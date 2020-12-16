@@ -10,16 +10,22 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const 
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
-		return nullptr;
-
-	FString TruePath = Filename;
-	if (bPathRelativeToContent)
 	{
-		TruePath = FPaths::Combine(FPaths::ProjectContentDir(), Filename);
+		return nullptr;
 	}
 
-	if (!Asset->LoadFromFilename(TruePath, LoaderConfig))
+	// Annoying copy, but we do not want to remove the const
+	FglTFRuntimeConfig OverrideConfig = LoaderConfig;
+
+	if (bPathRelativeToContent)
+	{
+		OverrideConfig.bSearchContentDir = true;
+	}
+
+	if (!Asset->LoadFromFilename(Filename, OverrideConfig))
+	{
 		return nullptr;
+	}
 
 	return Asset;
 }

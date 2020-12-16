@@ -7,13 +7,44 @@
 #include "Materials/Material.h"
 #include "Misc/Base64.h"
 #include "Misc/Compression.h"
+#include "Interfaces/IPluginManager.h"
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
+	FString TruePath = Filename;
+
+	if (LoaderConfig.bSearchContentDir)
+	{
+		TruePath = FPaths::Combine(FPaths::ProjectContentDir(), Filename);
+	}
+
+	if (!FPaths::FileExists(TruePath))
+	{
+		bool bAssetFound = false;
+		for (const FString& PluginName : LoaderConfig.ContentPluginsToScan)
+		{
+			TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(PluginName);
+			if (Plugin)
+			{
+				TruePath = FPaths::Combine(Plugin->GetContentDir(), Filename);
+				if (FPaths::FileExists(TruePath))
+				{
+					bAssetFound = true;
+					break;
+				}
+			}
+		}
+
+		if (!bAssetFound)
+		{
+			return nullptr;
+		}
+	}
+
 	TArray64<uint8> Content;
-	if (!FFileHelper::LoadFileToArray(Content, *Filename))
+	if (!FFileHelper::LoadFileToArray(Content, *TruePath))
 	{
 		return nullptr;
 	}

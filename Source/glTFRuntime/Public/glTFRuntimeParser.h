@@ -47,12 +47,18 @@ struct FglTFRuntimeConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	float SceneScale;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FString> ContentPluginsToScan;
+
+	bool bSearchContentDir;
+
 	FglTFRuntimeConfig()
 	{
 		TransformBaseType = EglTFRuntimeTransformBaseType::Default;
 		BasisMatrix = FMatrix::Identity;
 		BaseTransform = FTransform::Identity;
 		SceneScale = 100;
+		bSearchContentDir = false;
 	}
 
 	FMatrix GetMatrix() const
