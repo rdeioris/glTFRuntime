@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
   "Version": 1,
-  "VersionName": "20200903",
+  "VersionName": "20201217",
   "FriendlyName": "glTFRuntime",
   "Description": "Manage glTF files at runtime",
   "Category": "Runtime",
