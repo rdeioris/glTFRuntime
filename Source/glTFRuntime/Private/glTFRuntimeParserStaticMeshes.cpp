@@ -214,9 +214,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 
 		StaticMesh->StaticMaterials.Append(StaticMaterials);
 
-		FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription->GetMeshDescription());
+		
 		if (bCalculateNormals || bCalculateTangents)
 		{
+			FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription->GetMeshDescription());
 			EComputeNTBsFlags NTPBsFlags = EComputeNTBsFlags::None;
 			if (bCalculateNormals)
 			{
