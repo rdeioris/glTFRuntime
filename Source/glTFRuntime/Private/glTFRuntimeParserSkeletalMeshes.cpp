@@ -420,6 +420,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					{
 						FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
 						FVector4 Weights = Primitive.Weights[JointsIndex][Index];
+						uint32 TotalWeight = 0;
 						for (int32 j = 0; j < 4; j++)
 						{
 							if (BoneMapInUse.Contains(Joints[j]))
@@ -439,6 +440,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 								InWeights[TotalVertexIndex].InfluenceWeights[j] = QuantizedWeight;
 								InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
+
+								TotalWeight += QuantizedWeight;
 							}
 							else if (!SkeletalMeshContext->SkeletalMeshConfig.bIgnoreMissingBones)
 							{
@@ -446,6 +449,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 								return nullptr;
 							}
 						}
+
+						// fix weight
+						InWeights[TotalVertexIndex].InfluenceWeights[0] += 255 - TotalWeight;
+
 					}
 				}
 				else
