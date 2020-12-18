@@ -13,6 +13,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 {
 	FglTFRuntimeMaterial RuntimeMaterial;
 
+	RuntimeMaterial.BaseSpecularFactor = MaterialsConfig.SpecularFactor;
+
 	if (!JsonMaterialObject->TryGetBoolField("doubleSided", RuntimeMaterial.bTwoSided))
 	{
 		RuntimeMaterial.bTwoSided = false;
@@ -264,6 +266,8 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 	{
 		return nullptr;
 	}
+
+	Material->SetScalarParameterValue("specularFactor", RuntimeMaterial.BaseSpecularFactor);
 
 	Material->SetScalarParameterValue("alphaCutoff", RuntimeMaterial.AlphaCutoff);
 
@@ -535,7 +539,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		return nullptr;
 
 	// first check cache
-	if (MaterialsCache.Contains(Index))
+	if (CanReadFromCache(MaterialsConfig.CacheMode) && MaterialsCache.Contains(Index))
 	{
 		return MaterialsCache[Index];
 	}
@@ -559,9 +563,14 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 
 	UMaterialInterface* Material = LoadMaterial_Internal(JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors);
 	if (!Material)
+	{
 		return nullptr;
+	}
 
-	MaterialsCache.Add(Index, Material);
+	if (CanWriteToCache(MaterialsConfig.CacheMode))
+	{
+		MaterialsCache.Add(Index, Material);
+	}
 
 	return Material;
 }

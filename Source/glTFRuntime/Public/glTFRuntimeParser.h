@@ -215,6 +215,9 @@ struct FglTFRuntimeMaterialsConfig
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeCacheMode CacheMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UberMaterialsOverrideMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -234,6 +237,17 @@ struct FglTFRuntimeMaterialsConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bMergeSectionsByMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float SpecularFactor;
+
+	FglTFRuntimeMaterialsConfig()
+	{
+		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
+		bGeneratesMipMaps = false;
+		bMergeSectionsByMaterial = false;
+		SpecularFactor = 0;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -623,6 +637,7 @@ struct FglTFRuntimeMaterial
 	UTexture2D* SpecularGlossinessTextureCache;
 	int32 SpecularGlossinessTexCoord;
 
+	float BaseSpecularFactor;
 
 	FglTFRuntimeMaterial()
 	{
@@ -648,6 +663,7 @@ struct FglTFRuntimeMaterial
 		bHasGlossinessFactor = false;
 		SpecularGlossinessTextureCache = nullptr;
 		SpecularGlossinessTexCoord = 0;
+		BaseSpecularFactor = 0;
 	}
 };
 
