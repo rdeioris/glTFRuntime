@@ -10,6 +10,7 @@
 #include "IMeshBuilderModule.h"
 #include "LODUtilities.h"
 #include "MeshUtilities.h"
+#include "AssetRegistryModule.h"
 #endif
 #include "Engine/SkeletalMeshSocket.h"
 #include "glTFAnimBoneCompressionCodec.h"
@@ -706,10 +707,25 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		OnSkeletalMeshCreated.Broadcast(SkeletalMeshContext->SkeletalMesh);
 	}
 
+#if WITH_EDITOR
+	if (!SkeletalMeshContext->SkeletalMeshConfig.SaveToPackage.IsEmpty())
+	{
+		UPackage* Package = Cast<UPackage>(SkeletalMeshContext->SkeletalMesh->GetOuter());
+		if (Package && Package != GetTransientPackage())
+		{
+			const FString Filename = FPackageName::LongPackageNameToFilename(SkeletalMeshContext->SkeletalMeshConfig.SaveToPackage, FPackageName::GetAssetPackageExtension());
+			if (UPackage::SavePackage(Package, nullptr, EObjectFlags::RF_Public | EObjectFlags::RF_Standalone, *Filename))
+			{
+				FAssetRegistryModule::AssetCreated(SkeletalMeshContext->SkeletalMesh);
+			}
+		}
+	}
+#endif
+
 	return SkeletalMeshContext->SkeletalMesh;
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
 
 	// first check cache

@@ -420,6 +420,12 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bIgnoreMissingBones;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Outer;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString SaveToPackage;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -430,6 +436,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		BoundsScale = FVector::OneVector;
 		bShiftBoundsByRootBone = false;
 		bIgnoreMissingBones = false;
+		Outer = nullptr;
 	}
 };
 
@@ -530,7 +537,7 @@ struct FglTFRuntimeLOD
 {
 	GENERATED_BODY()
 
-	TArray<FglTFRuntimePrimitive> Primitives;
+		TArray<FglTFRuntimePrimitive> Primitives;
 
 	bool bHasNormals;
 	bool bHasTangents;
@@ -564,7 +571,32 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 
 	FglTFRuntimeSkeletalMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : Parser(InParser), SkeletalMeshConfig(InSkeletalMeshConfig)
 	{
-		SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
+		EObjectFlags Flags = RF_Public;
+		UObject* Outer = InSkeletalMeshConfig.Outer ? InSkeletalMeshConfig.Outer : GetTransientPackage();
+#if WITH_EDITOR
+		if (!InSkeletalMeshConfig.SaveToPackage.IsEmpty())
+		{
+			if (FindPackage(nullptr, *InSkeletalMeshConfig.SaveToPackage) || LoadPackage(nullptr, *InSkeletalMeshConfig.SaveToPackage, RF_Public|RF_Standalone))
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("UPackage %s already exists. Falling back to Transient."), *InSkeletalMeshConfig.SaveToPackage);
+				Outer = GetTransientPackage();
+			}
+			else
+			{
+				Outer = CreatePackage(nullptr, *InSkeletalMeshConfig.SaveToPackage);
+				if (!Outer)
+				{
+					UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to get UPackage %s. Falling back to Transient."), *InSkeletalMeshConfig.SaveToPackage);
+					Outer = GetTransientPackage();
+				}
+				else
+				{
+					Flags |= RF_Standalone;
+				}
+			}
+		}
+#endif
+		SkeletalMesh = NewObject<USkeletalMesh>(Outer, NAME_None, Flags);
 		BoundingBox = FBox(EForceInit::ForceInitToZero);
 		SkinIndex = -1;
 	}
@@ -629,7 +661,7 @@ struct FglTFRuntimeMaterial
 
 	bool bHasSpecularFactor;
 	FLinearColor SpecularFactor;
-	
+
 	bool bHasGlossinessFactor;
 	double GlossinessFactor;
 

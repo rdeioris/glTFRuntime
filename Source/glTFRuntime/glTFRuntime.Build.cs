@@ -55,6 +55,7 @@ public class glTFRuntime : ModuleRules
         {
             PrivateDependencyModuleNames.Add("SkeletalMeshUtilitiesCommon");
             PrivateDependencyModuleNames.Add("UnrealEd");
+            PrivateDependencyModuleNames.Add("AssetRegistry");
         }
 
 

@@ -267,6 +267,9 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 		return nullptr;
 	}
 
+	// make it public to allow exports
+	Material->SetFlags(EObjectFlags::RF_Public);
+
 	Material->SetScalarParameterValue("specularFactor", RuntimeMaterial.BaseSpecularFactor);
 
 	Material->SetScalarParameterValue("alphaCutoff", RuntimeMaterial.AlphaCutoff);
