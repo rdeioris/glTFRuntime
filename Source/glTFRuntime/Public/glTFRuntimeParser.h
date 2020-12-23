@@ -583,7 +583,11 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 			}
 			else
 			{
+#if ENGINE_MINOR_VERSION >= 26
+				Outer = CreatePackage(*InSkeletalMeshConfig.SaveToPackage);
+#else
 				Outer = CreatePackage(nullptr, *InSkeletalMeshConfig.SaveToPackage);
+#endif
 				if (!Outer)
 				{
 					UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to get UPackage %s. Falling back to Transient."), *InSkeletalMeshConfig.SaveToPackage);
