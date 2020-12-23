@@ -438,6 +438,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 								uint8 QuantizedWeight = FMath::Clamp((uint8)(Weights[j] * ((double)0xFF)), (uint8)0x00, (uint8)0xFF);
 
+								if (QuantizedWeight + TotalWeight > 255)
+								{
+									QuantizedWeight = 255 - TotalWeight;
+								}
+
 								InWeights[TotalVertexIndex].InfluenceWeights[j] = QuantizedWeight;
 								InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
 
@@ -451,7 +456,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						}
 
 						// fix weight
-						InWeights[TotalVertexIndex].InfluenceWeights[0] += 255 - TotalWeight;
+						if (TotalWeight < 255)
+						{
+							InWeights[TotalVertexIndex].InfluenceWeights[0] += 255 - TotalWeight;
+						}
 
 					}
 				}
