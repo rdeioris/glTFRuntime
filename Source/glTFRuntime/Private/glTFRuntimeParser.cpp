@@ -1442,11 +1442,15 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 	{
 		TSharedPtr<FJsonObject> JsonPrimitiveObject = JsonPrimitive->AsObject();
 		if (!JsonPrimitiveObject)
+		{
 			return false;
+		}
 
 		FglTFRuntimePrimitive Primitive;
 		if (!LoadPrimitive(JsonPrimitiveObject.ToSharedRef(), Primitive, MaterialsConfig))
+		{
 			return false;
+		}
 
 		Primitives.Add(Primitive);
 	}

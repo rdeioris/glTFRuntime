@@ -9,7 +9,7 @@
 #endif
 #include "PhysicsEngine/BodySetup.h"
 
-UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>>& PrimitivesCache)
 {
 
 	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(StaticMeshConfig.Outer ? StaticMeshConfig.Outer : GetTransientPackage(), NAME_None, RF_Public);
@@ -26,8 +26,18 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	{
 
 		TArray<FglTFRuntimePrimitive> Primitives;
-		if (!LoadPrimitives(JsonMeshObject, Primitives, StaticMeshConfig.MaterialsConfig))
-			return nullptr;
+
+		if (PrimitivesCache.Contains(JsonMeshObject))
+		{
+			Primitives = PrimitivesCache[JsonMeshObject];
+		}
+		else
+		{
+			if (!LoadPrimitives(JsonMeshObject, Primitives, StaticMeshConfig.MaterialsConfig))
+			{
+				return nullptr;
+			}
+		}
 
 		UStaticMeshDescription* MeshDescription = UStaticMesh::CreateStaticMeshDescription();
 
@@ -385,7 +395,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const Fgl
 	TArray<TSharedRef<FJsonObject>> JsonMeshObjects;
 	JsonMeshObjects.Add(JsonMeshObject.ToSharedRef());
 
-	UStaticMesh* StaticMesh = LoadStaticMesh_Internal(JsonMeshObjects, StaticMeshConfig);
+	TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>> PrimitivesCache;
+	UStaticMesh* StaticMesh = LoadStaticMesh_Internal(JsonMeshObjects, StaticMeshConfig, PrimitivesCache);
 	if (!StaticMesh)
 	{
 		return nullptr;
@@ -397,6 +408,44 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const Fgl
 	}
 
 	return StaticMesh;
+}
+
+TArray<UStaticMesh*> FglTFRuntimeParser::LoadStaticMeshesFromPrimitives(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	TArray<UStaticMesh*> StaticMeshes;
+
+	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+	if (!JsonMeshObject)
+	{
+		return StaticMeshes;
+	}
+
+	TArray<TSharedRef<FJsonObject>> JsonMeshObjects;
+	JsonMeshObjects.Add(JsonMeshObject.ToSharedRef());
+
+	TArray<FglTFRuntimePrimitive> Primitives;
+	if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, StaticMeshConfig.MaterialsConfig))
+	{
+		return StaticMeshes;
+	}
+
+	for (FglTFRuntimePrimitive& Primitive : Primitives)
+	{
+		TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>> PrimitivesCache;
+		TArray<FglTFRuntimePrimitive> SinglePrimitive;
+		SinglePrimitive.Add(Primitive);
+		PrimitivesCache.Add(JsonMeshObject.ToSharedRef(), SinglePrimitive);
+
+		UStaticMesh* StaticMesh = LoadStaticMesh_Internal(JsonMeshObjects, StaticMeshConfig, PrimitivesCache);
+		if (!StaticMesh)
+		{
+			break;
+		}
+
+		StaticMeshes.Add(StaticMesh);
+	}
+
+	return StaticMeshes;
 }
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMeshLODs(const TArray<int32> MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
@@ -414,7 +463,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshLODs(const TArray<int32> MeshIndi
 		JsonMeshObjects.Add(JsonMeshObject.ToSharedRef());
 	}
 
-	return LoadStaticMesh_Internal(JsonMeshObjects, StaticMeshConfig);
+	TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>> PrimitivesCache;
+	return LoadStaticMesh_Internal(JsonMeshObjects, StaticMeshConfig, PrimitivesCache);
 }
 
 bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig)
