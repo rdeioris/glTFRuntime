@@ -247,6 +247,7 @@ struct FglTFRuntimeMaterialsConfig
 		bGeneratesMipMaps = false;
 		bMergeSectionsByMaterial = false;
 		SpecularFactor = 0;
+		bDisableVertexColors = false;
 	}
 };
 
