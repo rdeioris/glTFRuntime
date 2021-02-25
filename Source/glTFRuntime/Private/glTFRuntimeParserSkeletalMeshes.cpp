@@ -73,6 +73,69 @@ void FglTFRuntimeParser::NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& 
 	}
 }
 
+void FglTFRuntimeParser::ClearSkeletonRotations(FReferenceSkeleton& RefSkeleton)
+{
+	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
+	TMap<int32, FTransform> BonesNewTransforms;
+	ApplySkeletonBoneRotation(Modifier, 0, FQuat::Identity);
+}
+
+void FglTFRuntimeParser::ApplySkeletonBoneRotation(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FQuat ParentRotation)
+{
+	TArray<FTransform> BonesTransforms = Modifier.GetReferenceSkeleton().GetRefBonePose();
+
+	FTransform NewTransform = BonesTransforms[BoneIndex];
+
+	NewTransform.SetLocation(ParentRotation * NewTransform.GetLocation());
+
+
+	ParentRotation *= NewTransform.GetRotation();
+	NewTransform.SetRotation(FQuat::Identity);
+
+	Modifier.UpdateRefPoseTransform(BoneIndex, NewTransform);
+
+	TArray<FMeshBoneInfo> MeshBoneInfos = Modifier.GetRefBoneInfo();
+	for (int32 MeshBoneIndex = 0; MeshBoneIndex < MeshBoneInfos.Num(); MeshBoneIndex++)
+	{
+		FMeshBoneInfo& MeshBoneInfo = MeshBoneInfos[MeshBoneIndex];
+		if (MeshBoneInfo.ParentIndex == BoneIndex)
+		{
+			ApplySkeletonBoneRotation(Modifier, MeshBoneIndex, ParentRotation);
+		}
+	}
+}
+
+void FglTFRuntimeParser::CopySkeletonRotationsFrom(FReferenceSkeleton& RefSkeleton, const FReferenceSkeleton& SrcRefSkeleton)
+{
+	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
+	TMap<int32, FTransform> BonesNewTransforms;
+
+	TArray<FTransform> BonesTransforms = Modifier.GetReferenceSkeleton().GetRefBonePose();
+	TArray<FTransform> SrcBonesTransforms = SrcRefSkeleton.GetRefBonePose();
+
+	for (int32 BoneIndex = 0; BoneIndex < RefSkeleton.GetNum(); BoneIndex++)
+	{
+		FName BoneName = RefSkeleton.GetBoneName(BoneIndex);
+
+		int32 SrcBoneIndex = SrcRefSkeleton.FindBoneIndex(BoneName);
+
+		if (SrcBoneIndex > INDEX_NONE)
+		{
+			FTransform NewTransform = BonesTransforms[BoneIndex];
+			NewTransform.SetRotation(SrcBonesTransforms[SrcBoneIndex].GetRotation());
+			int32 SrcParentIndex = SrcRefSkeleton.GetParentIndex(SrcBoneIndex);
+			FQuat AllRotations = FQuat::Identity;
+			while (SrcParentIndex > INDEX_NONE)
+			{
+				AllRotations = SrcBonesTransforms[SrcParentIndex].GetRotation() * AllRotations;
+				SrcParentIndex = SrcRefSkeleton.GetParentIndex(SrcParentIndex);
+			}
+			NewTransform.SetLocation(AllRotations.Inverse() * NewTransform.GetLocation());
+			Modifier.UpdateRefPoseTransform(BoneIndex, NewTransform);
+		}
+	}
+}
+
 USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
 	if (SkeletalMeshContext->SkeletalMeshConfig.OverrideSkinIndex > INDEX_NONE)
@@ -108,6 +171,17 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.bNormalizeSkeletonScale)
 	{
 		NormalizeSkeletonScale(SkeletalMeshContext->SkeletalMesh->RefSkeleton);
+	}
+
+
+	if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.bClearRotations || SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CopyRotationsFrom)
+	{
+		ClearSkeletonRotations(SkeletalMeshContext->SkeletalMesh->RefSkeleton);
+	}
+
+	if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CopyRotationsFrom)
+	{
+		CopySkeletonRotationsFrom(SkeletalMeshContext->SkeletalMesh->RefSkeleton, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CopyRotationsFrom->GetReferenceSkeleton());
 	}
 
 	if (SkeletalMeshContext->SkeletalMeshConfig.Skeleton && SkeletalMeshContext->SkeletalMeshConfig.bOverwriteRefSkeleton)
@@ -679,6 +753,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		{
 			SkeletalMeshContext->SkeletalMesh->Skeleton = NewObject<USkeleton>(GetTransientPackage(), NAME_None, RF_Public);
 			SkeletalMeshContext->SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMeshContext->SkeletalMesh);
+
 			if (CanWriteToCache(SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CacheMode))
 			{
 				SkeletonsCache.Add(SkeletalMeshContext->SkinIndex, SkeletalMeshContext->SkeletalMesh->Skeleton);

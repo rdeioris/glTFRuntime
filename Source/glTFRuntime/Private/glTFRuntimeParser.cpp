@@ -1119,6 +1119,16 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 		NormalizeSkeletonScale(SkeletalMesh->RefSkeleton);
 	}
 
+	if (SkeletonConfig.bClearRotations || SkeletonConfig.CopyRotationsFrom)
+	{
+		ClearSkeletonRotations(SkeletalMesh->RefSkeleton);
+	}
+
+	if (SkeletonConfig.CopyRotationsFrom)
+	{
+		CopySkeletonRotationsFrom(SkeletalMesh->RefSkeleton, SkeletonConfig.CopyRotationsFrom->GetReferenceSkeleton());
+	}
+
 	Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
 
 	if (CanWriteToCache(SkeletonConfig.CacheMode))

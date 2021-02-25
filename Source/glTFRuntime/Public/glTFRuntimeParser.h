@@ -28,6 +28,32 @@ enum class EglTFRuntimeTransformBaseType : uint8
 	Default,
 	Matrix,
 	Transform,
+	YForward,
+	BasisMatrix,
+	Identity,
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeBasisMatrix
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector XAxis;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector YAxis;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector ZAxis;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector Origin;
+
+	FMatrix GetMatrix() const
+	{
+		return FBasisVectorMatrix(XAxis, YAxis, ZAxis, Origin);
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -43,6 +69,9 @@ struct FglTFRuntimeConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FTransform BaseTransform;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeBasisMatrix BasisVectorMatrix;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	float SceneScale;
@@ -75,9 +104,24 @@ struct FglTFRuntimeConfig
 			return BasisMatrix;
 		}
 
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::BasisMatrix)
+		{
+			return BasisVectorMatrix.GetMatrix();
+		}
+
 		if (TransformBaseType == EglTFRuntimeTransformBaseType::Transform)
 		{
 			return BaseTransform.ToMatrixWithScale();
+		}
+
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::YForward)
+		{
+			return FBasisVectorMatrix(FVector(1, 0, 0), FVector(0, 0, 1), FVector(0, 1, 0), FVector::ZeroVector);
+		}
+
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::Identity)
+		{
+			return FMatrix::Identity;
 		}
 
 		return DefaultMatrix;
@@ -371,12 +415,20 @@ struct FglTFRuntimeSkeletonConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, FglTFRuntimeSocket> Sockets;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bClearRotations;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	USkeleton* CopyRotationsFrom;
+
 	FglTFRuntimeSkeletonConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
 		RootNodeIndex = INDEX_NONE;
 		bNormalizeSkeletonScale = false;
 		bAddRootBone = false;
+		bClearRotations = false;
+		CopyRotationsFrom = nullptr;
 	}
 };
 
@@ -854,6 +906,11 @@ protected:
 
 	void NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton);
 	void NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FVector BoneScale);
+
+	void ClearSkeletonRotations(FReferenceSkeleton& RefSkeleton);
+	void ApplySkeletonBoneRotation(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FQuat BoneRotation);
+
+	void CopySkeletonRotationsFrom(FReferenceSkeleton& RefSkeleton, const FReferenceSkeleton& SrcRefSkeleton);
 
 	bool CanReadFromCache(const EglTFRuntimeCacheMode CacheMode) { return CacheMode == EglTFRuntimeCacheMode::Read || CacheMode == EglTFRuntimeCacheMode::ReadWrite; }
 	bool CanWriteToCache(const EglTFRuntimeCacheMode CacheMode) { return CacheMode == EglTFRuntimeCacheMode::Write || CacheMode == EglTFRuntimeCacheMode::ReadWrite; }
