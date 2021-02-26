@@ -76,7 +76,6 @@ void FglTFRuntimeParser::NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& 
 void FglTFRuntimeParser::ClearSkeletonRotations(FReferenceSkeleton& RefSkeleton)
 {
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
-	TMap<int32, FTransform> BonesNewTransforms;
 	ApplySkeletonBoneRotation(Modifier, 0, FQuat::Identity);
 }
 
