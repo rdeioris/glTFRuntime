@@ -936,17 +936,39 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> Mesh
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const TArray<FString>&ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
 	FglTFRuntimeNode Node;
-	if (!LoadNodeByName(NodeName, Node))
-	{
-		AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
-		return nullptr;
-	}
-
 	TArray<FglTFRuntimeNode> Nodes;
-	if (!LoadNodesRecursive(Node.Index, Nodes))
+
+	if (NodeName.IsEmpty())
 	{
-		AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
-		return nullptr;
+		FglTFRuntimeScene Scene;
+		if (!LoadScene(0, Scene))
+		{
+			AddError("LoadSkeletalMeshRecursive()", "No Scene found in asset");
+			return nullptr;
+		}
+
+		for (int32 NodeIndex : Scene.RootNodesIndices)
+		{
+			if (!LoadNodesRecursive(NodeIndex, Nodes))
+			{
+				AddError("LoadSkeletalMeshRecursive()", "Unable to build Node Tree from first Scene");
+				return nullptr;
+			}
+		}
+	}
+	else
+	{
+		if (!LoadNodeByName(NodeName, Node))
+		{
+			AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
+			return nullptr;
+		}
+
+		if (!LoadNodesRecursive(Node.Index, Nodes))
+		{
+			AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
+			return nullptr;
+		}
 	}
 
 	int32 NewSkinIndex = SkinIndex;
@@ -1056,17 +1078,39 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 		FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
 
 		FglTFRuntimeNode Node;
-		if (!LoadNodeByName(NodeName, Node))
-		{
-			AddError("LoadSkeletalMeshRecursiveAsync()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
-			return;
-		}
-
 		TArray<FglTFRuntimeNode> Nodes;
-		if (!LoadNodesRecursive(Node.Index, Nodes))
+
+		if (NodeName.IsEmpty())
 		{
-			AddError("LoadSkeletalMeshRecursiveAsync()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
-			return;
+			FglTFRuntimeScene Scene;
+			if (!LoadScene(0, Scene))
+			{
+				AddError("LoadSkeletalMeshRecursiveAsync()", "No Scene found in asset");
+				return;
+			}
+
+			for (int32 NodeIndex : Scene.RootNodesIndices)
+			{
+				if (!LoadNodesRecursive(NodeIndex, Nodes))
+				{
+					AddError("LoadSkeletalMeshRecursiveAsync()", "Unable to build Node Tree from first Scene");
+					return;
+				}
+			}
+		}
+		else
+		{
+			if (!LoadNodeByName(NodeName, Node))
+			{
+				AddError("LoadSkeletalMeshRecursiveAsync()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
+				return;
+			}
+
+			if (!LoadNodesRecursive(Node.Index, Nodes))
+			{
+				AddError("LoadSkeletalMeshRecursiveAsync()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
+				return;
+			}
 		}
 
 		int32 NewSkinIndex = SkinIndex;
