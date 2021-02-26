@@ -447,6 +447,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	bool bOverwriteRefSkeleton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bMergeAllBonesToBoneTree;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FglTFRuntimeBone> CustomSkeleton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -489,6 +492,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		BoundsScale = FVector::OneVector;
 		bShiftBoundsByRootBone = false;
 		bIgnoreMissingBones = false;
+		bMergeAllBonesToBoneTree = false;
 		Outer = nullptr;
 	}
 };

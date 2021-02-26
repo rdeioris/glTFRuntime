@@ -172,7 +172,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		NormalizeSkeletonScale(SkeletalMeshContext->SkeletalMesh->RefSkeleton);
 	}
 
-
 	if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.bClearRotations || SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CopyRotationsFrom)
 	{
 		ClearSkeletonRotations(SkeletalMeshContext->SkeletalMesh->RefSkeleton);
@@ -741,6 +740,10 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	if (SkeletalMeshContext->SkeletalMeshConfig.Skeleton)
 	{
 		SkeletalMeshContext->SkeletalMesh->Skeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton;
+		if (SkeletalMeshContext->SkeletalMeshConfig.bMergeAllBonesToBoneTree)
+		{
+			SkeletalMeshContext->SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMeshContext->SkeletalMesh);
+		}
 	}
 	else
 	{
