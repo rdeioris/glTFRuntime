@@ -50,7 +50,16 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 		UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to load file %s"), *Filename);
 		return nullptr;
 	}
-	return FromData(Content.GetData(), Content.Num(), LoaderConfig);
+
+	TSharedPtr<FglTFRuntimeParser> Parser = FromData(Content.GetData(), Content.Num(), LoaderConfig);
+
+	if (Parser && LoaderConfig.bAllowExternalFiles)
+	{
+		// allows to load external files
+		Parser->BaseDirectory = FPaths::GetPath(TruePath);
+	}
+
+	return Parser;
 }
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
@@ -174,7 +183,24 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 	if (!JsonObject)
 		return nullptr;
 
-	return MakeShared<FglTFRuntimeParser>(JsonObject.ToSharedRef(), LoaderConfig.GetMatrix(), LoaderConfig.SceneScale);
+	TSharedPtr<FglTFRuntimeParser> Parser = MakeShared<FglTFRuntimeParser>(JsonObject.ToSharedRef(), LoaderConfig.GetMatrix(), LoaderConfig.SceneScale);
+
+	if (Parser)
+	{
+		if (LoaderConfig.bAllowExternalFiles && !LoaderConfig.OverrideBaseDirectory.IsEmpty())
+		{
+			if (LoaderConfig.bOverrideBaseDirectoryFromContentDir)
+			{
+				Parser->BaseDirectory = FPaths::Combine(FPaths::ProjectContentDir(), LoaderConfig.OverrideBaseDirectory);
+			}
+			else
+			{
+				Parser->BaseDirectory = LoaderConfig.OverrideBaseDirectory;
+			}
+		}
+	}
+
+	return Parser;
 }
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
@@ -1843,10 +1869,26 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 	if (!JsonBufferObject->TryGetStringField("uri", Uri))
 		return false;
 
-	if (ParseBase64Uri(Uri, Bytes))
+	// check it is a valid base64 data uri
+	if (Uri.StartsWith("data:"))
 	{
-		BuffersCache.Add(Index, Bytes);
-		return true;
+		if (ParseBase64Uri(Uri, Bytes))
+		{
+			BuffersCache.Add(Index, Bytes);
+			return true;
+		}
+	}
+	else if (!BaseDirectory.IsEmpty())
+	{
+		if (FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(BaseDirectory, Uri)))
+		{
+			BuffersCache.Add(Index, Bytes);
+			return true;
+		}
+		else
+		{
+			AddError("GetBuffer()", FString::Printf(TEXT("Unable to load buffer %d from file %s"), Index, *Uri));
+		}
 	}
 
 	return false;
@@ -1854,11 +1896,7 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 
 bool FglTFRuntimeParser::ParseBase64Uri(const FString& Uri, TArray64<uint8>& Bytes)
 {
-	// check it is a valid base64 data uri
-	if (!Uri.StartsWith("data:"))
-		return false;
-
-	FString Base64Signature = ";base64,";
+	const FString Base64Signature = ";base64,";
 
 	int32 StringIndex = Uri.Find(Base64Signature, ESearchCase::IgnoreCase, ESearchDir::FromStart, 5);
 

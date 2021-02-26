@@ -5,6 +5,7 @@
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
+#include "Misc/FileHelper.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Modules/ModuleManager.h"
 
@@ -146,8 +147,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 		const TSharedPtr<FJsonObject>* JsonPbrSpecularGlossiness;
 		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_pbrSpecularGlossiness", JsonPbrSpecularGlossiness))
 		{
-			GetMaterialVector(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseFactor", 4, RuntimeMaterial.bHasBaseColorFactor, RuntimeMaterial.BaseColorFactor);
-			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseTexture", true, RuntimeMaterial.BaseColorTextureCache, RuntimeMaterial.BaseColorTextureMips, RuntimeMaterial.BaseColorTexCoord);
+			GetMaterialVector(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseFactor", 4, RuntimeMaterial.bHasDiffuseFactor, RuntimeMaterial.DiffuseFactor);
+			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseTexture", true, RuntimeMaterial.DiffuseTextureCache, RuntimeMaterial.DiffuseTextureMips, RuntimeMaterial.DiffuseTexCoord);
 
 			GetMaterialVector(JsonPbrSpecularGlossiness->ToSharedRef(), "specularFactor", 3, RuntimeMaterial.bHasSpecularFactor, RuntimeMaterial.SpecularFactor);
 
@@ -157,6 +158,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 			}
 
 			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "specularGlossinessTexture", true, RuntimeMaterial.SpecularGlossinessTextureCache, RuntimeMaterial.SpecularGlossinessTextureMips, RuntimeMaterial.SpecularGlossinessTexCoord);
+
+			RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness = true;
 		}
 	}
 
@@ -243,7 +246,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 		BaseMaterial = MetallicRoughnessMaterialsMap[RuntimeMaterial.MaterialType];
 	}
 
-	if (RuntimeMaterial.bHasSpecularFactor || RuntimeMaterial.bHasGlossinessFactor)
+	if (RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness)
 	{
 		if (SpecularGlossinessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 		{
@@ -335,6 +338,21 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 		"emissiveTexCoord", RuntimeMaterial.EmissiveTexCoord,
 		TextureCompressionSettings::TC_Default, true);
 
+
+	if (RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness)
+	{
+		ApplyMaterialFactor(RuntimeMaterial.bHasDiffuseFactor, "baseColorFactor", RuntimeMaterial.DiffuseFactor);
+		ApplyMaterialTexture("baseColorTexture", RuntimeMaterial.DiffuseTextureCache, RuntimeMaterial.DiffuseTextureMips,
+			"baseColorTexCoord", RuntimeMaterial.DiffuseTexCoord,
+			TextureCompressionSettings::TC_Default, true);
+
+		ApplyMaterialFactor(RuntimeMaterial.bHasSpecularFactor, "specularFactor", RuntimeMaterial.SpecularFactor);
+		ApplyMaterialFloatFactor(RuntimeMaterial.bHasGlossinessFactor, "glossinessFactor", RuntimeMaterial.GlossinessFactor);
+		ApplyMaterialTexture("specularGlossinessTexture", RuntimeMaterial.SpecularGlossinessTextureCache, RuntimeMaterial.SpecularGlossinessTextureMips,
+			"specularGlossinessTexCoord", RuntimeMaterial.SpecularGlossinessTexCoord,
+			TextureCompressionSettings::TC_Default, false);
+	}
+
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
 
 	return Material;
@@ -416,9 +434,21 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	FString Uri;
 	if (JsonImageObject->TryGetStringField("uri", Uri))
 	{
-		if (!ParseBase64Uri(Uri, Bytes))
+		// check it is a valid base64 data uri
+		if (Uri.StartsWith("data:"))
 		{
-			return nullptr;
+			if (!ParseBase64Uri(Uri, Bytes))
+			{
+				return nullptr;
+			}
+		}
+		else if (!BaseDirectory.IsEmpty())
+		{
+			if (!FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(BaseDirectory, Uri)))
+			{
+				AddError("LoadTexture()", FString::Printf(TEXT("Unable to load image %d from file %s"), ImageIndex, *Uri));
+				return nullptr;
+			}
 		}
 	}
 	else

@@ -79,6 +79,15 @@ struct FglTFRuntimeConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FString> ContentPluginsToScan;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAllowExternalFiles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString OverrideBaseDirectory;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bOverrideBaseDirectoryFromContentDir;
+
 	bool bSearchContentDir;
 
 	FglTFRuntimeConfig()
@@ -88,6 +97,8 @@ struct FglTFRuntimeConfig
 		BaseTransform = FTransform::Identity;
 		SceneScale = 100;
 		bSearchContentDir = false;
+		bAllowExternalFiles = false;
+		bOverrideBaseDirectoryFromContentDir = false;
 	}
 
 	FMatrix GetMatrix() const
@@ -732,6 +743,15 @@ struct FglTFRuntimeMaterial
 
 	float BaseSpecularFactor;
 
+	bool bHasDiffuseFactor;
+	FLinearColor DiffuseFactor;
+
+	TArray<FglTFRuntimeMipMap> DiffuseTextureMips;
+	UTexture2D* DiffuseTextureCache;
+	int32 DiffuseTexCoord;
+
+	bool bKHR_materials_pbrSpecularGlossiness;
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -757,6 +777,10 @@ struct FglTFRuntimeMaterial
 		SpecularGlossinessTextureCache = nullptr;
 		SpecularGlossinessTexCoord = 0;
 		BaseSpecularFactor = 0;
+		bHasDiffuseFactor = false;
+		DiffuseTextureCache = nullptr;
+		DiffuseTexCoord = 0;
+		bKHR_materials_pbrSpecularGlossiness = false;
 	}
 };
 
@@ -927,6 +951,8 @@ protected:
 
 	TArray<FString> Errors;
 
+	FString BaseDirectory;
+
 	template<typename T, typename Callback>
 	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const bool bNormalized, Callback Filter)
 	{
@@ -937,13 +963,19 @@ protected:
 		TArray64<uint8> Bytes;
 		int64 ComponentType = 0, Stride = 0, Elements = 0, ElementSize = 0, Count = 0;
 		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, Bytes))
+		{
 			return false;
+		}
 
 		if (!SupportedElements.Contains(Elements))
+		{
 			return false;
+		}
 
 		if (!SupportedTypes.Contains(ComponentType))
+		{
 			return false;
+		}
 
 		for (int64 ElementIndex = 0; ElementIndex < Count; ElementIndex++)
 		{
