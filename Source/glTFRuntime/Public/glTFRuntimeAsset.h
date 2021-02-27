@@ -139,6 +139,21 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ProceduralMeshConfig", AutoCreateRefTerm = "ProceduralMeshConfig"), Category = "glTFRuntime")
 	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	FString GetStringFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	int64 GetIntegerFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	float GetFloatFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetBooleanFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	int32 GetArraySizeFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

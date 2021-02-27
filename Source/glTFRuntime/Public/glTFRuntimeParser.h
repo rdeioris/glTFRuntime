@@ -784,6 +784,23 @@ struct FglTFRuntimeMaterial
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FglTFRuntimePathItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString Path;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 Index;
+
+	FglTFRuntimePathItem()
+	{
+		Index = INDEX_NONE;
+	}
+};
+
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
 
@@ -878,6 +895,14 @@ public:
 	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
 
 	USkeletalMesh* FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext);
+
+	TSharedPtr<FJsonValue> GetJSONObjectFromPath(const TArray<FglTFRuntimePathItem>& Path) const;
+
+	FString GetJSONStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+	double GetJSONNumberFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+	bool GetJSONBooleanFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+
+	int32 GetJSONArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
 protected:
 	TSharedRef<FJsonObject> Root;
