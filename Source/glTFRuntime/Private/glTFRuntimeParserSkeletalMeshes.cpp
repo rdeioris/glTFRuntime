@@ -798,8 +798,8 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 	}
 
-	/*
-	UPhysicsAsset* PhysicsAsset = NewObject<UPhysicsAsset>(SkeletalMeshContext->SkeletalMesh, NAME_None, RF_Public);
+
+	/*UPhysicsAsset* PhysicsAsset = NewObject<UPhysicsAsset>(SkeletalMeshContext->SkeletalMesh, NAME_None, RF_Public);
 	if (PhysicsAsset)
 	{
 		USkeletalBodySetup* NewBodySetup = NewObject<USkeletalBodySetup>(PhysicsAsset, NAME_None, RF_Public);
@@ -807,6 +807,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		NewBodySetup->PhysicsType = PhysType_Default;
 		NewBodySetup->BoneName = "Chest";
 		NewBodySetup->bConsiderForBounds = true;
+
 		FKSphylElem Capsule;
 		Capsule.Length = 30;
 		Capsule.Radius = 100;
@@ -817,11 +818,12 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 		PhysicsAsset->UpdateBodySetupIndexMap();
 		PhysicsAsset->UpdateBoundsBodiesArray();
-
+#if WITH_EDITOR
 		PhysicsAsset->PreviewSkeletalMesh = SkeletalMeshContext->SkeletalMesh;
+#endif
 		SkeletalMeshContext->SkeletalMesh->PhysicsAsset = PhysicsAsset;
-	}
-	*/
+	}*/
+
 
 #if !WITH_EDITOR
 	SkeletalMeshContext->SkeletalMesh->PostLoad();
@@ -1415,7 +1417,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			CompressionCodec->Tracks[BoneIndex].PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
 			CompressionCodec->Tracks[BoneIndex].RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
-}
+		}
 	}
 #endif
 
@@ -1592,7 +1594,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-		}
+}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
