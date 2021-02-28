@@ -19,6 +19,7 @@
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
 #include "Animation/AnimCurveTypes.h"
+#include "PhysicsEngine/PhysicsAsset.h"
 
 struct FglTFRuntimeSkeletalMeshContextFinalizer
 {
@@ -107,20 +108,42 @@ void FglTFRuntimeParser::ApplySkeletonBoneRotation(FReferenceSkeletonModifier& M
 void FglTFRuntimeParser::CopySkeletonRotationsFrom(FReferenceSkeleton& RefSkeleton, const FReferenceSkeleton& SrcRefSkeleton)
 {
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
-	TMap<int32, FTransform> BonesNewTransforms;
 
-	TArray<FTransform> BonesTransforms = Modifier.GetReferenceSkeleton().GetRefBonePose();
-	TArray<FTransform> SrcBonesTransforms = SrcRefSkeleton.GetRefBonePose();
+	const TArray<FTransform>& BonesTransforms = Modifier.GetReferenceSkeleton().GetRefBonePose();
+	const TArray<FTransform>& SrcBonesTransforms = SrcRefSkeleton.GetRefBonePose();
 
 	for (int32 BoneIndex = 0; BoneIndex < RefSkeleton.GetNum(); BoneIndex++)
 	{
 		FName BoneName = RefSkeleton.GetBoneName(BoneIndex);
+		FTransform NewTransform = BonesTransforms[BoneIndex];
 
 		int32 SrcBoneIndex = SrcRefSkeleton.FindBoneIndex(BoneName);
+		// no bone found, find the first available parent
+		if (SrcBoneIndex <= INDEX_NONE)
+		{
+			int32 ParentIndex = RefSkeleton.GetParentIndex(BoneIndex);
+			if (ParentIndex > INDEX_NONE)
+			{
+				FName ParentBoneName = RefSkeleton.GetBoneName(ParentIndex);
+				SrcBoneIndex = SrcRefSkeleton.FindBoneIndex(ParentBoneName);
+				while (SrcBoneIndex <= INDEX_NONE)
+				{
+					ParentIndex = RefSkeleton.GetParentIndex(ParentIndex);
+					if (ParentIndex > INDEX_NONE)
+					{
+						ParentBoneName = RefSkeleton.GetBoneName(ParentIndex);
+						SrcBoneIndex = SrcRefSkeleton.FindBoneIndex(ParentBoneName);
+					}
+					else
+					{
+						break;
+					}
+				}
+			}
+		}
 
 		if (SrcBoneIndex > INDEX_NONE)
 		{
-			FTransform NewTransform = BonesTransforms[BoneIndex];
 			NewTransform.SetRotation(SrcBonesTransforms[SrcBoneIndex].GetRotation());
 			int32 SrcParentIndex = SrcRefSkeleton.GetParentIndex(SrcBoneIndex);
 			FQuat AllRotations = FQuat::Identity;
@@ -775,6 +798,31 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 	}
 
+	/*
+	UPhysicsAsset* PhysicsAsset = NewObject<UPhysicsAsset>(SkeletalMeshContext->SkeletalMesh, NAME_None, RF_Public);
+	if (PhysicsAsset)
+	{
+		USkeletalBodySetup* NewBodySetup = NewObject<USkeletalBodySetup>(PhysicsAsset, NAME_None, RF_Public);
+		NewBodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
+		NewBodySetup->PhysicsType = PhysType_Default;
+		NewBodySetup->BoneName = "Chest";
+		NewBodySetup->bConsiderForBounds = true;
+		FKSphylElem Capsule;
+		Capsule.Length = 30;
+		Capsule.Radius = 100;
+		Capsule.Rotation = FRotator(90, 0, 0);
+		NewBodySetup->AggGeom.SphylElems.Add(Capsule);
+		int32 BodySetupIndex = PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
+
+
+		PhysicsAsset->UpdateBodySetupIndexMap();
+		PhysicsAsset->UpdateBoundsBodiesArray();
+
+		PhysicsAsset->PreviewSkeletalMesh = SkeletalMeshContext->SkeletalMesh;
+		SkeletalMeshContext->SkeletalMesh->PhysicsAsset = PhysicsAsset;
+	}
+	*/
+
 #if !WITH_EDITOR
 	SkeletalMeshContext->SkeletalMesh->PostLoad();
 #endif
@@ -1367,7 +1415,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			CompressionCodec->Tracks[BoneIndex].PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
 			CompressionCodec->Tracks[BoneIndex].RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
-		}
+}
 	}
 #endif
 
@@ -1544,7 +1592,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-}
+		}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
