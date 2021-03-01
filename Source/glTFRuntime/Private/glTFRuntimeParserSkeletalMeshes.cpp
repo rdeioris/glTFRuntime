@@ -798,31 +798,44 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 	}
 
-
-	/*UPhysicsAsset* PhysicsAsset = NewObject<UPhysicsAsset>(SkeletalMeshContext->SkeletalMesh, NAME_None, RF_Public);
-	if (PhysicsAsset)
+	if (SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies.Num() > 0)
 	{
-		USkeletalBodySetup* NewBodySetup = NewObject<USkeletalBodySetup>(PhysicsAsset, NAME_None, RF_Public);
-		NewBodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
-		NewBodySetup->PhysicsType = PhysType_Default;
-		NewBodySetup->BoneName = "Chest";
-		NewBodySetup->bConsiderForBounds = true;
+		UPhysicsAsset* PhysicsAsset = NewObject<UPhysicsAsset>(SkeletalMeshContext->SkeletalMesh, NAME_None, RF_Public);
+		if (PhysicsAsset)
+		{
+			for (const TPair<FString, FglTFRuntimePhysicsBody>& PhysicsBody : SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies)
+			{
+				if (PhysicsBody.Key.IsEmpty())
+				{
+					continue;
+				}
+				USkeletalBodySetup* NewBodySetup = NewObject<USkeletalBodySetup>(PhysicsAsset, NAME_None, RF_Public);
+				NewBodySetup->CollisionTraceFlag = PhysicsBody.Value.CollisionTraceFlag;
+				NewBodySetup->PhysicsType = PhysicsBody.Value.PhysicsType;
+				NewBodySetup->BoneName = FName(PhysicsBody.Key);
+				NewBodySetup->bConsiderForBounds = PhysicsBody.Value.bConsiderForBounds;
 
-		FKSphylElem Capsule;
-		Capsule.Length = 30;
-		Capsule.Radius = 100;
-		Capsule.Rotation = FRotator(90, 0, 0);
-		NewBodySetup->AggGeom.SphylElems.Add(Capsule);
-		int32 BodySetupIndex = PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
+				for (const FglTFRuntimeCapsule& CapsuleCollision : PhysicsBody.Value.CapsuleCollisions)
+				{
+					FKSphylElem Capsule;
+					Capsule.Length = CapsuleCollision.Length;
+					Capsule.Center = CapsuleCollision.Center;
+					Capsule.Radius = CapsuleCollision.Radius;
+					Capsule.Rotation = CapsuleCollision.Rotation;
+					NewBodySetup->AggGeom.SphylElems.Add(Capsule);
+				}
 
+				PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
+			}
 
-		PhysicsAsset->UpdateBodySetupIndexMap();
-		PhysicsAsset->UpdateBoundsBodiesArray();
+			PhysicsAsset->UpdateBodySetupIndexMap();
+			PhysicsAsset->UpdateBoundsBodiesArray();
 #if WITH_EDITOR
-		PhysicsAsset->PreviewSkeletalMesh = SkeletalMeshContext->SkeletalMesh;
+			PhysicsAsset->PreviewSkeletalMesh = SkeletalMeshContext->SkeletalMesh;
 #endif
-		SkeletalMeshContext->SkeletalMesh->PhysicsAsset = PhysicsAsset;
-	}*/
+			SkeletalMeshContext->SkeletalMesh->PhysicsAsset = PhysicsAsset;
+		}
+	}
 
 
 #if !WITH_EDITOR

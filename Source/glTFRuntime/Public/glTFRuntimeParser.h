@@ -444,6 +444,55 @@ struct FglTFRuntimeSkeletonConfig
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeCapsule
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector Center;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float Radius;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float Length;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FRotator Rotation;
+
+	FglTFRuntimeCapsule()
+	{
+		Radius = 0;
+		Length = 0;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimePhysicsBody
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<ECollisionTraceFlag> CollisionTraceFlag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<EPhysicsType> PhysicsType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bConsiderForBounds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FglTFRuntimeCapsule> CapsuleCollisions;
+
+	FglTFRuntimePhysicsBody()
+	{
+		CollisionTraceFlag = ECollisionTraceFlag::CTF_UseDefault;
+		PhysicsType = EPhysicsType::PhysType_Default;
+		bConsiderForBounds = true;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalMeshConfig
 {
 	GENERATED_BODY()
@@ -486,6 +535,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bIgnoreMissingBones;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, FglTFRuntimePhysicsBody> PhysicsBodies;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	UObject* Outer;
@@ -605,7 +657,7 @@ struct FglTFRuntimeLOD
 {
 	GENERATED_BODY()
 
-		TArray<FglTFRuntimePrimitive> Primitives;
+	TArray<FglTFRuntimePrimitive> Primitives;
 
 	bool bHasNormals;
 	bool bHasTangents;
