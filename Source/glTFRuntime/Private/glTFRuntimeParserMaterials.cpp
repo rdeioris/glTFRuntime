@@ -442,12 +442,24 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 				return nullptr;
 			}
 		}
-		else if (!BaseDirectory.IsEmpty())
+		else
 		{
-			if (!FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(BaseDirectory, Uri)))
+			bool bFound = false;
+			if (ZipFile)
 			{
-				AddError("LoadTexture()", FString::Printf(TEXT("Unable to load image %d from file %s"), ImageIndex, *Uri));
-				return nullptr;
+				if (ZipFile->GetFileContent(Uri, Bytes))
+				{
+					bFound = true;
+				}
+			}
+
+			if (!bFound && !BaseDirectory.IsEmpty())
+			{
+				if (!FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(BaseDirectory, Uri)))
+				{
+					AddError("LoadTexture()", FString::Printf(TEXT("Unable to load image %d from file %s"), ImageIndex, *Uri));
+					return nullptr;
+				}
 			}
 		}
 	}

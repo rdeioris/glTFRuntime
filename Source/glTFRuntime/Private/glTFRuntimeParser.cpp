@@ -149,6 +149,53 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		DataNum = *GzipOriginalSize;
 	}
 
+	// Zip archive ?
+	TSharedPtr<FglTFRuntimeZipFile> ZipFile = nullptr;
+	TArray64<uint8> UnzippedData;
+	if (DataNum > 4 && DataPtr[0] == 0x50 && DataPtr[1] == 0x4b && DataPtr[2] == 0x03 && DataPtr[3] == 0x04)
+	{
+		ZipFile = MakeShared<FglTFRuntimeZipFile>();
+		if (!ZipFile->FromData(DataPtr, DataNum))
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to parse Zip archive."));
+			return nullptr;
+		}
+
+		FString Filename = LoaderConfig.ArchiveEntryPoint;
+
+		if (Filename.IsEmpty())
+		{
+			TArray<FString> Extensions;
+			LoaderConfig.ArchiveAutoEntryPointExtensions.ParseIntoArray(Extensions, TEXT(" "), true);
+			for (const FString& Extension : Extensions)
+			{
+				Filename = ZipFile->GetFirstFilenameByExtension(Extension);
+				if (!Filename.IsEmpty())
+				{
+					break;
+				}
+			}
+		}
+
+		if (Filename.IsEmpty())
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to find entry point from Zip archive."), *Filename);
+			return nullptr;
+		}
+
+		if (!ZipFile->GetFileContent(Filename, UnzippedData))
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to get %s from Zip archive."), *Filename);
+			return nullptr;
+		}
+
+		if (UnzippedData.Num() > 0)
+		{
+			DataPtr = UnzippedData.GetData();
+			DataNum = UnzippedData.Num();
+		}
+	}
+
 	// detect binary format
 	if (DataNum > 20)
 	{
@@ -157,19 +204,21 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 			DataPtr[2] == 0x54 &&
 			DataPtr[3] == 0x46)
 		{
-			return FromBinary(DataPtr, DataNum, LoaderConfig);
+			return FromBinary(DataPtr, DataNum, LoaderConfig, ZipFile);
 		}
 	}
-	if (DataNum <= INT32_MAX)
+
+	if (DataNum > 0 && DataNum <= INT32_MAX)
 	{
 		FString JsonData;
 		FFileHelper::BufferToString(JsonData, DataPtr, (int32)DataNum);
-		return FromString(JsonData, LoaderConfig);
+		return FromString(JsonData, LoaderConfig, ZipFile);
 	}
+
 	return nullptr;
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
 {
 	TSharedPtr<FJsonValue> RootValue;
 
@@ -198,12 +247,14 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 				Parser->BaseDirectory = LoaderConfig.OverrideBaseDirectory;
 			}
 		}
+
+		Parser->ZipFile = InZipFile;
 	}
 
 	return Parser;
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
 {
 	FString JsonData;
 	TArray64<uint8> BinaryBuffer;
@@ -249,11 +300,14 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 		return nullptr;
 	}
 
-	TSharedPtr<FglTFRuntimeParser> Parser = FromString(JsonData, LoaderConfig);
+	TSharedPtr<FglTFRuntimeParser> Parser = FromString(JsonData, LoaderConfig, InZipFile);
 
-	if (Parser && bBinaryFound)
+	if (Parser)
 	{
-		Parser->SetBinaryBuffer(BinaryBuffer);
+		if (bBinaryFound)
+		{
+			Parser->SetBinaryBuffer(BinaryBuffer);
+		}
 	}
 
 	return Parser;
@@ -1877,20 +1931,29 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 			BuffersCache.Add(Index, Bytes);
 			return true;
 		}
+		return false;
 	}
-	else if (!BaseDirectory.IsEmpty())
+
+	if (ZipFile)
+	{
+		if (ZipFile->GetFileContent(Uri, Bytes))
+		{
+			BuffersCache.Add(Index, Bytes);
+			return true;
+		}
+	}
+
+	// fallback
+	if (!BaseDirectory.IsEmpty())
 	{
 		if (FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(BaseDirectory, Uri)))
 		{
 			BuffersCache.Add(Index, Bytes);
 			return true;
 		}
-		else
-		{
-			AddError("GetBuffer()", FString::Printf(TEXT("Unable to load buffer %d from file %s"), Index, *Uri));
-		}
 	}
 
+	AddError("GetBuffer()", FString::Printf(TEXT("Unable to load buffer %d from Uri %s"), Index, *Uri));
 	return false;
 }
 
@@ -2455,4 +2518,169 @@ bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName
 	}
 
 	return true;
+}
+
+bool FglTFRuntimeZipFile::FromData(const uint8* DataPtr, const int64 DataNum)
+{
+	Data.Append(DataPtr, DataNum);
+
+	// step0: retrieve the trailer magic
+	TArray<uint8> Magic;
+	bool bIndexFound = false;
+	uint64 Index = 0;
+	for (Index = Data.Num() - 1; Index >= 0; Index--)
+	{
+		Magic.Insert(Data[Index], 0);
+		if (Magic.Num() == 4)
+		{
+			if (Magic[0] == 0x50 && Magic[1] == 0x4b && Magic[2] == 0x05 && Magic[3] == 0x06)
+			{
+				bIndexFound = true;
+				break;
+			}
+			Magic.Pop();
+		}
+	}
+
+	if (!bIndexFound)
+	{
+		return false;
+	}
+
+	uint16 DiskEntries = 0;
+	uint16 TotalEntries = 0;
+	uint32 CentralDirectorySize = 0;
+	uint32 CentralDirectoryOffset = 0;
+	uint16 CommentLen = 0;
+
+	constexpr uint64 TrailerMinSize = 22;
+	constexpr uint64 CentralDirectoryMinSize = 46;
+
+	if (Index + TrailerMinSize > Data.Num())
+	{
+		return false;
+	}
+
+	// skip signature and disk data
+	Data.Seek(Index + 8);
+	Data << DiskEntries;
+	Data << TotalEntries;
+	Data << CentralDirectorySize;
+	Data << CentralDirectoryOffset;
+	Data << CommentLen;
+
+	uint16 DirectoryEntries = FMath::Min(DiskEntries, TotalEntries);
+
+	for (uint16 DirectoryIndex = 0; DirectoryIndex < DirectoryEntries; DirectoryIndex++)
+	{
+		if (CentralDirectoryOffset + CentralDirectoryMinSize > Data.Num())
+		{
+			return false;
+		}
+
+		uint16 FilenameLen = 0;
+		uint16 ExtraFieldLen = 0;
+		uint16 EntryCommentLen = 0;
+		uint32 EntryOffset = 0;
+
+		// seek to FilenameLen
+		Data.Seek(CentralDirectoryOffset + 28);
+		Data << FilenameLen;
+		Data << ExtraFieldLen;
+		Data << EntryCommentLen;
+		// seek to EntryOffset
+		Data.Seek(CentralDirectoryOffset + 42);
+		Data << EntryOffset;
+
+		if (CentralDirectoryOffset + CentralDirectoryMinSize + FilenameLen + ExtraFieldLen + EntryCommentLen > Data.Num())
+		{
+			return false;
+		}
+
+		TArray64<uint8> FilenameBytes;
+		FilenameBytes.Append(Data.GetData() + CentralDirectoryOffset + CentralDirectoryMinSize, FilenameLen);
+		FilenameBytes.Add(0);
+
+		FString Filename = FString(UTF8_TO_TCHAR(FilenameBytes.GetData()));
+
+		OffsetsMap.Add(Filename, EntryOffset);
+
+		CentralDirectoryOffset += CentralDirectoryMinSize + FilenameLen + ExtraFieldLen + EntryCommentLen;
+	}
+
+	return true;
+}
+
+bool FglTFRuntimeZipFile::GetFileContent(const FString& Filename, TArray64<uint8>& OutData)
+{
+	uint32* Offset = OffsetsMap.Find(Filename);
+	if (!Offset)
+	{
+		return false;
+	}
+
+	constexpr uint64 LocalEntryMinSize = 30;
+
+	if (*Offset + LocalEntryMinSize > Data.Num())
+	{
+		return false;
+	}
+
+	uint16 Compression = 0;
+	uint32 CompressedSize;
+	uint32 UncompressedSize = 0;
+	uint16 FilenameLen = 0;
+	uint16 ExtraFieldLen = 0;
+
+	// seek to Compression
+	Data.Seek(*Offset + 8);
+	Data << Compression;
+	// seek to CompressedSize
+	Data.Seek(*Offset + 18);
+	Data << CompressedSize;
+	Data << UncompressedSize;
+	Data << FilenameLen;
+	Data << ExtraFieldLen;
+
+	if (*Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen + CompressedSize > Data.Num())
+	{
+		return false;
+	}
+
+	if (Compression == 8)
+	{
+		OutData.AddUninitialized(UncompressedSize);
+		if (!FCompression::UncompressMemory(NAME_Zlib, OutData.GetData(), UncompressedSize, Data.GetData() + *Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen, CompressedSize, COMPRESS_NoFlags, -15))
+		{
+			return false;
+		}
+	}
+	else if (Compression == 0 && CompressedSize == UncompressedSize)
+	{
+		OutData.Append(Data.GetData() + *Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen, UncompressedSize);
+	}
+	else
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool FglTFRuntimeZipFile::FileExists(const FString& Filename) const
+{
+	return OffsetsMap.Contains(Filename);
+}
+
+FString FglTFRuntimeZipFile::GetFirstFilenameByExtension(const FString& Extension) const
+{
+	for (const TPair<FString, uint32>& Pair : OffsetsMap)
+	{
+		if (Pair.Key.EndsWith(Extension, ESearchCase::IgnoreCase))
+		{
+			return Pair.Key;
+		}
+	}
+
+	return "";
 }

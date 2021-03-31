@@ -13,6 +13,7 @@
 #if WITH_EDITOR
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
+#include "Serialization/ArrayReader.h"
 #include "glTFRuntimeParser.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
@@ -88,6 +89,12 @@ struct FglTFRuntimeConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bOverrideBaseDirectoryFromContentDir;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString ArchiveEntryPoint;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString ArchiveAutoEntryPointExtensions;
+
 	bool bSearchContentDir;
 
 	FglTFRuntimeConfig()
@@ -99,6 +106,7 @@ struct FglTFRuntimeConfig
 		bSearchContentDir = false;
 		bAllowExternalFiles = false;
 		bOverrideBaseDirectoryFromContentDir = false;
+		ArchiveAutoEntryPointExtensions = ".glb .gltf .json .js";
 	}
 
 	FMatrix GetMatrix() const
@@ -853,6 +861,21 @@ struct FglTFRuntimePathItem
 	}
 };
 
+class FglTFRuntimeZipFile
+{
+public:
+	bool FromData(const uint8* DataPtr, const int64 DataNum);
+
+	bool GetFileContent(const FString& Filename, TArray64<uint8>& OutData);
+
+	bool FileExists(const FString& Filename) const;
+
+	FString GetFirstFilenameByExtension(const FString& Extension) const;
+
+protected:
+	TMap<FString, uint32> OffsetsMap;
+	FArrayReader Data;
+};
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
 
@@ -865,12 +888,12 @@ public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale);
 
 	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig);
-	static TSharedPtr<FglTFRuntimeParser> FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig);
-	static TSharedPtr<FglTFRuntimeParser> FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig);
+	static TSharedPtr<FglTFRuntimeParser> FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile = nullptr);
+	static TSharedPtr<FglTFRuntimeParser> FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile = nullptr);
 	static TSharedPtr<FglTFRuntimeParser> FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig);
 
-	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig); }
-	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile = nullptr) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig, InZipFile); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile = nullptr) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig, InZipFile); }
 	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromData(Data.GetData(), Data.Num(), LoaderConfig); }
 	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromData(Data.GetData(), Data.Num(), LoaderConfig); }
 
@@ -1208,4 +1231,6 @@ protected:
 	}
 
 	bool MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive);
+
+	TSharedPtr<FglTFRuntimeZipFile> ZipFile;
 };

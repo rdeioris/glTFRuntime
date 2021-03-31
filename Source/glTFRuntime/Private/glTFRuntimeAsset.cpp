@@ -48,7 +48,7 @@ bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData, const FglTFRunti
 		return false;
 	}
 
-	Parser = FglTFRuntimeParser::FromString(JsonData, LoaderConfig);
+	Parser = FglTFRuntimeParser::FromString(JsonData, LoaderConfig, nullptr);
 	if (Parser)
 	{
 		FScriptDelegate Delegate;
