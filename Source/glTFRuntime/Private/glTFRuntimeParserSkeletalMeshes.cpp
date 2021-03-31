@@ -947,16 +947,6 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 		SkeletalMeshContext->LODs = LODs;
 
 		SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
-
-		if (SkeletalMeshContext->SkeletalMesh)
-		{
-			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, SkeletalMeshContext, AsyncCallback]()
-			{
-				SkeletalMeshContext->SkeletalMesh = FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
-				AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
-			}, TStatId(), nullptr, ENamedThreads::GameThread);
-			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
-		}
 	});
 }
 
