@@ -690,7 +690,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 				FString MorphTargetName = MorphTargetData.Name;
 				if (MorphTargetName.IsEmpty())
 				{
-					FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex);
+					MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex);
 				}
 				MorphTargetIndex++;
 				UMorphTarget* MorphTarget = NewObject<UMorphTarget>(SkeletalMeshContext->SkeletalMesh, *MorphTargetName, RF_Public);
