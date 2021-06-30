@@ -65,5 +65,7 @@ public class glTFRuntime : ModuleRules
 				// ... add any modules that your module loads dynamically here ...
 			}
             );
+
+        PublicDefinitions.Add("PLATFORM_WEAKLY_CONSISTENT_MEMORY=1");
     }
 }
