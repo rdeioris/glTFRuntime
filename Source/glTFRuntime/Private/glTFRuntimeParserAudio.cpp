@@ -2,6 +2,7 @@
 
 #include "glTFRuntimeParser.h"
 #include "Audio.h"
+#include "glTFRuntimeSoundWave.h"
 
 bool FglTFRuntimeParser::LoadEmitterIntoAudioComponent(const FglTFRuntimeAudioEmitter& Emitter, UAudioComponent* AudioComponent)
 {
@@ -84,22 +85,23 @@ bool FglTFRuntimeParser::LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntime
 								FWaveModInfo WaveModInfo;
 								if (WaveModInfo.ReadWaveInfo(Bytes.GetData(), Bytes.Num()))
 								{
-									Emitter.Sound = NewObject<USoundWave>(GetTransientPackage(), NAME_None, RF_Public);
-									Emitter.Sound->RawData.Lock(LOCK_READ_WRITE);
-									FMemory::Memcpy(Emitter.Sound->RawData.Realloc(Bytes.Num()), Bytes.GetData(), Bytes.Num());
-									Emitter.Sound->RawData.Unlock();
+									UglTFRuntimeSoundWave* RuntimeSound = NewObject<UglTFRuntimeSoundWave>(GetTransientPackage(), NAME_None, RF_Public);
 
-									Emitter.Sound->NumChannels = *WaveModInfo.pChannels;
+									RuntimeSound->NumChannels = *WaveModInfo.pChannels;
 
 									int32 SizeOfSample = (*WaveModInfo.pBitsPerSample) / 8;
 									int32 NumSamples = WaveModInfo.SampleDataSize / SizeOfSample;
-									int32 NumFrames = NumSamples / Emitter.Sound->NumChannels;
+									int32 NumFrames = NumSamples / RuntimeSound->NumChannels;
 
-									Emitter.Sound->Duration = (float)NumFrames / *WaveModInfo.pSamplesPerSec;
-									Emitter.Sound->SetSampleRate(*WaveModInfo.pSamplesPerSec);
-									Emitter.Sound->TotalSamples = *WaveModInfo.pSamplesPerSec * Emitter.Sound->Duration;
+									RuntimeSound->Duration = (float)NumFrames / *WaveModInfo.pSamplesPerSec;
+									RuntimeSound->SetSampleRate(*WaveModInfo.pSamplesPerSec);
+									RuntimeSound->TotalSamples = *WaveModInfo.pSamplesPerSec * RuntimeSound->Duration;
 
-									Emitter.Sound->bLooping = GetJsonObjectBool(JsonClip.ToSharedRef(), "loop", false);
+									RuntimeSound->bLooping = GetJsonObjectBool(JsonClip.ToSharedRef(), "loop", false);
+									
+									RuntimeSound->SetRuntimeAudioData(WaveModInfo.SampleDataStart, WaveModInfo.SampleDataSize);
+
+									Emitter.Sound = RuntimeSound;
 									break;
 								}
 							}
