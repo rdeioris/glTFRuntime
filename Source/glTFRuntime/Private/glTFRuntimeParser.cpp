@@ -459,7 +459,9 @@ bool FglTFRuntimeParser::LoadScenes(TArray<FglTFRuntimeScene>& Scenes)
 bool FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems)
 {
 	if (Index < 0)
+	{
 		return false;
+	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
 	if (!JsonObject->TryGetArrayField(FieldName, JsonArray))
@@ -491,10 +493,53 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromIndex(TSharedRef<FJ
 	return JsonArray[Index]->AsObject();
 }
 
+TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromExtensionIndex(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName, const int32 Index)
+{
+	if (Index < 0)
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonExtensionsObject;
+	if (!JsonObject->TryGetObjectField("extensions", JsonExtensionsObject))
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonExtensionObject = nullptr;
+	if (!(*JsonExtensionsObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
+	{
+		return false;
+	}
+
+	return GetJsonObjectFromIndex(JsonExtensionObject->ToSharedRef(), FieldName, Index);
+}
+
+
 FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue)
 {
 	FString Value;
 	if (!JsonObject->TryGetStringField(FieldName, Value))
+	{
+		return DefaultValue;
+	}
+	return Value;
+}
+
+double FglTFRuntimeParser::GetJsonObjectNumber(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const double DefaultValue)
+{
+	double Value;
+	if (!JsonObject->TryGetNumberField(FieldName, Value))
+	{
+		return DefaultValue;
+	}
+	return Value;
+}
+
+bool FglTFRuntimeParser::GetJsonObjectBool(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const bool DefaultValue)
+{
+	bool Value;
+	if (!JsonObject->TryGetBoolField(FieldName, Value))
 	{
 		return DefaultValue;
 	}
@@ -511,11 +556,64 @@ int32 FglTFRuntimeParser::GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject,
 	return (int32)Value;
 }
 
+int32 FglTFRuntimeParser::GetJsonExtensionObjectIndex(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName, const int32 DefaultValue)
+{
+	const TSharedPtr<FJsonObject>* JsonExtensionsObject;
+	if (!JsonObject->TryGetObjectField("extensions", JsonExtensionsObject))
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonExtensionObject = nullptr;
+	if (!(*JsonExtensionObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
+	{
+		return false;
+	}
+
+	return GetJsonObjectIndex(JsonExtensionObject->ToSharedRef(), FieldName, DefaultValue);
+}
+
+TArray<int32> FglTFRuntimeParser::GetJsonExtensionObjectIndices(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName)
+{
+	TArray<int32> Indices;
+	const TSharedPtr<FJsonObject>* JsonExtensionsObject;
+	if (!JsonObject->TryGetObjectField("extensions", JsonExtensionsObject))
+	{
+		return Indices;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonExtensionObject = nullptr;
+	if (!(*JsonExtensionsObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
+	{
+		return Indices;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (!(*JsonExtensionObject)->TryGetArrayField(FieldName, JsonArray))
+	{
+		return Indices;
+	}
+
+	for (TSharedPtr<FJsonValue> JsonItem : *JsonArray)
+	{
+		int32 Index;
+		if (!JsonItem->TryGetNumber(Index))
+		{
+			return Indices;
+		}
+		Indices.Add(Index);
+	}
+
+	return Indices;
+}
+
 bool FglTFRuntimeParser::LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene)
 {
 	TSharedPtr<FJsonObject> JsonSceneObject = GetJsonObjectFromRootIndex("scenes", SceneIndex);
 	if (!JsonSceneObject)
+	{
 		return false;
+	}
 
 	Scene.Index = SceneIndex;
 	Scene.Name = GetJsonObjectString(JsonSceneObject.ToSharedRef(), "name", FString::FromInt(Scene.Index));
@@ -635,6 +733,8 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	Node.SkinIndex = GetJsonObjectIndex(JsonNodeObject, "skin", INDEX_NONE);
 
 	Node.CameraIndex = GetJsonObjectIndex(JsonNodeObject, "camera", INDEX_NONE);
+
+	Node.EmitterIndices = GetJsonExtensionObjectIndices(JsonNodeObject, "MSFT_audio_emitter", "emitters");
 
 	FMatrix Matrix = FMatrix::Identity;
 
@@ -2683,4 +2783,55 @@ FString FglTFRuntimeZipFile::GetFirstFilenameByExtension(const FString& Extensio
 	}
 
 	return "";
+}
+
+bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, TArray64<uint8>& Bytes)
+{
+	FString Uri;
+	if (JsonObject->TryGetStringField("uri", Uri))
+	{
+		// check it is a valid base64 data uri
+		if (Uri.StartsWith("data:"))
+		{
+			if (!ParseBase64Uri(Uri, Bytes))
+			{
+				return false;
+			}
+		}
+		else
+		{
+			bool bFound = false;
+			if (ZipFile)
+			{
+				if (ZipFile->GetFileContent(Uri, Bytes))
+				{
+					bFound = true;
+				}
+			}
+
+			if (!bFound && !BaseDirectory.IsEmpty())
+			{
+				if (!FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(BaseDirectory, Uri)))
+				{
+					AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to load bytes from uri %s"), *Uri));
+					return false;
+				}
+			}
+		}
+	}
+	else
+	{
+		int64 BufferViewIndex;
+		if (JsonObject->TryGetNumberField("bufferView", BufferViewIndex))
+		{
+			int64 Stride;
+			if (!GetBufferView(BufferViewIndex, Bytes, Stride))
+			{
+				AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to get bufferView: %d"), BufferViewIndex));
+				return false;
+			}
+		}
+	}
+
+	return Bytes.Num() > 0;
 }

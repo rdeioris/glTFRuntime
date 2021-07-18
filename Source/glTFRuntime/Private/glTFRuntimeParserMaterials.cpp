@@ -431,54 +431,9 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	TArray64<uint8> Bytes;
 	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
 
-	FString Uri;
-	if (JsonImageObject->TryGetStringField("uri", Uri))
+	if (!GetJsonObjectBytes(JsonImageObject.ToSharedRef(), Bytes))
 	{
-		// check it is a valid base64 data uri
-		if (Uri.StartsWith("data:"))
-		{
-			if (!ParseBase64Uri(Uri, Bytes))
-			{
-				return nullptr;
-			}
-		}
-		else
-		{
-			bool bFound = false;
-			if (ZipFile)
-			{
-				if (ZipFile->GetFileContent(Uri, Bytes))
-				{
-					bFound = true;
-				}
-			}
-
-			if (!bFound && !BaseDirectory.IsEmpty())
-			{
-				if (!FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(BaseDirectory, Uri)))
-				{
-					AddError("LoadTexture()", FString::Printf(TEXT("Unable to load image %d from file %s"), ImageIndex, *Uri));
-					return nullptr;
-				}
-			}
-		}
-	}
-	else
-	{
-		int64 BufferViewIndex;
-		if (JsonImageObject->TryGetNumberField("bufferView", BufferViewIndex))
-		{
-			int64 Stride;
-			if (!GetBufferView(BufferViewIndex, Bytes, Stride))
-			{
-				AddError("LoadTexture()", FString::Printf(TEXT("Unable to get bufferView: %d"), BufferViewIndex));
-				return nullptr;
-			}
-		}
-	}
-
-	if (Bytes.Num() == 0)
-	{
+		AddError("LoadTexture()", FString::Printf(TEXT("Unable to load image %d"), ImageIndex));
 		return nullptr;
 	}
 

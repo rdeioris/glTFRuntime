@@ -122,6 +122,22 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		return;
 	}
 
+	// check for audio emitters
+	for (const int32 EmitterIndex : Node.EmitterIndices)
+	{
+		FglTFRuntimeAudioEmitter AudioEmitter;
+		if (Asset->LoadAudioEmitter(EmitterIndex, AudioEmitter))
+		{
+			UAudioComponent* AudioComponent = NewObject<UAudioComponent>(this, *AudioEmitter.Name);
+			AudioComponent->SetupAttachment(NewComponent);
+			AudioComponent->RegisterComponent();
+			AudioComponent->SetRelativeTransform(Node.Transform);
+			AddInstanceComponent(AudioComponent);
+			Asset->LoadEmitterIntoAudioComponent(AudioEmitter, AudioComponent);
+			AudioComponent->Play();
+		}
+	}
+
 	// check for animations
 	if (!NewComponent->IsA<USkeletalMeshComponent>())
 	{

@@ -492,3 +492,15 @@ int32 UglTFRuntimeAsset::GetArraySizeFromPath(const TArray<FglTFRuntimePathItem>
 	GLTF_CHECK_PARSER(-1);
 	return Parser->GetJSONArraySizeFromPath(Path, bFound);
 }
+
+bool UglTFRuntimeAsset::LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter)
+{
+	GLTF_CHECK_PARSER(false);
+	return Parser->LoadAudioEmitter(EmitterIndex, Emitter);
+}
+
+bool UglTFRuntimeAsset::LoadEmitterIntoAudioComponent(const FglTFRuntimeAudioEmitter& Emitter, UAudioComponent* AudioComponent)
+{
+	GLTF_CHECK_PARSER(false);
+	return Parser->LoadEmitterIntoAudioComponent(Emitter, AudioComponent);
+}
