@@ -143,6 +143,7 @@ bool UglTFRuntimeAsset::GetNode(const int32 NodeIndex, FglTFRuntimeNode& Node)
 
 ACameraActor* UglTFRuntimeAsset::LoadNodeCamera(UObject* WorldContextObject, const int32 NodeIndex, TSubclassOf<ACameraActor> CameraActorClass)
 {
+	SCOPED_NAMED_EVENT(UglTFRuntimeAsset_LoadNodeCamera, FColor::Cyan);
 	GLTF_CHECK_PARSER(nullptr);
 
 	if (!CameraActorClass)
@@ -195,6 +196,7 @@ bool UglTFRuntimeAsset::LoadCamera(const int32 CameraIndex, UCameraComponent* Ca
 
 TArray<int32> UglTFRuntimeAsset::GetCameraNodesIndices()
 {
+	SCOPED_NAMED_EVENT(UglTFRuntimeAsset_GetCameraNodesIndices, FColor::Cyan);
 	TArray<int32> NodeIndices;
 
 	GLTF_CHECK_PARSER(NodeIndices);
@@ -328,6 +330,8 @@ UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* Ske
 
 bool UglTFRuntimeAsset::BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform)
 {
+	SCOPED_NAMED_EVENT(UglTFRuntimeAsset_BuildTransformFromNodeBackward, FColor::Cyan);
+
 	GLTF_CHECK_PARSER(false);
 
 	Transform = FTransform::Identity;
@@ -356,6 +360,8 @@ bool UglTFRuntimeAsset::NodeIsBone(const int32 NodeIndex)
 
 bool UglTFRuntimeAsset::BuildTransformFromNodeForward(const int32 NodeIndex, const int32 LastNodeIndex, FTransform& Transform)
 {
+	SCOPED_NAMED_EVENT(UglTFRuntimeAsset_BuildTransformFromNodeForward, FColor::Cyan);
+	
 	GLTF_CHECK_PARSER(false);
 
 	Transform = FTransform::Identity;
@@ -393,6 +399,8 @@ bool UglTFRuntimeAsset::BuildTransformFromNodeForward(const int32 NodeIndex, con
 
 UAnimMontage* UglTFRuntimeAsset::LoadSkeletalAnimationAsMontage(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FString& SlotNodeName, const FglTFRuntimeSkeletalAnimationConfig& AnimationConfig)
 {
+	SCOPED_NAMED_EVENT(UglTFRuntimeAsset_LoadSkeletalAnimationAsMontage, FColor::Cyan);
+
 	UAnimSequence* AnimSequence = LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, AnimationConfig);
 	if (!AnimSequence)
 	{
@@ -433,6 +441,8 @@ UAnimSequence* UglTFRuntimeAsset::LoadNodeSkeletalAnimation(USkeletalMesh* Skele
 
 bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32>& NodeIndices, const FString& NodeName, FglTFRuntimeNode& Node)
 {
+	SCOPED_NAMED_EVENT(UglTFRuntimeAsset_FindNodeByNameInArray, FColor::Cyan);
+
 	GLTF_CHECK_PARSER(false);
 
 	for (int32 NodeIndex : NodeIndices)

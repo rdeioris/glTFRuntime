@@ -21,6 +21,8 @@ void AglTFRuntimeAssetActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	SCOPED_NAMED_EVENT(AglTFRuntimeAssetActor_BeginPlay, FColor::Cyan);
+
 	if (!Asset)
 	{
 		return;
@@ -47,6 +49,8 @@ void AglTFRuntimeAssetActor::BeginPlay()
 
 void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, FglTFRuntimeNode& Node)
 {
+	SCOPED_NAMED_EVENT(AglTFRuntimeAssetActor_ProcessNode, FColor::Cyan);
+
 	// skip bones/joints
 	if (Asset->NodeIsBone(Node.Index))
 	{
@@ -182,6 +186,8 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 
 void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimationName)
 {
+	SCOPED_NAMED_EVENT(AglTFRuntimeAssetActor_SetCurveAnimationByName, FColor::Cyan);
+
 	if (!DiscoveredCurveAnimationsNames.Contains(CurveAnimationName))
 	{
 		return;
@@ -208,6 +214,7 @@ void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimati
 // Called every frame
 void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 {
+	SCOPED_NAMED_EVENT(AglTFRuntimeAssetActor_Tick, FColor::Cyan);
 	Super::Tick(DeltaTime);
 
 	for (TPair<USceneComponent*, UglTFRuntimeAnimationCurve*>& Pair : CurveBasedAnimations)

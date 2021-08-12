@@ -4,6 +4,8 @@
 
 TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromPath(const TArray<FglTFRuntimePathItem>& Path) const
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetJSONObjectFromPath, FColor::Cyan);
+
 	if (Path.Num() == 0)
 	{
 		return nullptr;
@@ -80,6 +82,8 @@ TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromPath(const TArray<Fg
 
 FString FglTFRuntimeParser::GetJSONStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetJSONStringFromPath, FColor::Cyan);
+
 	FString ReturnValue = "";
 	bFound = false;
 
@@ -96,6 +100,8 @@ FString FglTFRuntimeParser::GetJSONStringFromPath(const TArray<FglTFRuntimePathI
 
 double FglTFRuntimeParser::GetJSONNumberFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetJSONNumberFromPath, FColor::Cyan);
+
 	double ReturnValue = 0;
 	bFound = false;
 
@@ -111,6 +117,8 @@ double FglTFRuntimeParser::GetJSONNumberFromPath(const TArray<FglTFRuntimePathIt
 
 bool FglTFRuntimeParser::GetJSONBooleanFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetJSONBooleanFromPath, FColor::Cyan);
+
 	bool ReturnValue = false;
 	bFound = false;
 
@@ -126,6 +134,8 @@ bool FglTFRuntimeParser::GetJSONBooleanFromPath(const TArray<FglTFRuntimePathIte
 
 int32 FglTFRuntimeParser::GetJSONArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetJSONArraySizeFromPath, FColor::Cyan);
+
 	int32 ReturnValue = -1;
 	bFound = false;
 

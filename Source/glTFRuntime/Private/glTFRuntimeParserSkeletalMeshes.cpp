@@ -160,6 +160,8 @@ void FglTFRuntimeParser::CopySkeletonRotationsFrom(FReferenceSkeleton& RefSkelet
 
 USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_CreateSkeletalMeshFromLODs, FColor::Cyan);
+
 	if (SkeletalMeshContext->SkeletalMeshConfig.OverrideSkinIndex > INDEX_NONE)
 	{
 		SkeletalMeshContext->SkinIndex = SkeletalMeshContext->SkeletalMeshConfig.OverrideSkinIndex;
@@ -650,6 +652,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FinalizeSkeletalMeshWithLODs, FColor::Cyan);
 
 #if !WITH_EDITOR
 	bool bHasMorphTargets = false;
@@ -746,6 +749,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #else
 	if (bHasMorphTargets)
 	{
+		SCOPED_NAMED_EVENT(FglTFRuntimeParser_FinalizeSkeletalMeshWithLODs_InitMorphTargets, FColor::Cyan);
 		SkeletalMeshContext->SkeletalMesh->InitMorphTargets();
 	}
 #endif
@@ -764,6 +768,8 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #if WITH_EDITOR
 	SkeletalMeshContext->SkeletalMesh->VertexColorGuid = SkeletalMeshContext->SkeletalMesh->bHasVertexColors ? FGuid::NewGuid() : FGuid();
 #endif
+
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FinalizeSkeletalMeshWithLODs_Config, FColor::Cyan);
 
 	if (SkeletalMeshContext->SkeletalMeshConfig.Skeleton)
 	{
@@ -802,6 +808,8 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalMeshContext->SkeletalMesh->Skeleton->Sockets.Add(SkeletalSocket);
 		}
 	}
+
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FinalizeSkeletalMeshWithLODs_PhysicsBodies, FColor::Cyan);
 
 	if (SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies.Num() > 0)
 	{
@@ -852,6 +860,8 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		OnSkeletalMeshCreated.Broadcast(SkeletalMeshContext->SkeletalMesh);
 	}
 
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FinalizeSkeletalMeshWithLODs_SavePackage, FColor::Cyan);
+
 #if WITH_EDITOR
 	if (!SkeletalMeshContext->SkeletalMeshConfig.SaveToPackage.IsEmpty())
 	{
@@ -872,6 +882,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeletalMesh, FColor::Cyan);
 
 	// first check cache
 	if (CanReadFromCache(SkeletalMeshConfig.CacheMode) && SkeletalMeshesCache.Contains(MeshIndex))
@@ -929,6 +940,8 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, MeshIndex, AsyncCallback]()
 	{
+		SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeletalMeshAsync, FColor::Cyan);
+
 		FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
 
 		TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
@@ -957,6 +970,8 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeletalMeshLODs, FColor::Cyan);
+
 	TArray<FglTFRuntimeLOD> LODs;
 
 	for (const int32 MeshIndex : MeshIndices)
@@ -993,6 +1008,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> Mesh
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const TArray<FString>&ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeletalMeshRecursive, FColor::Cyan);
+
 	FglTFRuntimeNode Node;
 	TArray<FglTFRuntimeNode> Nodes;
 
@@ -1133,6 +1150,8 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, ExcludeNodes, NodeName, SkinIndex, AsyncCallback]()
 	{
+		SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeletalMeshRecursiveAsync, FColor::Cyan);
+
 		FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
 
 		FglTFRuntimeNode Node;
@@ -1266,6 +1285,8 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeletalAnimationByName, FColor::Cyan);
+
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1301,6 +1322,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * S
 
 UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadNodeSkeletalAnimation, FColor::Cyan);
 
 	if (!SkeletalMesh)
 	{
@@ -1383,6 +1405,8 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeletalAnimation, FColor::Cyan);
+
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1606,6 +1630,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
+
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeletalAnimation_Internal, FColor::Cyan);
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
 	{

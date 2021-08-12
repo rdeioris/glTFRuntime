@@ -11,6 +11,7 @@
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>>& PrimitivesCache)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadStaticMesh_Internal, FColor::Cyan);
 
 	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(StaticMeshConfig.Outer ? StaticMeshConfig.Outer : GetTransientPackage(), NAME_None, RF_Public);
 	StaticMesh->bAllowCPUAccess = StaticMeshConfig.bAllowCPUAccess;
@@ -358,6 +359,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 
 bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadStaticMeshes, FColor::Cyan);
+
 	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;
 	// no meshes ?
 	if (!Root->TryGetArrayField("meshes", JsonMeshes))
@@ -380,6 +383,7 @@ bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, co
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadStaticMesh, FColor::Cyan);
 
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 	if (!JsonMeshObject)
@@ -412,6 +416,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const Fgl
 
 TArray<UStaticMesh*> FglTFRuntimeParser::LoadStaticMeshesFromPrimitives(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadStaticMeshesFromPrimitives, FColor::Cyan);
+
 	TArray<UStaticMesh*> StaticMeshes;
 
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
@@ -450,6 +456,8 @@ TArray<UStaticMesh*> FglTFRuntimeParser::LoadStaticMeshesFromPrimitives(const in
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMeshLODs(const TArray<int32> MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadStaticMeshLODs, FColor::Cyan);
+
 	TArray<TSharedRef<FJsonObject>> JsonMeshObjects;
 
 	for (const int32 MeshIndex : MeshIndices)
@@ -469,6 +477,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshLODs(const TArray<int32> MeshIndi
 
 bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadStaticMeshIntoProceduralMeshComponent, FColor::Cyan);
+
 	if (!ProceduralMeshComponent)
 	{
 		return false;
@@ -521,6 +531,8 @@ bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 M
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMeshByName(const FString Name, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadStaticMeshByName, FColor::Cyan);
+
 	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;
 	if (!Root->TryGetArrayField("meshes", JsonMeshes))
 	{

@@ -13,6 +13,8 @@ DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromFilename, FColor::Cyan);
+
 	FString TruePath = Filename;
 
 	if (LoaderConfig.bSearchContentDir)
@@ -64,6 +66,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromData, FColor::Cyan);
+
 	// required for Gzip;
 	TArray<uint8> UncompressedData;
 
@@ -220,6 +224,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromString, FColor::Cyan);
+
 	TSharedPtr<FJsonValue> RootValue;
 
 	TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonData);
@@ -256,6 +262,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromBinary, FColor::Cyan);
+
 	FString JsonData;
 	TArray64<uint8> BinaryBuffer;
 
@@ -315,6 +323,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 
 FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_Constructor, FColor::Cyan);
+
 	bAllNodesCached = false;
 
 	UMaterialInterface* OpaqueMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeBase"));
@@ -369,6 +379,8 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 
 bool FglTFRuntimeParser::LoadNodes()
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadNodes, FColor::Cyan);
+
 	if (bAllNodesCached)
 	{
 		return true;
@@ -416,6 +428,8 @@ void FglTFRuntimeParser::FixNodeParent(FglTFRuntimeNode& Node)
 
 bool FglTFRuntimeParser::LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadNodesRecursive, FColor::Cyan);
+
 	FglTFRuntimeNode Node;
 	if (!LoadNode(NodeIndex, Node))
 	{
@@ -438,6 +452,8 @@ bool FglTFRuntimeParser::LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFR
 
 bool FglTFRuntimeParser::LoadScenes(TArray<FglTFRuntimeScene>& Scenes)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadScenes, FColor::Cyan);
+
 	const TArray<TSharedPtr<FJsonValue>>* JsonScenes;
 	// no scenes ?
 	if (!Root->TryGetArrayField("scenes", JsonScenes))
@@ -609,6 +625,8 @@ TArray<int32> FglTFRuntimeParser::GetJsonExtensionObjectIndices(TSharedRef<FJson
 
 bool FglTFRuntimeParser::LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadScene, FColor::Cyan);
+
 	TSharedPtr<FJsonObject> JsonSceneObject = GetJsonObjectFromRootIndex("scenes", SceneIndex);
 	if (!JsonSceneObject)
 	{
@@ -638,6 +656,8 @@ bool FglTFRuntimeParser::LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene)
 
 bool FglTFRuntimeParser::GetAllNodes(TArray<FglTFRuntimeNode>& Nodes)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetAllNodes, FColor::Cyan);
+
 	if (!bAllNodesCached)
 	{
 		if (!LoadNodes())
@@ -651,6 +671,8 @@ bool FglTFRuntimeParser::GetAllNodes(TArray<FglTFRuntimeNode>& Nodes)
 
 bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadNode, FColor::Cyan);
+
 	// a bit hacky, but allows zero-copy for cached values
 	if (!bAllNodesCached)
 	{
@@ -667,6 +689,8 @@ bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 
 bool FglTFRuntimeParser::LoadNodeByName(const FString& Name, FglTFRuntimeNode& Node)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadNodeByName, FColor::Cyan);
+
 	// a bit hacky, but allows zero-copy for cached values
 	if (!bAllNodesCached)
 	{
@@ -706,6 +730,8 @@ void FglTFRuntimeParser::ClearErrors()
 
 bool FglTFRuntimeParser::FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues, FMatrix& Matrix)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FillJsonMatrix, FColor::Cyan);
+
 	if (JsonMatrixValues->Num() != 16)
 		return false;
 
@@ -725,6 +751,8 @@ bool FglTFRuntimeParser::FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* Js
 
 bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadNode_Internal, FColor::Cyan);
+
 	Node.Index = Index;
 	Node.Name = GetJsonObjectString(JsonNodeObject, "name", FString::FromInt(Node.Index));
 
@@ -809,6 +837,8 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 
 bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadAnimation_Internal, FColor::Cyan);
+
 	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
@@ -914,6 +944,8 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 
 TArray<FString> FglTFRuntimeParser::GetCamerasNames()
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetCamerasNames, FColor::Cyan);
+
 	TArray<FString> CamerasNames;
 	const TArray<TSharedPtr<FJsonValue>>* JsonCameras;
 	if (!Root->TryGetArrayField("cameras", JsonCameras))
@@ -943,6 +975,8 @@ TArray<FString> FglTFRuntimeParser::GetCamerasNames()
 
 UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int32 NodeIndex)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadNodeAnimationCurve, FColor::Cyan);
+
 	FglTFRuntimeNode Node;
 	if (!LoadNode(NodeIndex, Node))
 		return nullptr;
@@ -1032,6 +1066,8 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 
 TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurves(const int32 NodeIndex)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadAllNodeAnimationCurves, FColor::Cyan);
+
 	TArray<UglTFRuntimeAnimationCurve*> AnimationCurves;
 
 	FglTFRuntimeNode Node;
@@ -1124,6 +1160,8 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 
 bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_HasRoot, FColor::Cyan);
+
 	if (Index == RootIndex)
 		return true;
 
@@ -1144,6 +1182,8 @@ bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)
 
 int32 FglTFRuntimeParser::FindTopRoot(int32 Index)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FindTopRoot, FColor::Cyan);
+
 	FglTFRuntimeNode Node;
 	if (!LoadNode(Index, Node))
 		return INDEX_NONE;
@@ -1158,6 +1198,8 @@ int32 FglTFRuntimeParser::FindTopRoot(int32 Index)
 
 int32 FglTFRuntimeParser::FindCommonRoot(const TArray<int32>& Indices)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FindCommonRoot, FColor::Cyan);
+
 	int32 CurrentRootIndex = Indices[0];
 	bool bTryNextParent = true;
 
@@ -1184,6 +1226,8 @@ int32 FglTFRuntimeParser::FindCommonRoot(const TArray<int32>& Indices)
 
 bool FglTFRuntimeParser::LoadCameraIntoCameraComponent(const int32 CameraIndex, UCameraComponent* CameraComponent)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadCameraIntoCameraComponent, FColor::Cyan);
+
 	if (!CameraComponent)
 	{
 		AddError("LoadCameraIntoCameraComponent()", "No valid CameraComponent specified.");
@@ -1272,6 +1316,8 @@ bool FglTFRuntimeParser::LoadCameraIntoCameraComponent(const int32 CameraIndex, 
 
 USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadSkeleton, FColor::Cyan);
+
 	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
 	if (!JsonSkinObject)
 	{
@@ -1321,6 +1367,8 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 
 bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_NodeIsBone, FColor::Cyan);
+
 	const TArray<TSharedPtr<FJsonValue>>* JsonSkins;
 	if (!Root->TryGetArrayField("skins", JsonSkins))
 	{
@@ -1360,6 +1408,8 @@ bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
 
 bool FglTFRuntimeParser::FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FillFakeSkeleton, FColor::Cyan);
+
 	RefSkeleton.Empty();
 
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
@@ -1427,6 +1477,8 @@ bool FglTFRuntimeParser::FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<
 
 bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FillReferenceSkeleton, FColor::Cyan);
+
 	// get the list of valid joints	
 	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
 	TArray<int32> Joints;
@@ -1539,6 +1591,8 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_TraverseJoints, FColor::Cyan);
+
 	// add fake root bone ?
 	if (Parent == INDEX_NONE && SkeletonConfig.bAddRootBone)
 	{
@@ -1618,6 +1672,8 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 
 bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadPrimitives, FColor::Cyan);
+
 	// get primitives
 	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
 	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
@@ -1720,6 +1776,8 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 
 bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadPrimitive, FColor::Cyan);
+
 	const TSharedPtr<FJsonObject>* JsonAttributesObject;
 	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
 	{
@@ -2461,6 +2519,8 @@ float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float
 
 bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_MergePrimitives, FColor::Cyan);
+
 	if (SourcePrimitives.Num() < 1)
 	{
 		return false;
@@ -2564,6 +2624,8 @@ bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePri
 
 bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName>& MorphTargetNames)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetMorphTargetNames, FColor::Cyan);
+
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 	if (!JsonMeshObject)
 	{
@@ -2622,6 +2684,8 @@ bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName
 
 bool FglTFRuntimeZipFile::FromData(const uint8* DataPtr, const int64 DataNum)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromData, FColor::Cyan);
+
 	Data.Append(DataPtr, DataNum);
 
 	// step0: retrieve the trailer magic
@@ -2713,6 +2777,8 @@ bool FglTFRuntimeZipFile::FromData(const uint8* DataPtr, const int64 DataNum)
 
 bool FglTFRuntimeZipFile::GetFileContent(const FString& Filename, TArray64<uint8>& OutData)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_GetFileContent, FColor::Cyan);
+
 	uint32* Offset = OffsetsMap.Find(Filename);
 	if (!Offset)
 	{

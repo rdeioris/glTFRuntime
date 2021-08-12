@@ -12,6 +12,8 @@
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadMaterial_Internal, FColor::Cyan);
+
 	FglTFRuntimeMaterial RuntimeMaterial;
 
 	RuntimeMaterial.BaseSpecularFactor = MaterialsConfig.SpecularFactor;
@@ -186,6 +188,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 
 UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_BuildTexture, FColor::Cyan);
+
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
 
 	Texture->PlatformData = new FTexturePlatformData();
@@ -239,6 +243,8 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_BuildMaterial, FColor::Cyan);
+
 	UMaterialInterface* BaseMaterial = nullptr;
 
 	if (MetallicRoughnessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
@@ -360,6 +366,8 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 
 UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadTexture, FColor::Cyan);
+
 	if (TextureIndex < 0)
 	{
 		return nullptr;
@@ -535,6 +543,8 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadMaterial, FColor::Cyan);
+
 	if (Index < 0)
 		return nullptr;
 
