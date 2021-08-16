@@ -358,7 +358,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			}
 		}
 
-#if ENGINE_MINOR_VERSION > 25
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
 		FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences, FString::Printf(TEXT("LOD_%d"), ImportedResource->LODModels.Num()));
 #else
 		FLODUtilities::ProcessImportMeshInfluences(Wedges.Num(), Influences);
@@ -729,7 +729,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 #if WITH_EDITOR
 		IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
-#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION >= 27
+#if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION >= 27
 		FSkeletalMeshBuildParameters SkeletalMeshBuildParameters(SkeletalMeshContext->SkeletalMesh, GetTargetPlatformManagerRef().GetRunningTargetPlatform(), LODIndex, false);
 		if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshBuildParameters))
 #else

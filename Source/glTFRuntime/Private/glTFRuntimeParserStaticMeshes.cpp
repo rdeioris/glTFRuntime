@@ -222,8 +222,14 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 			}
 		}
 
-		StaticMesh->StaticMaterials.Append(StaticMaterials);
 
+#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+		TArray<FStaticMaterial> CurrentStaticMaterials = StaticMesh->GetStaticMaterials();
+		CurrentStaticMaterials.Append(StaticMaterials);
+		StaticMesh->SetStaticMaterials(CurrentStaticMaterials);
+#else
+		StaticMesh->StaticMaterials.Append(StaticMaterials);
+#endif
 		
 		if (bCalculateNormals || bCalculateTangents)
 		{
@@ -251,12 +257,20 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	bIsMobile |= Editor->GetActiveFeatureLevelPreviewType() == ERHIFeatureLevel::ES3_1;
 #endif
 
-	if ((bHasVertexColors || bIsMobile) && StaticMesh->RenderData && StaticMesh->RenderData->LODResources.Num() > 0)
+#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+	FStaticMeshRenderData* RenderData = StaticMesh->GetRenderData();
+	UBodySetup* BodySetup = StaticMesh->GetBodySetup();
+#else
+	FStaticMeshRenderData* RenderData = StaticMesh->RenderData;
+	UBodySetup* BodySetup = StaticMesh->BodySetup;
+#endif
+
+	if ((bHasVertexColors || bIsMobile) && RenderData && RenderData->LODResources.Num() > 0)
 	{
 		StaticMesh->ReleaseResources();
-		for (int32 LODIndex = 0; LODIndex < StaticMesh->RenderData->LODResources.Num(); LODIndex++)
+		for (int32 LODIndex = 0; LODIndex < RenderData->LODResources.Num(); LODIndex++)
 		{
-			StaticMesh->RenderData->LODResources[LODIndex].bHasColorVertexData = true;
+			RenderData->LODResources[LODIndex].bHasColorVertexData = true;
 		}
 		StaticMesh->InitResources();
 	}
@@ -265,27 +279,27 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	for (const TPair<int32, float>& Pair : StaticMeshConfig.LODScreenSize)
 	{
 		int32 CurrentLODIndex = Pair.Key;
-		if (StaticMesh->RenderData && CurrentLODIndex >= 0 && CurrentLODIndex < StaticMesh->RenderData->LODResources.Num())
+		if (RenderData && CurrentLODIndex >= 0 && CurrentLODIndex < RenderData->LODResources.Num())
 		{
-			StaticMesh->RenderData->ScreenSize[CurrentLODIndex].Default = Pair.Value;
+			RenderData->ScreenSize[CurrentLODIndex].Default = Pair.Value;
 		}
 	}
 
-	if (!StaticMesh->BodySetup)
+	if (!BodySetup)
 	{
 		StaticMesh->CreateBodySetup();
 	}
 
-	StaticMesh->BodySetup->bMeshCollideAll = false;
-	StaticMesh->BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
+	BodySetup->bMeshCollideAll = false;
+	BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
 
-	StaticMesh->BodySetup->InvalidatePhysicsData();
+	BodySetup->InvalidatePhysicsData();
 
 	// required for building complex collisions
 #if !WITH_EDITOR
-	if (!bIsMobile && StaticMesh->bAllowCPUAccess && StaticMesh->RenderData && StaticMesh->RenderData->LODResources.Num() > 0)
+	if (!bIsMobile && StaticMesh->bAllowCPUAccess && RenderData && RenderData->LODResources.Num() > 0)
 	{
-		FStaticMeshLODResources& LOD = StaticMesh->RenderData->LODResources[0];
+		FStaticMeshLODResources& LOD = RenderData->LODResources[0];
 		ENQUEUE_RENDER_COMMAND(FixIndexBufferOnCPUCommand)(
 			[&LOD, &LOD0CPUVertexInstancesIDs](FRHICommandListImmediate& RHICmdList)
 		{
@@ -302,11 +316,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	if (StaticMeshConfig.bBuildSimpleCollision)
 	{
 		FKBoxElem BoxElem;
-		BoxElem.Center = StaticMesh->RenderData->Bounds.Origin;
-		BoxElem.X = StaticMesh->RenderData->Bounds.BoxExtent.X * 2.0f;
-		BoxElem.Y = StaticMesh->RenderData->Bounds.BoxExtent.Y * 2.0f;
-		BoxElem.Z = StaticMesh->RenderData->Bounds.BoxExtent.Z * 2.0f;
-		StaticMesh->BodySetup->AggGeom.BoxElems.Add(BoxElem);
+		BoxElem.Center = RenderData->Bounds.Origin;
+		BoxElem.X = RenderData->Bounds.BoxExtent.X * 2.0f;
+		BoxElem.Y = RenderData->Bounds.BoxExtent.Y * 2.0f;
+		BoxElem.Z = RenderData->Bounds.BoxExtent.Z * 2.0f;
+		BodySetup->AggGeom.BoxElems.Add(BoxElem);
 	}
 
 	for (const FBox& Box : StaticMeshConfig.BoxCollisions)
@@ -317,7 +331,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 		BoxElem.X = BoxSize.X;
 		BoxElem.Y = BoxSize.Y;
 		BoxElem.Z = BoxSize.Z;
-		StaticMesh->BodySetup->AggGeom.BoxElems.Add(BoxElem);
+		BodySetup->AggGeom.BoxElems.Add(BoxElem);
 	}
 
 	for (const FVector4 Sphere : StaticMeshConfig.SphereCollisions)
@@ -325,10 +339,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 		FKSphereElem SphereElem;
 		SphereElem.Center = Sphere;
 		SphereElem.Radius = Sphere.W;
-		StaticMesh->BodySetup->AggGeom.SphereElems.Add(SphereElem);
+		BodySetup->AggGeom.SphereElems.Add(SphereElem);
 	}
 
-	StaticMesh->BodySetup->CreatePhysicsMeshes();
+	BodySetup->CreatePhysicsMeshes();
 
 	for (const TPair<FString, FTransform>& Pair : StaticMeshConfig.Sockets)
 	{
