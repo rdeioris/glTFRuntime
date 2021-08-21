@@ -257,11 +257,15 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	bIsMobile |= Editor->GetActiveFeatureLevelPreviewType() == ERHIFeatureLevel::ES3_1;
 #endif
 
+	FStaticMeshRenderData* RenderData = nullptr;
 #if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
-	FStaticMeshRenderData* RenderData = StaticMesh->GetRenderData();
+	RenderData = StaticMesh->GetRenderData();
 	UBodySetup* BodySetup = StaticMesh->GetBodySetup();
 #else
-	FStaticMeshRenderData* RenderData = StaticMesh->RenderData;
+	if (StaticMesh->RenderData.IsValid())
+	{
+		RenderData = StaticMesh->RenderData.Get();
+	}
 	UBodySetup* BodySetup = StaticMesh->BodySetup;
 #endif
 
