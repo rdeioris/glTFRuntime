@@ -5,6 +5,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
+#include "ObjectTools.h"
 
 // Sets default values
 AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
@@ -56,7 +57,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	USceneComponent* NewComponent = nullptr;
 	if (Node.CameraIndex != INDEX_NONE)
 	{
-		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, *Node.Name);
+		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, *ObjectTools::SanitizeObjectName(Node.Name));
 		NewCameraComponent->SetupAttachment(NodeParentComponent);
 		NewCameraComponent->RegisterComponent();
 		NewCameraComponent->SetRelativeTransform(Node.Transform);
@@ -67,7 +68,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	}
 	else if (Node.MeshIndex < 0)
 	{
-		NewComponent = NewObject<USceneComponent>(this, *Node.Name);
+		NewComponent = NewObject<USceneComponent>(this, *ObjectTools::SanitizeObjectName(Node.Name));
 		NewComponent->SetupAttachment(NodeParentComponent);
 		NewComponent->RegisterComponent();
 		NewComponent->SetRelativeTransform(Node.Transform);
@@ -77,7 +78,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	{
 		if (Node.SkinIndex < 0)
 		{
-			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, *Node.Name);
+			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, *ObjectTools::SanitizeObjectName(Node.Name));
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			StaticMeshComponent->RegisterComponent();
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
@@ -105,7 +106,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		}
 		else
 		{
-			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, *Node.Name);
+			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, *ObjectTools::SanitizeObjectName(Node.Name));
 			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);

@@ -725,7 +725,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			LODInfo.LODMaterialMap.Add(MatIndex);
 			int32 NewMatIndex = SkeletalMeshContext->SkeletalMesh->Materials.Add(SkeletalMeshContext->LODs[LODIndex].Primitives[MatIndex].Material);
 			SkeletalMeshContext->SkeletalMesh->Materials[NewMatIndex].UVChannelData.bInitialized = true;
-			SkeletalMeshContext->SkeletalMesh->Materials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d"), LODIndex, MatIndex));
+			SkeletalMeshContext->SkeletalMesh->Materials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex].Primitives[MatIndex].MaterialName)));
 		}
 #if WITH_EDITOR
 		IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();

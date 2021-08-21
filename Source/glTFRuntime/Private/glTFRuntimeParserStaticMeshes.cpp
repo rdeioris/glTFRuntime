@@ -86,10 +86,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 
 		for (FglTFRuntimePrimitive& Primitive : Primitives)
 		{
-			FName MaterialName = FName(FString::Printf(TEXT("LOD_%d_Section_%d"), CurrentLODIndex, StaticMaterials.Num()));
+			FName MaterialName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), CurrentLODIndex, StaticMaterials.Num(), *Primitive.MaterialName));
 			FStaticMaterial StaticMaterial(Primitive.Material, MaterialName);
 			StaticMaterial.UVChannelData.bInitialized = true;
-			StaticMaterials.Add(StaticMaterial);
+			int32 MaterialIndex = StaticMaterials.Add(StaticMaterial);
 
 			FStaticMeshSection& Section = Sections.AddDefaulted_GetRef();
 			int32 NumVertexInstancesPerSection = Primitive.Indices.Num();
@@ -98,6 +98,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 			Section.FirstIndex = VertexInstanceBaseIndex;
 			Section.bEnableCollision = true;
 			Section.bCastShadow = true;
+			Section.MaterialIndex = MaterialIndex;
 
 			bool bMissingNormals = false;
 			bool bMissingTangents = false;
@@ -118,7 +119,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 
 				for (int32 UVIndex = 0; UVIndex < NumUVs; UVIndex++)
 				{
-					StaticMeshVertex.UVs[UVIndex] = GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore);
+					if (UVIndex < Primitive.UVs.Num())
+					{
+						StaticMeshVertex.UVs[UVIndex] = GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore);
+					}
 				}
 
 				if (bHasVertexColors)

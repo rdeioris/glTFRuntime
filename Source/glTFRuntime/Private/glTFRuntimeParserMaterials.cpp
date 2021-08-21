@@ -10,9 +10,14 @@
 #include "Modules/ModuleManager.h"
 
 
-UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
+UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName)
 {
 	FglTFRuntimeMaterial RuntimeMaterial;
+
+	if (!JsonMaterialObject->TryGetStringField("name", MaterialName))
+	{
+		MaterialName = "";
+	}
 
 	RuntimeMaterial.BaseSpecularFactor = MaterialsConfig.SpecularFactor;
 
@@ -533,14 +538,20 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	return nullptr;
 }
 
-UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
+UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName)
 {
 	if (Index < 0)
+	{
 		return nullptr;
+	}
 
 	// first check cache
 	if (CanReadFromCache(MaterialsConfig.CacheMode) && MaterialsCache.Contains(Index))
 	{
+		if (MaterialsNameCache.Contains(MaterialsCache[Index]))
+		{
+			MaterialName = MaterialsNameCache[MaterialsCache[Index]];
+		}
 		return MaterialsCache[Index];
 	}
 
@@ -559,9 +570,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 
 	TSharedPtr<FJsonObject> JsonMaterialObject = (*JsonMaterials)[Index]->AsObject();
 	if (!JsonMaterialObject)
+	{
 		return nullptr;
+	}
 
-	UMaterialInterface* Material = LoadMaterial_Internal(JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors);
+	UMaterialInterface* Material = LoadMaterial_Internal(JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors, MaterialName);
 	if (!Material)
 	{
 		return nullptr;
@@ -569,6 +582,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 
 	if (CanWriteToCache(MaterialsConfig.CacheMode))
 	{
+		MaterialsNameCache.Add(Material, MaterialName);
 		MaterialsCache.Add(Index, Material);
 	}
 

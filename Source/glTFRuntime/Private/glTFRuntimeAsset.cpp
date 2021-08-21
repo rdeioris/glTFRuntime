@@ -460,7 +460,8 @@ bool UglTFRuntimeAsset::LoadStaticMeshIntoProceduralMeshComponent(const int32 Me
 UMaterialInterface* UglTFRuntimeAsset::LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
 	GLTF_CHECK_PARSER(nullptr);
-	return Parser->LoadMaterial(MaterialIndex, MaterialsConfig, bUseVertexColors);
+	FString MaterialName;
+	return Parser->LoadMaterial(MaterialIndex, MaterialsConfig, bUseVertexColors, MaterialName);
 }
 
 FString UglTFRuntimeAsset::GetStringFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
