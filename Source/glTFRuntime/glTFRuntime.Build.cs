@@ -39,8 +39,6 @@ public class glTFRuntime : ModuleRules
                 "CoreUObject",
                 "Engine",
                 "JSON",
-                "MeshDescription",
-                "StaticMeshDescription",
                 "RenderCore",
                 "RHI",
                 "ApplicationCore",

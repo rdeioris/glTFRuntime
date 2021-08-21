@@ -2835,3 +2835,12 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 
 	return Bytes.Num() > 0;
 }
+
+FVector FglTFRuntimeParser::ComputeTangentY(FVector Normal, FVector TangetX)
+{
+	float Determinant = GetBasisDeterminantSign(Normal.GetSafeNormal(),
+		(Normal ^ TangetX).GetSafeNormal(),
+		Normal.GetSafeNormal());
+
+	return (Normal ^ TangetX) * Determinant;
+}

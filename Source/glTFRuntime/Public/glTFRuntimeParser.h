@@ -1212,7 +1212,6 @@ protected:
 			{
 				uint8* Ptr = (uint8*)&(Bytes[Index]);
 				Value = bNormalized ? ((float)(*Ptr)) / 255.f : *Ptr;
-
 			}
 			// SHORT
 			else if (ComponentType == 5122)
@@ -1267,4 +1266,17 @@ protected:
 	bool MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive);
 
 	TSharedPtr<FglTFRuntimeZipFile> ZipFile;
+
+	template<typename T>
+	T GetSafeValue(TArray<T>& Values, const int32 Index, const T DefaultValue, bool& bMissing)
+	{
+		if (Index >= Values.Num())
+		{
+			bMissing = true;
+			return DefaultValue;
+		}
+		return Values[Index];
+	}
+
+	FVector ComputeTangentY(FVector Normal, FVector TangetX);
 };
