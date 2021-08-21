@@ -497,19 +497,19 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromExtensionIndex(TSha
 {
 	if (Index < 0)
 	{
-		return false;
+		return nullptr;
 	}
 
 	const TSharedPtr<FJsonObject>* JsonExtensionsObject;
 	if (!JsonObject->TryGetObjectField("extensions", JsonExtensionsObject))
 	{
-		return false;
+		return nullptr;
 	}
 
 	const TSharedPtr<FJsonObject>* JsonExtensionObject = nullptr;
 	if (!(*JsonExtensionsObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
 	{
-		return false;
+		return nullptr;
 	}
 
 	return GetJsonObjectFromIndex(JsonExtensionObject->ToSharedRef(), FieldName, Index);
