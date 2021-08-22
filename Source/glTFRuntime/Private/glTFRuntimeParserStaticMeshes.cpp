@@ -21,15 +21,26 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	bool bHasVertexColors = false;
 	FVector LOD0PivotDelta = FVector::ZeroVector;
 
-	TArray<UStaticMeshDescription*> MeshDescriptions;
+	FStaticMeshRenderData* RenderData = nullptr;
 
+#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+	if (StaticMesh->GetRenderData())
+	{
+		StaticMesh->GetRenderData()->ReleaseResources();
+	}
+	StaticMesh->SetRenderData(MakeUnique<FStaticMeshRenderData>());
+	RenderData = StaticMesh->GetRenderData();
+#else
 	if (StaticMesh->RenderData.IsValid())
 	{
 		StaticMesh->RenderData->ReleaseResources();
 	}
-
 	StaticMesh->RenderData = MakeUnique<FStaticMeshRenderData>();
-	StaticMesh->RenderData->AllocateLODResources(JsonMeshObjects.Num());
+	RenderData = StaticMesh->RenderData.Get();
+#endif
+
+	
+	RenderData->AllocateLODResources(JsonMeshObjects.Num());
 
 	int32 LODIndex = 0;
 
@@ -38,9 +49,13 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	for (TSharedRef<FJsonObject> JsonMeshObject : JsonMeshObjects)
 	{
 		const int32 CurrentLODIndex = LODIndex++;
-		FStaticMeshLODResources& LODResources = StaticMesh->RenderData->LODResources[CurrentLODIndex];
+		FStaticMeshLODResources& LODResources = RenderData->LODResources[CurrentLODIndex];
 
-		FStaticMeshLODResources::FStaticMeshSectionArray& Sections = LODResources.Sections;
+#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+		FStaticMeshSectionArray& Sections = LODResources.Sections;
+#else
+		FStaticMeshLODResources::FStaticMeshSectionArray& Section = LODResources.Sections;
+#endif
 
 		TArray<FglTFRuntimePrimitive> Primitives;
 		TArray<uint32> LODIndices;
@@ -264,15 +279,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 #endif
 	}
 
-	FStaticMeshRenderData* RenderData = nullptr;
+	
 #if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
-	RenderData = StaticMesh->GetRenderData();
 	UBodySetup* BodySetup = StaticMesh->GetBodySetup();
 #else
-	if (StaticMesh->RenderData.IsValid())
-	{
-		RenderData = StaticMesh->RenderData.Get();
-	}
 	UBodySetup* BodySetup = StaticMesh->BodySetup;
 #endif
 
