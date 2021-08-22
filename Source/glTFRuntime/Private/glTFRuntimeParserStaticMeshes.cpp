@@ -247,10 +247,6 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 		{
 			LODResources.VertexBuffers.ColorVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
 		}
-		else
-		{
-			LODResources.VertexBuffers.ColorVertexBuffer.InitFromSingleColor(FColor::White, NumVertexInstancesPerLOD);
-		}
 		LODResources.bHasColorVertexData = bHasVertexColors;
 		LODResources.IndexBuffer.SetIndices(LODIndices, EIndexBufferStride::Force32Bit);
 
