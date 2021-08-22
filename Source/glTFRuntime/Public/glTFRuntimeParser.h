@@ -372,7 +372,7 @@ struct FglTFRuntimeStaticMeshConfig
 		bBuildSimpleCollision = false;
 		Outer = nullptr;
 		CollisionComplexity = ECollisionTraceFlag::CTF_UseDefault;
-		bAllowCPUAccess = true;
+		bAllowCPUAccess = false;
 		PivotPosition = EglTFRuntimePivotPosition::Asset;
 	}
 };

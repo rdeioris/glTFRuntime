@@ -12,7 +12,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 {
 
 	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(StaticMeshConfig.Outer ? StaticMeshConfig.Outer : GetTransientPackage(), NAME_None, RF_Public);
+#if PLATFORM_ANDROID || PLATFORM_IOS
+	StaticMesh->bAllowCPUAccess = false;
+#else
 	StaticMesh->bAllowCPUAccess = StaticMeshConfig.bAllowCPUAccess;
+#endif
 
 	bool bHasVertexColors = false;
 	FVector LOD0PivotDelta = FVector::ZeroVector;
