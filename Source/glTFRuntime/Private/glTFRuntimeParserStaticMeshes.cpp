@@ -316,6 +316,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 #endif
 	}
 
+	if (!StaticMesh->bAllowCPUAccess)
+	{
+		BodySetup->bNeverNeedsCookedCollisionData = true;
+	}
+
 	BodySetup->bMeshCollideAll = false;
 	BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
 
