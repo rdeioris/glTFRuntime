@@ -18,6 +18,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	StaticMesh->bAllowCPUAccess = StaticMeshConfig.bAllowCPUAccess;
 #endif
 
+#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+	StaticMesh->SetIsBuiltAtRuntime(true);
+#endif
+	StaticMesh->NeverStream = true;
+
 	bool bHasVertexColors = false;
 	FVector LOD0PivotDelta = FVector::ZeroVector;
 

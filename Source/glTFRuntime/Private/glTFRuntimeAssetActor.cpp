@@ -7,7 +7,19 @@
 #include "Animation/AnimSequence.h"
 #if WITH_EDITOR
 #include "ObjectTools.h"
-#define GLTF_SAFE_NAME(x) *ObjectTools::SanitizeObjectName(x)
+namespace glTFRuntimeUtils
+{
+	static FName GetSafeObjectName(const FString& InName)
+	{
+		const FString SanitizedName = ObjectTools::SanitizeObjectName(InName);
+		if (SanitizedName.IsEmpty())
+		{
+			return NAME_None;
+		}
+		return *SanitizedName;
+	}
+}
+#define GLTF_SAFE_NAME(x) NAME_None
 #else
 #define GLTF_SAFE_NAME(x) NAME_None
 #endif
