@@ -5,24 +5,6 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
-#if WITH_EDITOR
-#include "ObjectTools.h"
-namespace glTFRuntimeUtils
-{
-	static FName GetSafeObjectName(const FString& InName)
-	{
-		const FString SanitizedName = ObjectTools::SanitizeObjectName(InName);
-		if (SanitizedName.IsEmpty())
-		{
-			return NAME_None;
-		}
-		return *SanitizedName;
-	}
-}
-#define GLTF_SAFE_NAME(x) NAME_None
-#else
-#define GLTF_SAFE_NAME(x) NAME_None
-#endif
 
 // Sets default values
 AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
@@ -74,7 +56,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	USceneComponent* NewComponent = nullptr;
 	if (Node.CameraIndex != INDEX_NONE)
 	{
-		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, GLTF_SAFE_NAME(Node.Name));
+		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, GetSafeNodeName<UCameraComponent>(Node));
 		NewCameraComponent->SetupAttachment(NodeParentComponent);
 		NewCameraComponent->RegisterComponent();
 		NewCameraComponent->SetRelativeTransform(Node.Transform);
@@ -85,7 +67,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	}
 	else if (Node.MeshIndex < 0)
 	{
-		NewComponent = NewObject<USceneComponent>(this, GLTF_SAFE_NAME(Node.Name));
+		NewComponent = NewObject<USceneComponent>(this, GetSafeNodeName<USceneComponent>(Node));
 		NewComponent->SetupAttachment(NodeParentComponent);
 		NewComponent->RegisterComponent();
 		NewComponent->SetRelativeTransform(Node.Transform);
@@ -95,7 +77,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	{
 		if (Node.SkinIndex < 0)
 		{
-			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GLTF_SAFE_NAME(Node.Name));
+			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			StaticMeshComponent->RegisterComponent();
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
@@ -123,7 +105,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		}
 		else
 		{
-			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, GLTF_SAFE_NAME(Node.Name));
+			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, GetSafeNodeName<USkeletalMeshComponent>(Node));
 			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);

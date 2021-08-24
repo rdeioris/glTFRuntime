@@ -29,6 +29,12 @@ protected:
 
 	TMap<USceneComponent*, TMap<FString, UglTFRuntimeAnimationCurve*>> DiscoveredCurveAnimations;
 
+	template<typename T>
+	FName GetSafeNodeName(const FglTFRuntimeNode& Node)
+	{
+		return MakeUniqueObjectName(this, T::StaticClass(), *Node.Name);
+	}
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
