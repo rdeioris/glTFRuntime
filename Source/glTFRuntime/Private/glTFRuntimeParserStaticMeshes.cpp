@@ -51,7 +51,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 		const int32 CurrentLODIndex = LODIndex++;
 		FStaticMeshLODResources& LODResources = RenderData->LODResources[CurrentLODIndex];
 
-#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+#if ENGINE_MAJOR_VERSION > 4
 		FStaticMeshSectionArray& Sections = LODResources.Sections;
 #else
 		FStaticMeshLODResources::FStaticMeshSectionArray& Sections = LODResources.Sections;
