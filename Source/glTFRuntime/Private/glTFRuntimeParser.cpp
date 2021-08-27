@@ -1288,7 +1288,13 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
 	USkeleton* Skeleton = NewObject<USkeleton>(GetTransientPackage(), NAME_None, RF_Public);
 
-	if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), SkeletalMesh->RefSkeleton, BoneMap, SkeletonConfig))
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+	FReferenceSkeleton& RefSkeleton = SkeletalMesh->GetRefSkeleton();
+#else
+	FReferenceSkeleton& RefSkeleton = SkeletalMesh->RefSkeleton;
+#endif
+
+	if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), RefSkeleton, BoneMap, SkeletonConfig))
 	{
 		AddError("FillReferenceSkeleton()", "Unable to fill RefSkeleton.");
 		return nullptr;
@@ -1296,17 +1302,17 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 
 	if (SkeletonConfig.bNormalizeSkeletonScale)
 	{
-		NormalizeSkeletonScale(SkeletalMesh->RefSkeleton);
+		NormalizeSkeletonScale(RefSkeleton);
 	}
 
 	if (SkeletonConfig.bClearRotations || SkeletonConfig.CopyRotationsFrom)
 	{
-		ClearSkeletonRotations(SkeletalMesh->RefSkeleton);
+		ClearSkeletonRotations(RefSkeleton);
 	}
 
 	if (SkeletonConfig.CopyRotationsFrom)
 	{
-		CopySkeletonRotationsFrom(SkeletalMesh->RefSkeleton, SkeletonConfig.CopyRotationsFrom->GetReferenceSkeleton());
+		CopySkeletonRotationsFrom(RefSkeleton, SkeletonConfig.CopyRotationsFrom->GetReferenceSkeleton());
 	}
 
 	Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);

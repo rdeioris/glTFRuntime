@@ -38,7 +38,7 @@ bool FglTFRuntimeParser::LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntime
 	const TArray<TSharedPtr<FJsonValue>>* JsonClips;
 	if (JsonEmitterObject->TryGetArrayField("clips", JsonClips))
 	{
-		for (const TSharedPtr<FJsonValue> JsonClipItem : *JsonClips)
+		for (const TSharedPtr<FJsonValue>& JsonClipItem : *JsonClips)
 		{
 			const TSharedPtr<FJsonObject>* JsonClipObject;
 			if (JsonClipItem->TryGetObject(JsonClipObject))

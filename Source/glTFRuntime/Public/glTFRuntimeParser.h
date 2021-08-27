@@ -479,6 +479,8 @@ struct FglTFRuntimeCapsule
 	{
 		Radius = 0;
 		Length = 0;
+		Center = FVector::ZeroVector;
+		Rotation = FRotator::ZeroRotator;
 	}
 };
 
@@ -898,6 +900,12 @@ struct FglTFRuntimeAudioEmitter
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	USoundWave* Sound;
+
+	FglTFRuntimeAudioEmitter()
+	{
+		Sound = nullptr;
+		Volume = 1.0f;
+	}
 };
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
