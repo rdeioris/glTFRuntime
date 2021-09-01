@@ -545,6 +545,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		return nullptr;
 	}
 
+	if (MaterialsConfig.MaterialsOverrideMap.Contains(Index))
+	{
+		return MaterialsConfig.MaterialsOverrideMap[Index];
+	}
+
 	// first check cache
 	if (CanReadFromCache(MaterialsConfig.CacheMode) && MaterialsCache.Contains(Index))
 	{
