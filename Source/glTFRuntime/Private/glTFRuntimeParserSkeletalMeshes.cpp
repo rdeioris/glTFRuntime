@@ -481,7 +481,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			MeshSection.BaseVertexIndex = Base;
 			MeshSection.MaxBoneInfluences = 4;
 
-			MeshSection.NumVertices = Primitive.Positions.Num();
+			MeshSection.NumVertices = Primitive.Indices.Num();
 
 			TMap<int32, TArray<int32>> OverlappingVertices;
 			MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
