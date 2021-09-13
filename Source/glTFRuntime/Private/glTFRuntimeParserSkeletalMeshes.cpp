@@ -458,19 +458,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		InWeights.AddUninitialized(NumIndices);
 
 		int32 TotalVertexIndex = 0;
-
-		TArray<FVector> Points;
+		int32 Base = 0;
 
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.Primitives.Num(); PrimitiveIndex++)
 		{
 			FglTFRuntimePrimitive& Primitive = LOD.Primitives[PrimitiveIndex];
-
-			int32 Base = Points.Num();
-			for (FVector& Point : Primitive.Positions)
-			{
-				SkeletalMeshContext->BoundingBox += Point * SkeletalMeshContext->SkeletalMeshConfig.BoundsScale;
-				Points.Add(Point);
-			}
 
 			new(&LodRenderData->RenderSections[PrimitiveIndex]) FSkelMeshRenderSection();
 			FSkelMeshRenderSection& MeshSection = LodRenderData->RenderSections[PrimitiveIndex];
@@ -483,6 +475,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 			MeshSection.NumVertices = Primitive.Indices.Num();
 
+			Base += MeshSection.NumVertices;
+
 			TMap<int32, TArray<int32>> OverlappingVertices;
 			MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
 
@@ -491,6 +485,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				int32 Index = Primitive.Indices[VertexIndex];
 				FModelVertex ModelVertex;
 				ModelVertex.Position = Primitive.Positions[Index];
+				SkeletalMeshContext->BoundingBox += ModelVertex.Position * SkeletalMeshContext->SkeletalMeshConfig.BoundsScale;
 				ModelVertex.TangentX = FVector::ZeroVector;
 				ModelVertex.TangentZ = FVector::ZeroVector;
 				if (Index < Primitive.Normals.Num())
