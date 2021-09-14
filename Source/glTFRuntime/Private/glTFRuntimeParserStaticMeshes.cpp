@@ -131,9 +131,9 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 			for (int32 VertexInstanceSectionIndex = 0; VertexInstanceSectionIndex < NumVertexInstancesPerSection; VertexInstanceSectionIndex++)
 			{
 				uint32 VertexIndex = Primitive.Indices[VertexInstanceSectionIndex];
-				LODIndices.Add(VertexInstanceBaseIndex + VertexIndex);
+				LODIndices.Add(VertexInstanceBaseIndex + VertexInstanceSectionIndex);
 
-				FStaticMeshBuildVertex& StaticMeshVertex = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexIndex];
+				FStaticMeshBuildVertex& StaticMeshVertex = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
 
 				StaticMeshVertex.Position = GetSafeValue(Primitive.Positions, VertexIndex, FVector::ZeroVector, bMissingIgnore);
 				BoundingBox += StaticMeshVertex.Position;
