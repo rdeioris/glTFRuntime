@@ -10,7 +10,7 @@
 #include "Modules/ModuleManager.h"
 
 
-UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName)
+UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName)
 {
 	FglTFRuntimeMaterial RuntimeMaterial;
 
@@ -170,19 +170,19 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 
 	if (IsInGameThread())
 	{
-		return BuildMaterial(RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+		return BuildMaterial(Index, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 	}
 
 	UMaterialInterface* Material = nullptr;
 
-	FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, &Material, &RuntimeMaterial, MaterialsConfig, bUseVertexColors]()
+	FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, Index, &Material, &RuntimeMaterial, MaterialsConfig, bUseVertexColors]()
 	{
 		// this is mainly for editor ...
 		if (IsGarbageCollecting())
 		{
 			return;
 		}
-		Material = BuildMaterial(RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+		Material = BuildMaterial(Index, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 	}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 
@@ -242,7 +242,7 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	return Texture;
 }
 
-UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
+UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
 	UMaterialInterface* BaseMaterial = nullptr;
 
@@ -262,6 +262,11 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
 		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[RuntimeMaterial.MaterialType];
+	}
+
+	if (MaterialsConfig.MaterialsOverrideMap.Contains(Index))
+	{
+		BaseMaterial = MaterialsConfig.MaterialsOverrideMap[Index];
 	}
 
 	if (!BaseMaterial)
@@ -545,7 +550,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		return nullptr;
 	}
 
-	if (MaterialsConfig.MaterialsOverrideMap.Contains(Index))
+	if (!MaterialsConfig.bMaterialsOverrideMapInjectParams && MaterialsConfig.MaterialsOverrideMap.Contains(Index))
 	{
 		return MaterialsConfig.MaterialsOverrideMap[Index];
 	}
@@ -579,7 +584,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		return nullptr;
 	}
 
-	UMaterialInterface* Material = LoadMaterial_Internal(JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors, MaterialName);
+	UMaterialInterface* Material = LoadMaterial_Internal(Index, JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors, MaterialName);
 	if (!Material)
 	{
 		return nullptr;
