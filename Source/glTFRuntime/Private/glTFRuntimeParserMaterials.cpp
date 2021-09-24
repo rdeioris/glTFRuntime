@@ -10,14 +10,9 @@
 #include "Modules/ModuleManager.h"
 
 
-UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName)
+UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
 	FglTFRuntimeMaterial RuntimeMaterial;
-
-	if (!JsonMaterialObject->TryGetStringField("name", MaterialName))
-	{
-		MaterialName = "";
-	}
 
 	RuntimeMaterial.BaseSpecularFactor = MaterialsConfig.SpecularFactor;
 
@@ -170,19 +165,19 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 	if (IsInGameThread())
 	{
-		return BuildMaterial(Index, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+		return BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 	}
 
 	UMaterialInterface* Material = nullptr;
 
-	FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, Index, &Material, &RuntimeMaterial, MaterialsConfig, bUseVertexColors]()
+	FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, Index, MaterialName, &Material, &RuntimeMaterial, MaterialsConfig, bUseVertexColors]()
 	{
 		// this is mainly for editor ...
 		if (IsGarbageCollecting())
 		{
 			return;
 		}
-		Material = BuildMaterial(Index, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+		Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 	}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 
@@ -242,7 +237,7 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	return Texture;
 }
 
-UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
+UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
 	UMaterialInterface* BaseMaterial = nullptr;
 
@@ -267,6 +262,11 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	if (MaterialsConfig.MaterialsOverrideMap.Contains(Index))
 	{
 		BaseMaterial = MaterialsConfig.MaterialsOverrideMap[Index];
+	}
+
+	if (MaterialsConfig.MaterialsOverrideByNameMap.Contains(MaterialName))
+	{
+		BaseMaterial = MaterialsConfig.MaterialsOverrideByNameMap[MaterialName];
 	}
 
 	if (!BaseMaterial)
@@ -584,7 +584,18 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		return nullptr;
 	}
 
-	UMaterialInterface* Material = LoadMaterial_Internal(Index, JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors, MaterialName);
+
+	if (!JsonMaterialObject->TryGetStringField("name", MaterialName))
+	{
+		MaterialName = "";
+	}
+
+	if (!MaterialsConfig.bMaterialsOverrideMapInjectParams && MaterialsConfig.MaterialsOverrideByNameMap.Contains(MaterialName))
+	{
+		return MaterialsConfig.MaterialsOverrideByNameMap[MaterialName];
+	}
+
+	UMaterialInterface* Material = LoadMaterial_Internal(Index, MaterialName, JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors);
 	if (!Material)
 	{
 		return nullptr;
