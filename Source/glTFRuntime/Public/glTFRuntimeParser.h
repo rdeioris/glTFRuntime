@@ -35,6 +35,14 @@ enum class EglTFRuntimeTransformBaseType : uint8
 	Identity,
 };
 
+UENUM()
+enum class EglTFRuntimeNormalsGenerationStrategy : uint8
+{
+	IfMissing,
+	Never,
+	Always
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeBasisMatrix
 {
@@ -372,6 +380,9 @@ struct FglTFRuntimeStaticMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<int32, float> LODScreenSize;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeNormalsGenerationStrategy NormalsGenerationStrategy;
+
 	FglTFRuntimeStaticMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -381,6 +392,7 @@ struct FglTFRuntimeStaticMeshConfig
 		CollisionComplexity = ECollisionTraceFlag::CTF_UseDefault;
 		bAllowCPUAccess = false;
 		PivotPosition = EglTFRuntimePivotPosition::Asset;
+		NormalsGenerationStrategy = EglTFRuntimeNormalsGenerationStrategy::IfMissing;
 	}
 };
 

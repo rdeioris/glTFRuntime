@@ -162,18 +162,36 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 				}
 			}
 
+			const bool bCanGenerateNormals = (bMissingNormals && StaticMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::IfMissing) ||
+				StaticMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Always;
+			if (bCanGenerateNormals && (NumVertexInstancesPerSection % 3) == 0)
+			{
+				for (int32 VertexInstanceSectionIndex = 0; VertexInstanceSectionIndex < NumVertexInstancesPerSection; VertexInstanceSectionIndex += 3)
+				{
+					FStaticMeshBuildVertex& StaticMeshVertex0 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
+					FStaticMeshBuildVertex& StaticMeshVertex1 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 1];
+					FStaticMeshBuildVertex& StaticMeshVertex2 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 2];
+
+					FVector SideA = StaticMeshVertex1.Position - StaticMeshVertex0.Position;
+					FVector SideB = StaticMeshVertex2.Position - StaticMeshVertex0.Position;
+
+					FVector NormalFromCross = FVector::CrossProduct(SideB, SideA).GetSafeNormal();
+
+					StaticMeshVertex0.TangentZ = NormalFromCross;
+					StaticMeshVertex1.TangentZ = NormalFromCross;
+					StaticMeshVertex2.TangentZ = NormalFromCross;
+				}
+				bMissingNormals = false;
+			}
 
 			// recompute tangents if required (need normals and uvs)
 			if (bMissingTangents && !bMissingNormals && Primitive.UVs.Num() > 0 && (NumVertexInstancesPerSection % 3) == 0)
 			{
 				for (int32 VertexInstanceSectionIndex = 0; VertexInstanceSectionIndex < NumVertexInstancesPerSection; VertexInstanceSectionIndex += 3)
 				{
-					uint32 VertexIndex0 = Primitive.Indices[VertexInstanceSectionIndex];
-					uint32 VertexIndex1 = Primitive.Indices[VertexInstanceSectionIndex + 1];
-					uint32 VertexIndex2 = Primitive.Indices[VertexInstanceSectionIndex + 2];
-					FStaticMeshBuildVertex& StaticMeshVertex0 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexIndex0];
-					FStaticMeshBuildVertex& StaticMeshVertex1 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexIndex1];
-					FStaticMeshBuildVertex& StaticMeshVertex2 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexIndex2];
+					FStaticMeshBuildVertex& StaticMeshVertex0 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
+					FStaticMeshBuildVertex& StaticMeshVertex1 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 1];
+					FStaticMeshBuildVertex& StaticMeshVertex2 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 2];
 
 					FVector Position0 = StaticMeshVertex0.Position;
 					FVector4 TangentZ0 = StaticMeshVertex0.TangentZ;
