@@ -290,6 +290,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 			LODResources.VertexBuffers.ColorVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
 		}
 		LODResources.bHasColorVertexData = bHasVertexColors;
+		if (StaticMesh->bAllowCPUAccess)
+		{
+			LODResources.IndexBuffer = FRawStaticIndexBuffer(true);
+		}
 		LODResources.IndexBuffer.SetIndices(LODIndices, EIndexBufferStride::Force32Bit);
 
 
