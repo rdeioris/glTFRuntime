@@ -63,5 +63,12 @@ public class glTFRuntime : ModuleRules
 				// ... add any modules that your module loads dynamically here ...
 			}
             );
+
+        string ThirdPartyDirectory = System.IO.Path.Combine(ModuleDirectory, "..", "ThirdParty");
+
+        if (Target.Platform == UnrealTargetPlatform.Win64)
+        {
+            PublicAdditionalLibraries.Add(System.IO.Path.Combine(ThirdPartyDirectory, "Win64", "LibglTFRuntimeDraco.lib"));
+        }
     }
 }

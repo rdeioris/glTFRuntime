@@ -860,6 +860,7 @@ struct FglTFRuntimeMaterial
 	int32 DiffuseTexCoord;
 
 	bool bKHR_materials_pbrSpecularGlossiness;
+	double NormalTextureScale;
 
 	FglTFRuntimeMaterial()
 	{
@@ -890,6 +891,7 @@ struct FglTFRuntimeMaterial
 		DiffuseTextureCache = nullptr;
 		DiffuseTexCoord = 0;
 		bKHR_materials_pbrSpecularGlossiness = false;
+		NormalTextureScale = 1;
 	}
 };
 

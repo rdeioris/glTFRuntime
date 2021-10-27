@@ -87,7 +87,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 		}
 	};
 
-	auto GetMaterialTexture = [this, MaterialsConfig](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, const bool sRGB, UTexture2D*& ParamTextureCache, TArray<FglTFRuntimeMipMap>& ParamMips, int32& ParamTexCoord)
+	auto GetMaterialTexture = [this, MaterialsConfig](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, const bool sRGB, UTexture2D*& ParamTextureCache, TArray<FglTFRuntimeMipMap>& ParamMips, int32& ParamTexCoord) -> const TSharedPtr<FJsonObject>
 	{
 		const TSharedPtr<FJsonObject>* JsonTextureObject;
 		if (JsonMaterialObject->TryGetObjectField(ParamName, JsonTextureObject))
@@ -95,7 +95,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			int64 TextureIndex;
 			if (!(*JsonTextureObject)->TryGetNumberField("index", TextureIndex))
 			{
-				return;
+				return nullptr;
 			}
 
 			if (!(*JsonTextureObject)->TryGetNumberField("texCoord", ParamTexCoord))
@@ -106,11 +106,13 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			if (ParamTexCoord < 0 || ParamTexCoord > 3)
 			{
 				AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for %s: %d"), *ParamName, ParamTexCoord));
-				return;
+				return nullptr;
 			}
 
 			ParamTextureCache = LoadTexture(TextureIndex, ParamMips, sRGB, MaterialsConfig);
+			return *JsonTextureObject;
 		}
+		return nullptr;
 	};
 
 	const TSharedPtr<FJsonObject>* JsonPBRObject;
@@ -132,7 +134,10 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 		GetMaterialTexture(JsonPBRObject->ToSharedRef(), "metallicRoughnessTexture", false, RuntimeMaterial.MetallicRoughnessTextureCache, RuntimeMaterial.MetallicRoughnessTextureMips, RuntimeMaterial.MetallicRoughnessTexCoord);
 	}
 
-	GetMaterialTexture(JsonMaterialObject, "normalTexture", false, RuntimeMaterial.NormalTextureCache, RuntimeMaterial.NormalTextureMips, RuntimeMaterial.NormalTexCoord);
+	if (const TSharedPtr<FJsonObject> JsonNormalTexture = GetMaterialTexture(JsonMaterialObject, "normalTexture", false, RuntimeMaterial.NormalTextureCache, RuntimeMaterial.NormalTextureMips, RuntimeMaterial.NormalTexCoord))
+	{
+		JsonNormalTexture->TryGetNumberField("scale", RuntimeMaterial.NormalTextureScale);
+	}
 
 	GetMaterialTexture(JsonMaterialObject, "occlusionTexture", false, RuntimeMaterial.OcclusionTextureCache, RuntimeMaterial.OcclusionTextureMips, RuntimeMaterial.OcclusionTexCoord);
 
@@ -337,6 +342,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	ApplyMaterialTexture("normalTexture", RuntimeMaterial.NormalTextureCache, RuntimeMaterial.NormalTextureMips,
 		"normalTexCoord", RuntimeMaterial.NormalTexCoord,
 		TextureCompressionSettings::TC_Normalmap, false);
+	ApplyMaterialFactor(true, "normalTexScale", FLinearColor(RuntimeMaterial.NormalTextureScale, RuntimeMaterial.NormalTextureScale, 1, 1));
 
 	ApplyMaterialTexture("occlusionTexture", RuntimeMaterial.OcclusionTextureCache, RuntimeMaterial.OcclusionTextureMips,
 		"occlusionTexCoord", RuntimeMaterial.OcclusionTexCoord,

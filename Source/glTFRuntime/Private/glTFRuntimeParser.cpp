@@ -9,6 +9,10 @@
 #include "Misc/Compression.h"
 #include "Interfaces/IPluginManager.h"
 
+#if PLATFORM_WINDOWS
+#include "ThirdParty/glTFRuntimeDraco.h"
+#endif
+
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
@@ -1966,6 +1970,64 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		}
 	}
 
+	// Draco decompression
+	const TSharedPtr<FJsonObject>* JsonExtensions;
+	if (JsonPrimitiveObject->TryGetObjectField("extensions", JsonExtensions))
+	{
+		// KHR_draco_mesh_compression
+		const TSharedPtr<FJsonObject>* KHR_draco_mesh_compression;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_draco_mesh_compression", KHR_draco_mesh_compression))
+		{
+			int64 BufferView;
+			if (!(*KHR_draco_mesh_compression)->TryGetNumberField("bufferView", BufferView))
+			{
+				AddError("LoadPrimitive()", "KHR_draco_mesh_compression requires a valid bufferView");
+				return false;
+			}
+
+			TArray64<uint8> DracoData;
+			int64 Stride;
+			if (!GetBufferView(BufferView, DracoData, Stride))
+			{
+				AddError("LoadPrimitive()", "KHR_draco_mesh_compression has an invalid bufferView");
+				return false;
+			}
+
+			UE_LOG(LogTemp, Warning, TEXT("%lld %lld %d"), DracoData.Num(), Stride, Primitive.Indices.Num());
+
+			FglTFRuntimeDraco Draco(DracoData.GetData(), DracoData.Num());
+
+			if (!Draco.FillIndices(reinterpret_cast<uint8*>(Primitive.Indices.GetData()), Primitive.Indices.Num() * sizeof(uint32), sizeof(uint32)))
+			{
+				AddError("LoadPrimitive()", "KHR_draco_mesh_compression unable to decompress indices");
+				return false;
+			}
+
+			const TSharedPtr<FJsonObject>* JsonDracoAttributesObject;
+			if (!(*KHR_draco_mesh_compression)->TryGetObjectField("attributes", JsonDracoAttributesObject))
+			{
+				AddError("LoadPrimitive()", "No KHR_draco_mesh_compression attributes available");
+				return false;
+			}
+
+			int64 UniqueID;
+			if ((*JsonDracoAttributesObject)->TryGetNumberField("POSITION", UniqueID))
+			{
+				if (!Draco.FillData(UniqueID, reinterpret_cast<uint8*>(Primitive.Positions.GetData()), Primitive.Positions.Num() * sizeof(FVector)))
+				{
+					AddError("LoadPrimitive()", "KHR_draco_mesh_compression invalid POSITION attribute data");
+					return false;
+				}
+				else
+				{
+					for (FVector& Position : Primitive.Positions)
+					{
+						Position = SceneBasis.TransformPosition(Position) * SceneScale;
+					}
+				}
+			}
+		}
+	}
 
 	int64 MaterialIndex;
 	if (JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
@@ -1973,7 +2035,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		Primitive.Material = LoadMaterial(MaterialIndex, MaterialsConfig, Primitive.Colors.Num() > 0, Primitive.MaterialName);
 		if (!Primitive.Material)
 		{
-			AddError("LoadMaterial()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
+			AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
 			return false;
 		}
 	}
@@ -2027,7 +2089,9 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 
 	FString Uri;
 	if (!JsonBufferObject->TryGetStringField("uri", Uri))
+	{
 		return false;
+	}
 
 	// check it is a valid base64 data uri
 	if (Uri.StartsWith("data:"))
@@ -2059,7 +2123,7 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 		}
 	}
 
-	AddError("GetBuffer()", FString::Printf(TEXT("Unable to load buffer %d from Uri %s"), Index, *Uri));
+	AddError("GetBuffer()", FString::Printf(TEXT("Unable to load buffer %d from Uri %s (you may want to enable external files loading...)"), Index, *Uri));
 	return false;
 }
 
@@ -2214,6 +2278,7 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 		Bytes.AddZeroed(FinalSize);
 		if (!bHasSparse)
 		{
+			Stride = ElementSize * Elements;
 			return true;
 		}
 	}
@@ -2822,6 +2887,13 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 					AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to load bytes from uri %s"), *Uri));
 					return false;
 				}
+				bFound = true;
+			}
+
+			if (!bFound)
+			{
+				AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to open uri %s, you may want to enable external files loading..."), *Uri));
+				return false;
 			}
 		}
 	}
