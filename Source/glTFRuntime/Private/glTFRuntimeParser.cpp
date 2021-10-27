@@ -9,10 +9,6 @@
 #include "Misc/Compression.h"
 #include "Interfaces/IPluginManager.h"
 
-#if PLATFORM_WINDOWS
-#include "ThirdParty/glTFRuntimeDraco.h"
-#endif
-
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
@@ -1993,39 +1989,8 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 				return false;
 			}
 
-			UE_LOG(LogTemp, Warning, TEXT("%lld %lld %d"), DracoData.Num(), Stride, Primitive.Indices.Num());
-
-			FglTFRuntimeDraco Draco(DracoData.GetData(), DracoData.Num());
-
-			if (!Draco.FillIndices(reinterpret_cast<uint8*>(Primitive.Indices.GetData()), Primitive.Indices.Num() * sizeof(uint32), sizeof(uint32)))
-			{
-				AddError("LoadPrimitive()", "KHR_draco_mesh_compression unable to decompress indices");
-				return false;
-			}
-
-			const TSharedPtr<FJsonObject>* JsonDracoAttributesObject;
-			if (!(*KHR_draco_mesh_compression)->TryGetObjectField("attributes", JsonDracoAttributesObject))
-			{
-				AddError("LoadPrimitive()", "No KHR_draco_mesh_compression attributes available");
-				return false;
-			}
-
-			int64 UniqueID;
-			if ((*JsonDracoAttributesObject)->TryGetNumberField("POSITION", UniqueID))
-			{
-				if (!Draco.FillData(UniqueID, reinterpret_cast<uint8*>(Primitive.Positions.GetData()), Primitive.Positions.Num() * sizeof(FVector)))
-				{
-					AddError("LoadPrimitive()", "KHR_draco_mesh_compression invalid POSITION attribute data");
-					return false;
-				}
-				else
-				{
-					for (FVector& Position : Primitive.Positions)
-					{
-						Position = SceneBasis.TransformPosition(Position) * SceneScale;
-					}
-				}
-			}
+			AddError("LoadPrimitive()", "KHR_draco_mesh_compression extension is currently not supported");
+			return false;
 		}
 	}
 
