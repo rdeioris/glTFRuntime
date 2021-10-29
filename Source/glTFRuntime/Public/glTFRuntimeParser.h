@@ -43,6 +43,14 @@ enum class EglTFRuntimeNormalsGenerationStrategy : uint8
 	Always
 };
 
+UENUM()
+enum class EglTFRuntimeTangentsGenerationStrategy : uint8
+{
+	IfMissing,
+	Never,
+	Always
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeBasisMatrix
 {
@@ -383,6 +391,12 @@ struct FglTFRuntimeStaticMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	EglTFRuntimeNormalsGenerationStrategy NormalsGenerationStrategy;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeTangentsGenerationStrategy TangentsGenerationStrategy;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bReverseTangents;
+
 	FglTFRuntimeStaticMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -393,6 +407,8 @@ struct FglTFRuntimeStaticMeshConfig
 		bAllowCPUAccess = false;
 		PivotPosition = EglTFRuntimePivotPosition::Asset;
 		NormalsGenerationStrategy = EglTFRuntimeNormalsGenerationStrategy::IfMissing;
+		TangentsGenerationStrategy = EglTFRuntimeTangentsGenerationStrategy::IfMissing;
+		bReverseTangents = false;
 	}
 };
 
@@ -1337,5 +1353,6 @@ protected:
 		return Values[Index];
 	}
 
-	FVector ComputeTangentY(FVector Normal, FVector TangetX);
+	FVector ComputeTangentY(const FVector Normal, const FVector TangetX);
+	FVector ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W);
 };

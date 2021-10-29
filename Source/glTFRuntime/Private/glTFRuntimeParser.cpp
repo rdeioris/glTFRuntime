@@ -1760,7 +1760,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("TANGENT"))
 	{
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TANGENT", Primitive.Tangents,
-			{ 4 }, { 5126 }, false, [&](FVector4 Value) -> FVector4 { return SceneBasis.TransformVector(Value); }))
+			{ 4 }, { 5126 }, false, [&](FVector4 Value) -> FVector4 { return SceneBasis.TransformFVector4(Value); }))
 		{
 			AddError("LoadPrimitive()", "Unable to load TANGENT attribute");
 			return false;
@@ -2879,11 +2879,16 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 	return Bytes.Num() > 0;
 }
 
-FVector FglTFRuntimeParser::ComputeTangentY(FVector Normal, FVector TangetX)
+FVector FglTFRuntimeParser::ComputeTangentY(const FVector Normal, const FVector TangetX)
 {
 	float Determinant = GetBasisDeterminantSign(Normal.GetSafeNormal(),
 		(Normal ^ TangetX).GetSafeNormal(),
 		Normal.GetSafeNormal());
 
 	return (Normal ^ TangetX) * Determinant;
+}
+
+FVector FglTFRuntimeParser::ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W)
+{
+	return (Normal ^ TangetX) * W;
 }
