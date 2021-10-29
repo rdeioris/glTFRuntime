@@ -13,6 +13,8 @@ DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromFilename, FColor::Magenta);
+
 	FString TruePath = Filename;
 
 	if (LoaderConfig.bSearchContentDir)
@@ -64,6 +66,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromData, FColor::Magenta);
+
 	// required for Gzip;
 	TArray<uint8> UncompressedData;
 
@@ -220,6 +224,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromString, FColor::Magenta);
+
 	TSharedPtr<FJsonValue> RootValue;
 
 	TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonData);
@@ -256,6 +262,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromBinary, FColor::Magenta);
+
 	FString JsonData;
 	TArray64<uint8> BinaryBuffer;
 
@@ -1726,6 +1734,8 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 
 bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadPrimitive, FColor::Magenta);
+
 	const TSharedPtr<FJsonObject>* JsonAttributesObject;
 	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
 	{
