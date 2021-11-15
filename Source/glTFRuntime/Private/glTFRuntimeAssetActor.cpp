@@ -5,6 +5,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
+#include "DatasmithAssetUserData.h"
 
 // Sets default values
 AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
@@ -168,6 +169,19 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 			SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		}
 	}
+
+	// check for extras
+	if (Node.Extras) {
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Node.Extras)->Values) {
+			FString StringValue;
+			float NumberValue;
+
+			if (Pair.Value->TryGetString(StringValue)) {
+				UDatasmithAssetUserData::SetDatasmithUserDataValueForKey(NewComponent, FName(*Pair.Key), StringValue);
+			}
+		}
+	}
+
 
 	for (int32 ChildIndex : Node.ChildrenIndices)
 	{

@@ -2,7 +2,6 @@
 
 #include "glTFRuntimeParser.h"
 #include "Misc/FileHelper.h"
-#include "Serialization/JsonSerializer.h"
 #include "Animation/Skeleton.h"
 #include "Materials/Material.h"
 #include "Misc/Base64.h"
@@ -744,6 +743,8 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 
 	Node.EmitterIndices = GetJsonExtensionObjectIndices(JsonNodeObject, "MSFT_audio_emitter", "emitters");
 
+	JsonNodeObject->TryGetObjectField("extras", Node.Extras);
+	
 	FMatrix Matrix = FMatrix::Identity;
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues;

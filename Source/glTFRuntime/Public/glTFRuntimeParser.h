@@ -11,6 +11,7 @@
 #include "Components/AudioComponent.h"
 #include "glTFRuntimeAnimationCurve.h"
 #include "ProceduralMeshComponent.h"
+#include "Serialization/JsonSerializer.h"
 #if WITH_EDITOR
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
@@ -215,6 +216,8 @@ struct FglTFRuntimeNode
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
 	TArray<int32> EmitterIndices;
 
+	const TSharedPtr<FJsonObject>* Extras;
+
 	FglTFRuntimeNode()
 	{
 		Index = INDEX_NONE;
@@ -223,6 +226,7 @@ struct FglTFRuntimeNode
 		MeshIndex = INDEX_NONE;
 		SkinIndex = INDEX_NONE;
 		CameraIndex = INDEX_NONE;
+		Extras = nullptr;
 	}
 };
 
