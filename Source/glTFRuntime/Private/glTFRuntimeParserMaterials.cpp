@@ -374,7 +374,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
 
-	for (const TPair<FString, float> Pair : MaterialsConfig.ParamsMultiplier)
+	for (const TPair<FString, float>& Pair : MaterialsConfig.ParamsMultiplier)
 	{
 		float ScalarValue = 0;
 		FLinearColor VectorValue = FLinearColor::Black;
