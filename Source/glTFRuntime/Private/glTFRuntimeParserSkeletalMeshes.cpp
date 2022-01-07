@@ -724,16 +724,18 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 
 #endif
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION >= 27
+		TArray<FSkeletalMaterial>& SkeletalMaterials = SkeletalMeshContext->SkeletalMesh->GetMaterials();
+#else
+		TArray<FSkeletalMaterial>& SkeletalMaterials = SkeletalMeshContext->SkeletalMesh->Materials;
+#endif
+
+		int32 BaseMaterialIndex = SkeletalMaterials.Num();
 
 		for (int32 MatIndex = 0; MatIndex < SkeletalMeshContext->LODs[LODIndex].Primitives.Num(); MatIndex++)
 		{
-			LODInfo.LODMaterialMap.Add(MatIndex);
+			LODInfo.LODMaterialMap.Add(BaseMaterialIndex + MatIndex);
 			
-#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION >= 27
-			TArray<FSkeletalMaterial>& SkeletalMaterials = SkeletalMeshContext->SkeletalMesh->GetMaterials();
-#else
-			TArray<FSkeletalMaterial>& SkeletalMaterials = SkeletalMeshContext->SkeletalMesh->Materials;
-#endif
 			int32 NewMatIndex = SkeletalMaterials.Add(SkeletalMeshContext->LODs[LODIndex].Primitives[MatIndex].Material);
 			SkeletalMaterials[NewMatIndex].UVChannelData.bInitialized = true;
 			SkeletalMaterials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex].Primitives[MatIndex].MaterialName)));
@@ -881,6 +883,26 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	return SkeletalMeshContext->SkeletalMesh;
 }
 
+FglTFRuntimeLOD FglTFRuntimeParser::LoadSkeletalMeshLOD(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	FglTFRuntimeLOD LOD0;
+	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+	if (!JsonMeshObject)
+	{
+		AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
+		return LOD0;
+	}
+
+	TArray<FglTFRuntimePrimitive> Primitives;
+	if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, SkeletalMeshConfig.MaterialsConfig))
+	{
+		return LOD0;
+	}
+
+	LOD0.Primitives = Primitives;
+	return LOD0;
+}
+
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
 
@@ -907,6 +929,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 	FglTFRuntimeLOD LOD0;
 	LOD0.Primitives = Primitives;
 	LODs.Add(LOD0);
+
+	LODs.Append(SkeletalMeshConfig.ExternalLODs);
 
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
@@ -1002,7 +1026,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> Mesh
 	return nullptr;
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const TArray<FString>&ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
+bool FglTFRuntimeParser::LoadSkeletalMeshLODRecursive(const FString& NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, FglTFRuntimeLOD& LOD, int32& NewSkinIndex)
 {
 	FglTFRuntimeNode Node;
 	TArray<FglTFRuntimeNode> Nodes;
@@ -1012,16 +1036,16 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 		FglTFRuntimeScene Scene;
 		if (!LoadScene(0, Scene))
 		{
-			AddError("LoadSkeletalMeshRecursive()", "No Scene found in asset");
-			return nullptr;
+			AddError("LoadSkeletalMeshLODRecursive()", "No Scene found in asset");
+			return false;
 		}
 
 		for (int32 NodeIndex : Scene.RootNodesIndices)
 		{
 			if (!LoadNodesRecursive(NodeIndex, Nodes))
 			{
-				AddError("LoadSkeletalMeshRecursive()", "Unable to build Node Tree from first Scene");
-				return nullptr;
+				AddError("LoadSkeletalMeshLODRecursive()", "Unable to build Node Tree from first Scene");
+				return false;
 			}
 		}
 	}
@@ -1029,18 +1053,18 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 	{
 		if (!LoadNodeByName(NodeName, Node))
 		{
-			AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
-			return nullptr;
+			AddError("LoadSkeletalMeshLODRecursive()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
+			return false;
 		}
 
 		if (!LoadNodesRecursive(Node.Index, Nodes))
 		{
-			AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
-			return nullptr;
+			AddError("LoadSkeletalMeshLODRecursive()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
+			return false;
 		}
 	}
 
-	int32 NewSkinIndex = SkinIndex;
+	NewSkinIndex = SkinIndex;
 
 	if (NewSkinIndex <= INDEX_NONE)
 	{
@@ -1060,8 +1084,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 
 		if (NewSkinIndex <= INDEX_NONE)
 		{
-			AddError("LoadSkeletalMeshRecursive()", "Unable to find a valid Skin");
-			return nullptr;
+			AddError("LoadSkeletalMeshLODRecursive()", "Unable to find a valid Skin");
+			return false;
 		}
 	}
 
@@ -1079,8 +1103,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", ChildNode.MeshIndex);
 			if (!JsonMeshObject)
 			{
-				AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to find Mesh with index %d"), ChildNode.MeshIndex));
-				return nullptr;
+				AddError("LoadSkeletalMeshLODRecursive()", FString::Printf(TEXT("Unable to find Mesh with index %d"), ChildNode.MeshIndex));
+				return false;
 			}
 
 			// keep track of primitives
@@ -1088,7 +1112,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 
 			if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, SkeletalMeshConfig.MaterialsConfig))
 			{
-				return nullptr;
+				return false;
 			}
 
 			// if the SkinIndex is different from the selected one,
@@ -1098,8 +1122,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 				TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
 				if (!JsonSkinObject)
 				{
-					AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to fill skin %d"), ChildNode.SkinIndex));
-					return nullptr;
+					AddError("LoadSkeletalMeshLODRecursive()", FString::Printf(TEXT("Unable to fill skin %d"), ChildNode.SkinIndex));
+					return false;
 				}
 
 				TMap<int32, FName> BoneMap;
@@ -1107,8 +1131,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 				FReferenceSkeleton FakeRefSkeleton;
 				if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), FakeRefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
 				{
-					AddError("LoadSkeletalMeshRecursive()", "Unable to fill RefSkeleton.");
-					return nullptr;
+					AddError("LoadSkeletalMeshLODRecursive()", "Unable to fill RefSkeleton.");
+					return false;
 				}
 
 				// apply overrides
@@ -1121,10 +1145,22 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 		}
 	}
 
+	LOD.Primitives = Primitives;
+	return true;
+}
+
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const TArray<FString>&ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
+{
 	TArray<FglTFRuntimeLOD> LODs;
 	FglTFRuntimeLOD LOD0;
-	LOD0.Primitives = Primitives;
+	int32 NewSkinIndex;
+	if (!LoadSkeletalMeshLODRecursive(NodeName, SkinIndex, ExcludeNodes, SkeletalMeshConfig, LOD0, NewSkinIndex))
+	{
+		return nullptr;
+	}
 	LODs.Add(LOD0);
+
+	LODs.Append(SkeletalMeshConfig.ExternalLODs);
 
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = NewSkinIndex;

@@ -547,116 +547,6 @@ struct FglTFRuntimePhysicsBody
 	}
 };
 
-USTRUCT(BlueprintType)
-struct FglTFRuntimeSkeletalMeshConfig
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	EglTFRuntimeCacheMode CacheMode;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	USkeleton* Skeleton;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bOverwriteRefSkeleton;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bMergeAllBonesToBoneTree;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TArray<FglTFRuntimeBone> CustomSkeleton;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bIgnoreSkin;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	int32 OverrideSkinIndex;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FglTFRuntimeSkeletonConfig SkeletonConfig;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FglTFRuntimeMaterialsConfig MaterialsConfig;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TMap<int32, float> LODScreenSize;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FVector BoundsScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bShiftBoundsByRootBone;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bIgnoreMissingBones;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TMap<FString, FglTFRuntimePhysicsBody> PhysicsBodies;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	UObject* Outer;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FString SaveToPackage;
-
-	FglTFRuntimeSkeletalMeshConfig()
-	{
-		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
-		bOverwriteRefSkeleton = false;
-		Skeleton = nullptr;
-		bIgnoreSkin = false;
-		OverrideSkinIndex = -1;
-		BoundsScale = FVector::OneVector;
-		bShiftBoundsByRootBone = false;
-		bIgnoreMissingBones = false;
-		bMergeAllBonesToBoneTree = false;
-		Outer = nullptr;
-	}
-};
-
-USTRUCT(BlueprintType)
-struct FglTFRuntimeSkeletalAnimationConfig
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	EglTFRuntimeCacheMode CacheMode;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	int32 RootNodeIndex;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bRootMotion;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bRemoveRootMotion;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bRemoveTranslations;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bRemoveRotations;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bRemoveScales;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bRemoveMorphTargets;
-
-	FglTFRuntimeSkeletalAnimationConfig()
-	{
-		RootNodeIndex = INDEX_NONE;
-		bRootMotion = false;
-		bRemoveRootMotion = false;
-		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
-		bRemoveTranslations = false;
-		bRemoveRotations = false;
-		bRemoveScales = false;
-		bRemoveMorphTargets = false;
-	}
-};
-
 struct FglTFRuntimeUInt16Vector4
 {
 	uint16 X;
@@ -728,6 +618,119 @@ struct FglTFRuntimeLOD
 		bHasNormals = false;
 		bHasTangents = false;
 		bHasUV = false;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletalMeshConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeCacheMode CacheMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	USkeleton* Skeleton;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bOverwriteRefSkeleton;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bMergeAllBonesToBoneTree;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FglTFRuntimeBone> CustomSkeleton;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bIgnoreSkin;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 OverrideSkinIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeSkeletonConfig SkeletonConfig;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<int32, float> LODScreenSize;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector BoundsScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bShiftBoundsByRootBone;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bIgnoreMissingBones;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, FglTFRuntimePhysicsBody> PhysicsBodies;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Outer;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString SaveToPackage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FglTFRuntimeLOD> ExternalLODs;
+
+	FglTFRuntimeSkeletalMeshConfig()
+	{
+		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
+		bOverwriteRefSkeleton = false;
+		Skeleton = nullptr;
+		bIgnoreSkin = false;
+		OverrideSkinIndex = -1;
+		BoundsScale = FVector::OneVector;
+		bShiftBoundsByRootBone = false;
+		bIgnoreMissingBones = false;
+		bMergeAllBonesToBoneTree = false;
+		Outer = nullptr;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletalAnimationConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeCacheMode CacheMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 RootNodeIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bRootMotion;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bRemoveRootMotion;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bRemoveTranslations;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bRemoveRotations;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bRemoveScales;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bRemoveMorphTargets;
+
+	FglTFRuntimeSkeletalAnimationConfig()
+	{
+		RootNodeIndex = INDEX_NONE;
+		bRootMotion = false;
+		bRemoveRootMotion = false;
+		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
+		bRemoveTranslations = false;
+		bRemoveRotations = false;
+		bRemoveScales = false;
+		bRemoveMorphTargets = false;
 	}
 };
 
@@ -1010,6 +1013,7 @@ public:
 	bool LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene);
 
 	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	FglTFRuntimeLOD LoadSkeletalMeshLOD(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	UAnimSequence* LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
@@ -1023,6 +1027,7 @@ public:
 	USkeletalMesh* LoadSkeletalMeshLODs(const TArray<int32> MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
 	USkeletalMesh* LoadSkeletalMeshRecursive(const FString& NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	bool LoadSkeletalMeshLODRecursive(const FString& NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, FglTFRuntimeLOD& LOD, int32& NewSkinIndex);
 	void LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);

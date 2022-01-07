@@ -284,6 +284,13 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const 
 	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, SkeletalMeshConfig);
 }
 
+FglTFRuntimeLOD UglTFRuntimeAsset::LoadSkeletalMeshLOD(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	GLTF_CHECK_PARSER(FglTFRuntimeLOD());
+
+	return Parser->LoadSkeletalMeshLOD(MeshIndex, SkinIndex, SkeletalMeshConfig);
+}
+
 void UglTFRuntimeAsset::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
@@ -296,6 +303,15 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeN
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeletalMeshRecursive(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, SkeletalMeshConfig);
+}
+
+FglTFRuntimeLOD UglTFRuntimeAsset::LoadSkeletalMeshLODRecursive(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	FglTFRuntimeLOD LOD;
+	int32 NewSkinIndex;
+	GLTF_CHECK_PARSER(LOD);
+	Parser->LoadSkeletalMeshLODRecursive(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, SkeletalMeshConfig, LOD, NewSkinIndex);
+	return LOD;
 }
 
 void UglTFRuntimeAsset::LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
