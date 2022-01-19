@@ -114,6 +114,10 @@ void AglTFRuntimeAssetActorAsync::LoadNextMeshAsync()
 	if (UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(It->Key))
 	{
 		CurrentPrimitiveComponent = StaticMeshComponent;
+		if (StaticMeshConfig.Outer == nullptr)
+		{
+			StaticMeshConfig.Outer = StaticMeshComponent;
+		}
 		FglTFRuntimeStaticMeshAsync Delegate;
 		Delegate.BindDynamic(this, &AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync);
 		Asset->LoadStaticMeshAsync(It->Value.MeshIndex, Delegate, StaticMeshConfig);
