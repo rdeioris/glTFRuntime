@@ -114,6 +114,10 @@ void AglTFRuntimeAssetActorAsync::LoadNextMeshAsync()
 	if (UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(It->Key))
 	{
 		CurrentPrimitiveComponent = StaticMeshComponent;
+		if (StaticMeshConfig.Outer == nullptr)
+		{
+			StaticMeshConfig.Outer = StaticMeshComponent;
+		}
 		FglTFRuntimeStaticMeshAsync Delegate;
 		Delegate.BindDynamic(this, &AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync);
 		Asset->LoadStaticMeshAsync(It->Value.MeshIndex, Delegate, StaticMeshConfig);
@@ -132,6 +136,24 @@ void AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync(UStaticMesh* StaticMesh)
 	if (UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(CurrentPrimitiveComponent))
 	{
 		StaticMeshComponent->SetStaticMesh(StaticMesh);
+
+		if (StaticMeshConfig.Outer == nullptr)
+		{
+			StaticMeshConfig.Outer = StaticMeshComponent;
+		}
+		if (StaticMesh && !StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
+		{
+			UStaticMeshSocket* DeltaSocket = StaticMesh->FindSocket(FName(StaticMeshConfig.ExportOriginalPivotToSocket));
+			if (DeltaSocket)
+			{
+				FTransform NewTransform = StaticMeshComponent->GetRelativeTransform();
+				FVector DeltaLocation = -DeltaSocket->RelativeLocation * NewTransform.GetScale3D();
+				DeltaLocation = NewTransform.GetRotation().RotateVector(DeltaLocation);
+				NewTransform.AddToTranslation(DeltaLocation);
+				StaticMeshComponent->SetRelativeTransform(NewTransform);
+			}
+		}
+
 	}
 
 	MeshesToLoad.Remove(CurrentPrimitiveComponent);
