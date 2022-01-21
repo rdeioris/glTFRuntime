@@ -447,6 +447,26 @@ bool FglTFRuntimeParser::LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFR
 	return true;
 }
 
+int32 FglTFRuntimeParser::GetNumMeshes() const
+{
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (Root->TryGetArrayField("meshes", JsonArray))
+	{	
+		return JsonArray->Num();
+	}
+	return 0;
+}
+
+int32 FglTFRuntimeParser::GetNumImages() const
+{
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (Root->TryGetArrayField("images", JsonArray))
+	{
+		return JsonArray->Num();
+	}
+	return 0;
+}
+
 bool FglTFRuntimeParser::LoadScenes(TArray<FglTFRuntimeScene>& Scenes)
 {
 	const TArray<TSharedPtr<FJsonValue>>* JsonScenes;
