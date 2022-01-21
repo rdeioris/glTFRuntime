@@ -1035,7 +1035,7 @@ public:
 
 	bool GetBuffer(int32 BufferIndex, TArray64<uint8>& Bytes);
 	bool GetBufferView(int32 BufferViewIndex, TArray64<uint8>& Bytes, int64& Stride);
-	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray64<uint8>& Bytes);
+	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, TArray64<uint8>& Bytes);
 
 	bool GetAllNodes(TArray<FglTFRuntimeNode>& Nodes);
 
@@ -1246,6 +1246,7 @@ protected:
 			}
 			else
 			{
+				UE_LOG(LogTemp, Error, TEXT("Unsupported type %d"), ComponentType);
 				return false;
 			}
 
@@ -1268,10 +1269,14 @@ protected:
 			return false;
 
 		if (Elements != 1)
+		{
 			return false;
+		}
 
 		if (!SupportedTypes.Contains(ComponentType))
+		{
 			return false;
+		}
 
 		for (int64 ElementIndex = 0; ElementIndex < Count; ElementIndex++)
 		{
@@ -1310,6 +1315,7 @@ protected:
 			}
 			else
 			{
+				UE_LOG(LogTemp, Error, TEXT("Unsupported type %d"), ComponentType);
 				return false;
 			}
 
