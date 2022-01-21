@@ -600,6 +600,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FString SaveToPackage;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bPerPolyCollision;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -612,6 +615,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		bIgnoreMissingBones = false;
 		bMergeAllBonesToBoneTree = false;
 		Outer = nullptr;
+		bPerPolyCollision = false;
 	}
 };
 
