@@ -1510,7 +1510,8 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	{
 		TArray64<uint8> InverseBindMatricesBytes;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
-		if (!GetAccessor(inverseBindMatricesIndex, ComponentType, Stride, Elements, ElementSize, Count, InverseBindMatricesBytes))
+		bool bNormalized = false;
+		if (!GetAccessor(inverseBindMatricesIndex, ComponentType, Stride, Elements, ElementSize, Count, bNormalized, InverseBindMatricesBytes))
 		{
 			AddError("FillReferenceSkeleton()", FString::Printf(TEXT("Unable to load accessor: %lld."), inverseBindMatricesIndex));
 			return false;
@@ -1923,7 +1924,8 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray64<uint8> IndicesBytes;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
-		if (!GetAccessor(IndicesAccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, IndicesBytes))
+		bool bNormalized = false;
+		if (!GetAccessor(IndicesAccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bNormalized, IndicesBytes))
 		{
 			AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load accessor: %lld"), IndicesAccessorIndex));
 			return false;
@@ -2188,7 +2190,7 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int6
 	return true;
 }
 
-bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray64<uint8>& Bytes)
+bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, TArray64<uint8>& Bytes)
 {
 
 	TSharedPtr<FJsonObject> JsonAccessorObject = GetJsonObjectFromRootIndex("accessors", Index);
@@ -2216,6 +2218,11 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 	if (!JsonAccessorObject->TryGetNumberField("byteOffset", ByteOffset))
 	{
 		ByteOffset = 0;
+	}
+
+	if (!JsonAccessorObject->TryGetBoolField("normalized", bNormalized))
+	{
+		bNormalized = false;
 	}
 
 	if (!JsonAccessorObject->TryGetNumberField("componentType", ComponentType))
