@@ -167,6 +167,19 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 			RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness = true;
 		}
+
+		// KHR_materials_transmission
+		const TSharedPtr<FJsonObject>* JsonMaterialTransmission;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_transmission", JsonMaterialTransmission))
+		{
+			if ((*JsonMaterialTransmission)->TryGetNumberField("transmissionFactor", RuntimeMaterial.TransmissionFactor))
+			{
+				RuntimeMaterial.bHasTransmissionFactor = true;
+			}
+			GetMaterialTexture(JsonMaterialTransmission->ToSharedRef(), "transmissionTexture", false, RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips, RuntimeMaterial.TransmissionTexCoord);
+
+			RuntimeMaterial.bKHR_materials_transmission = true;
+		}
 	}
 
 	if (IsInGameThread())
@@ -369,6 +382,14 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		ApplyMaterialFloatFactor(RuntimeMaterial.bHasGlossinessFactor, "glossinessFactor", RuntimeMaterial.GlossinessFactor);
 		ApplyMaterialTexture("specularGlossinessTexture", RuntimeMaterial.SpecularGlossinessTextureCache, RuntimeMaterial.SpecularGlossinessTextureMips,
 			"specularGlossinessTexCoord", RuntimeMaterial.SpecularGlossinessTexCoord,
+			TextureCompressionSettings::TC_Default, false);
+	}
+
+	if (RuntimeMaterial.bKHR_materials_transmission)
+	{
+		ApplyMaterialFloatFactor(RuntimeMaterial.bHasTransmissionFactor, "transmissionFactor", RuntimeMaterial.TransmissionFactor);
+		ApplyMaterialTexture("transmissionTexture", RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips,
+			"transmissionTexCoord", RuntimeMaterial.TransmissionTexCoord,
 			TextureCompressionSettings::TC_Default, false);
 	}
 

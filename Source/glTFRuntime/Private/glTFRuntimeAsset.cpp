@@ -557,3 +557,15 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const TEnumAsBy
 
 	return nullptr;
 }
+
+TArray<FString> UglTFRuntimeAsset::GetExtensionsUsed() const
+{
+	GLTF_CHECK_PARSER(TArray<FString>());
+	return Parser->ExtensionsUsed;
+}
+
+TArray<FString> UglTFRuntimeAsset::GetExtensionsRequired() const
+{
+	GLTF_CHECK_PARSER(TArray<FString>());
+	return Parser->ExtensionsRequired;
+}

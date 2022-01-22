@@ -175,6 +175,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	UTexture2D* LoadImage(const int32 ImageIndex, const TEnumAsByte<TextureCompressionSettings> Compression, const bool bSRGB);
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	TArray<FString> GetExtensionsUsed() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	TArray<FString> GetExtensionsRequired() const;
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	
