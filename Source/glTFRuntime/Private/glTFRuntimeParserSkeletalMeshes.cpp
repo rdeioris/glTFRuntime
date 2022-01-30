@@ -1118,7 +1118,7 @@ bool FglTFRuntimeParser::LoadSkeletalMeshLODRecursive(const FString& NodeName, c
 
 			// if the SkinIndex is different from the selected one,
 			// build an override bone map
-			if (ChildNode.SkinIndex > INDEX_NONE && ChildNode.SkinIndex != NewSkinIndex)
+			if (ChildNode.SkinIndex > INDEX_NONE && (ChildNode.SkinIndex != NewSkinIndex || SkeletalMeshConfig.bForceBuildOverrideBoneMap))
 			{
 				TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
 				if (!JsonSkinObject)

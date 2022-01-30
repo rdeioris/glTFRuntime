@@ -680,6 +680,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bPerPolyCollision;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bForceBuildOverrideBoneMap;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -693,6 +696,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		bMergeAllBonesToBoneTree = false;
 		Outer = nullptr;
 		bPerPolyCollision = false;
+		bForceBuildOverrideBoneMap = false;
 	}
 };
 
