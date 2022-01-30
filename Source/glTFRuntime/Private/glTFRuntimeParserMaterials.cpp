@@ -426,7 +426,7 @@ bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& Unco
 	if (!GetJsonObjectBytes(JsonImageObject.ToSharedRef(), Bytes))
 	{
 		AddError("LoadImage()", FString::Printf(TEXT("Unable to load image %d"), ImageIndex));
-		return nullptr;
+		return false;
 	}
 
 	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
