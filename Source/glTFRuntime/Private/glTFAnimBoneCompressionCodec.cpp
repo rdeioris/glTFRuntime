@@ -16,7 +16,11 @@ FQuat UglTFAnimBoneCompressionCodec::GetTrackRotation(FAnimSequenceDecompression
 	int32 FrameB = 0;
 
 	float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].RotKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+#if ENGINE_MAJOR_VERSION > 4
+	return FQuat::Slerp(FQuat(Tracks[TrackIndex].RotKeys[FrameA]), FQuat(Tracks[TrackIndex].RotKeys[FrameB]), Alpha);
+#else
 	return FQuat::Slerp(Tracks[TrackIndex].RotKeys[FrameA], Tracks[TrackIndex].RotKeys[FrameB], Alpha);
+#endif
 }
 
 FVector UglTFAnimBoneCompressionCodec::GetTrackLocation(FAnimSequenceDecompressionContext& DecompContext, const int32 TrackIndex) const

@@ -763,7 +763,7 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 			}
 			else
 			{
-#if ENGINE_MINOR_VERSION >= 26
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION >= 26
 				Outer = CreatePackage(*InSkeletalMeshConfig.SaveToPackage);
 #else
 				Outer = CreatePackage(nullptr, *InSkeletalMeshConfig.SaveToPackage);

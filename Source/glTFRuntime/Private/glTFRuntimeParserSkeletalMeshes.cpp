@@ -239,7 +239,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		TArray<SkeletalMeshImportData::FTriangle> Triangles;
 		TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
 
+#if ENGINE_MAJOR_VERSION > 4
+		TArray<FVector3f> Points;
+#else
 		TArray<FVector> Points;
+#endif
 
 		for (FglTFRuntimePrimitive& Primitive : LOD.Primitives)
 		{
@@ -327,9 +331,15 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 					if (Primitive.Tangents.Num() > 0)
 					{
+#if ENGINE_MAJOR_VERSION > 4
+						Triangle.TangentX[0] = FVector3f(Primitive.Tangents[Primitive.Indices[i - 2]]);
+						Triangle.TangentX[1] = FVector3f(Primitive.Tangents[Primitive.Indices[i - 1]]);
+						Triangle.TangentX[2] = FVector3f(Primitive.Tangents[Primitive.Indices[i]]);
+#else
 						Triangle.TangentX[0] = Primitive.Tangents[Primitive.Indices[i - 2]];
 						Triangle.TangentX[1] = Primitive.Tangents[Primitive.Indices[i - 1]];
 						Triangle.TangentX[2] = Primitive.Tangents[Primitive.Indices[i]];
+#endif
 						LOD.bHasTangents = true;
 					}
 
@@ -397,7 +407,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
 			{
 				TSet<uint32> MorphTargetPoints;
+#if ENGINE_MAJOR_VERSION > 4
+				TArray<FVector3f> MorphTargetPositions;
+#else
 				TArray<FVector> MorphTargetPositions;
+#endif
 				for (uint32 PointIndex = 0; PointIndex < (uint32)Primitive.Positions.Num(); PointIndex++)
 				{
 					MorphTargetPoints.Add(PointsBase + PointIndex);
@@ -742,7 +756,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 #if WITH_EDITOR
 		IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
-#if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION >= 27
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION >= 27
 		FSkeletalMeshBuildParameters SkeletalMeshBuildParameters(SkeletalMeshContext->SkeletalMesh, GetTargetPlatformManagerRef().GetRunningTargetPlatform(), LODIndex, false);
 		if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshBuildParameters))
 #else
@@ -1481,12 +1495,20 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		{
 			for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
 			{
+#if ENGINE_MAJOR_VERSION > 4
+				Pair.Value.RotKeys.Add(FQuat4f(BonesPoses[BoneIndex].GetRotation()));
+#else
 				Pair.Value.RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
+#endif
 			}
 		}
 		else if (Pair.Value.RotKeys.Num() < NumFrames)
 		{
+#if ENGINE_MAJOR_VERSION > 4
+			FQuat4f LastValidRotation = Pair.Value.RotKeys.Last();
+#else
 			FQuat LastValidRotation = Pair.Value.RotKeys.Last();
+#endif
 			int32 FirstNewFrame = Pair.Value.RotKeys.Num();
 			for (int32 FrameIndex = FirstNewFrame; FrameIndex < NumFrames; FrameIndex++)
 			{
@@ -1533,13 +1555,21 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				for (int32 FrameIndex = 0; FrameIndex < Pair.Value.RotKeys.Num(); FrameIndex++)
 				{
 					FVector Pos = Pair.Value.PosKeys[FrameIndex];
+#if ENGINE_MAJOR_VERSION > 4
+					FQuat4d Quat = FQuat4d(Pair.Value.RotKeys[FrameIndex]);
+#else
 					FQuat Quat = Pair.Value.RotKeys[FrameIndex];
+#endif
 					FVector Scale = Pair.Value.ScaleKeys[FrameIndex];
 
 					FTransform FrameTransform = FTransform(Quat, Pos, Scale) * AnimRootNode.Transform;
 
 					Pair.Value.PosKeys[FrameIndex] = FrameTransform.GetLocation();
+#if ENGINE_MAJOR_VERSION > 4
+					Pair.Value.RotKeys[FrameIndex] = FQuat4f(FrameTransform.GetRotation());
+#else
 					Pair.Value.RotKeys[FrameIndex] = FrameTransform.GetRotation();
+#endif
 					Pair.Value.ScaleKeys[FrameIndex] = FrameTransform.GetScale3D();
 				}
 			}
@@ -1655,7 +1685,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				FirstQuat = FirstMatrix.ToQuat();
 				SecondQuat = SecondMatrix.ToQuat();
 				FQuat AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+#if ENGINE_MAJOR_VERSION > 4
+				Track.RotKeys.Add(FQuat4f(AnimQuat));
+#else
 				Track.RotKeys.Add(AnimQuat);
+#endif
 				FrameBase += FrameDelta;
 			}
 		}
