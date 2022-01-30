@@ -167,6 +167,19 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 			RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness = true;
 		}
+
+		// KHR_materials_transmission
+		const TSharedPtr<FJsonObject>* JsonMaterialTransmission;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_transmission", JsonMaterialTransmission))
+		{
+			if ((*JsonMaterialTransmission)->TryGetNumberField("transmissionFactor", RuntimeMaterial.TransmissionFactor))
+			{
+				RuntimeMaterial.bHasTransmissionFactor = true;
+			}
+			GetMaterialTexture(JsonMaterialTransmission->ToSharedRef(), "transmissionTexture", false, RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips, RuntimeMaterial.TransmissionTexCoord);
+
+			RuntimeMaterial.bKHR_materials_transmission = true;
+		}
 	}
 
 	if (IsInGameThread())
@@ -190,7 +203,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	return Material;
 }
 
-UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB)
 {
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
 
@@ -318,7 +331,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		{
 			if (Mips.Num() > 0)
 			{
-				Texture = BuildTexture(Material, Mips, Compression, sRGB, MaterialsConfig);
+				Texture = BuildTexture(Material, Mips, Compression, sRGB);
 			}
 		}
 		if (Texture)
@@ -372,6 +385,14 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			TextureCompressionSettings::TC_Default, false);
 	}
 
+	if (RuntimeMaterial.bKHR_materials_transmission)
+	{
+		ApplyMaterialFloatFactor(RuntimeMaterial.bHasTransmissionFactor, "transmissionFactor", RuntimeMaterial.TransmissionFactor);
+		ApplyMaterialTexture("transmissionTexture", RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips,
+			"transmissionTexCoord", RuntimeMaterial.TransmissionTexCoord,
+			TextureCompressionSettings::TC_Default, false);
+	}
+
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ParamsMultiplier)
@@ -389,6 +410,57 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	}
 
 	return Material;
+}
+
+bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height)
+{
+
+	TSharedPtr<FJsonObject> JsonImageObject = GetJsonObjectFromRootIndex("images", ImageIndex);
+	if (!JsonImageObject)
+	{
+		AddError("LoadImage()", FString::Printf(TEXT("Unable to load image %d"), ImageIndex));
+		return false;
+	}
+
+	TArray64<uint8> Bytes;
+	if (!GetJsonObjectBytes(JsonImageObject.ToSharedRef(), Bytes))
+	{
+		AddError("LoadImage()", FString::Printf(TEXT("Unable to load image %d"), ImageIndex));
+		return nullptr;
+	}
+
+	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
+
+
+	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Bytes.GetData(), Bytes.Num());
+	if (ImageFormat == EImageFormat::Invalid)
+	{
+		AddError("LoadImage()", "Unable to detect image format");
+		return false;
+	}
+
+	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
+	if (!ImageWrapper.IsValid())
+	{
+		AddError("LoadImage()", "Unable to create ImageWrapper");
+		return false;
+	}
+	if (!ImageWrapper->SetCompressed(Bytes.GetData(), Bytes.Num()))
+	{
+		AddError("LoadImage()", "Unable to parse image data");
+		return false;
+	}
+
+	if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
+	{
+		AddError("LoadImage()", "Unable to get raw image data");
+		return false;
+	}
+
+	Width = ImageWrapper->GetWidth();
+	Height = ImageWrapper->GetHeight();
+
+	return true;
 }
 
 UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
@@ -435,72 +507,19 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		return nullptr;
 	}
 
-	if (ImageIndex < 0)
-	{
-		return nullptr;
-	}
-
-	const TArray<TSharedPtr<FJsonValue>>* JsonImages;
-	// no images ?
-	if (!Root->TryGetArrayField("images", JsonImages))
-	{
-		return nullptr;
-	}
-
-	if (ImageIndex >= JsonImages->Num())
-	{
-		return nullptr;
-	}
-
 	if (MaterialsConfig.ImagesOverrideMap.Contains(ImageIndex))
 	{
 		return MaterialsConfig.ImagesOverrideMap[ImageIndex];
 	}
 
-	TSharedPtr<FJsonObject> JsonImageObject = (*JsonImages)[ImageIndex]->AsObject();
-	if (!JsonImageObject)
-	{
-		return nullptr;
-	}
-
-	TArray64<uint8> Bytes;
-	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
-
-	if (!GetJsonObjectBytes(JsonImageObject.ToSharedRef(), Bytes))
-	{
-		AddError("LoadTexture()", FString::Printf(TEXT("Unable to load image %d"), ImageIndex));
-		return nullptr;
-	}
-
-	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Bytes.GetData(), Bytes.Num());
-	if (ImageFormat == EImageFormat::Invalid)
-	{
-		AddError("LoadTexture()", "Unable to detect image format");
-		return nullptr;
-	}
-
-	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
-	if (!ImageWrapper.IsValid())
-	{
-		AddError("LoadTexture()", "Unable to create ImageWrapper");
-		return nullptr;
-	}
-	if (!ImageWrapper->SetCompressed(Bytes.GetData(), Bytes.Num()))
-	{
-		AddError("LoadTexture()", "Unable to parse image data");
-		return nullptr;
-	}
-
 	TArray64<uint8> UncompressedBytes;
-	if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
+	EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
+	int32 Width = 0;
+	int32 Height = 0;
+	if (!LoadImage(ImageIndex, UncompressedBytes, Width, Height))
 	{
-		AddError("LoadTexture()", "Unable to get raw image data");
 		return nullptr;
 	}
-
-	EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
-	int32 Width = ImageWrapper->GetWidth();
-	int32 Height = ImageWrapper->GetHeight();
 
 	if (Width > 0 && Height > 0 &&
 		(Width % GPixelFormats[PixelFormat].BlockSizeX) == 0 &&
