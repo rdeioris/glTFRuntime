@@ -332,9 +332,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					if (Primitive.Tangents.Num() > 0)
 					{
 #if ENGINE_MAJOR_VERSION > 4
-						Triangle.TangentX[0] = FVector3f(Primitive.Tangents[Primitive.Indices[i - 2]]);
-						Triangle.TangentX[1] = FVector3f(Primitive.Tangents[Primitive.Indices[i - 1]]);
-						Triangle.TangentX[2] = FVector3f(Primitive.Tangents[Primitive.Indices[i]]);
+						Triangle.TangentX[0] = FVector(Primitive.Tangents[Primitive.Indices[i - 2]]);
+						Triangle.TangentX[1] = FVector(Primitive.Tangents[Primitive.Indices[i - 1]]);
+						Triangle.TangentX[2] = FVector(Primitive.Tangents[Primitive.Indices[i]]);
 #else
 						Triangle.TangentX[0] = Primitive.Tangents[Primitive.Indices[i - 2]];
 						Triangle.TangentX[1] = Primitive.Tangents[Primitive.Indices[i - 1]];
