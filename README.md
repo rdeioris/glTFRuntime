@@ -1,5 +1,5 @@
 # glTFRuntime
-Unreal Engine Plugin for loading glTF files at runtime
+Unreal Engine Plugin for loading glTF files at runtime (supports UE >= 4.25 and UE5) 
 
 ![Megagrant](https://raw.githubusercontent.com/rdeioris/glTFRuntime-docs/master/Epic_MegaGrants_Recipient_logo_horizontal_black.png?raw=true#gh-light-mode-only "Megagrant")
 ![Megagrant](https://raw.githubusercontent.com/rdeioris/glTFRuntime-docs/master/Epic_MegaGrants_Recipient_logo_horizontal_white.png?raw=true#gh-dark-mode-only "Megagrant")
