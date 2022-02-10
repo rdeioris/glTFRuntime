@@ -85,9 +85,7 @@ void FglTFRuntimeParser::ApplySkeletonBoneRotation(FReferenceSkeletonModifier& M
 	TArray<FTransform> BonesTransforms = Modifier.GetReferenceSkeleton().GetRefBonePose();
 
 	FTransform NewTransform = BonesTransforms[BoneIndex];
-
 	NewTransform.SetLocation(ParentRotation * NewTransform.GetLocation());
-
 
 	ParentRotation *= NewTransform.GetRotation();
 	NewTransform.SetRotation(FQuat::Identity);
