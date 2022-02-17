@@ -1292,7 +1292,7 @@ protected:
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("Unsupported type %d"), ComponentType);
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Unsupported type %d"), ComponentType);
 				return false;
 			}
 
@@ -1369,7 +1369,7 @@ protected:
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("Unsupported type %d"), ComponentType);
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Unsupported type %d"), ComponentType);
 				return false;
 			}
 
