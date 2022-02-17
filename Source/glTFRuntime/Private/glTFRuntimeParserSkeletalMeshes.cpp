@@ -283,7 +283,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(
 
 				for (int32 UVIndex = 0; UVIndex < Primitive.UVs.Num(); UVIndex++)
 				{
+#if ENGINE_MAJOR_VERSION > 4
 					Wedge.UVs[UVIndex] = FVector2f(Primitive.UVs[UVIndex][PrimitiveIndex]);
+#else
+					Wedge.UVs[UVIndex] = Primitive.UVs[UVIndex][PrimitiveIndex];
+#endif
 				}
 
 				int32 WedgeIndex = Wedges.Add(Wedge);
