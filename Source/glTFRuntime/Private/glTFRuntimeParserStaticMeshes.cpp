@@ -275,8 +275,6 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 					FVector2D UV0 = FVector2D(StaticMeshVertex0.UVs[0]);
 #else
 					FVector4 TangentZ0 = StaticMeshVertex0.TangentZ;
-#endif
-					// FVector2D UV0 = FVector2D(StaticMeshVertex0.UVs[0]);
 					FVector2D UV0 = StaticMeshVertex0.UVs[0];
 #endif
 					
@@ -297,8 +295,6 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 					FVector2D UV2 = FVector2D(StaticMeshVertex2.UVs[0]);
 #else
 					FVector4 TangentZ2 = StaticMeshVertex2.TangentZ;
-#endif
-					// FVector2D UV2 = FVector2D(StaticMeshVertex2.UVs[0]);
 					FVector2D UV2 = StaticMeshVertex2.UVs[0];
 #endif
 					
