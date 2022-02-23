@@ -38,11 +38,11 @@ public class glTFRuntime : ModuleRules
             {
                 "CoreUObject",
                 "Engine",
-                "JSON",
+                "Json",
                 "RenderCore",
                 "RHI",
                 "ApplicationCore",
-                "Http",
+                "HTTP",
                 "PhysicsCore",
                 "Projects",
                 "DatasmithContent"
