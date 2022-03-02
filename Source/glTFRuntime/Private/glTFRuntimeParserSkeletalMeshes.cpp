@@ -533,12 +533,21 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				}
 				if (Primitive.UVs.Num() > 0 && Index < Primitive.UVs[0].Num())
 				{
+
+#if ENGINE_MAJOR_VERSION > 4
+					ModelVertex.TexCoord = FVector2f(Primitive.UVs[0][Index]);
+#else
 					ModelVertex.TexCoord = Primitive.UVs[0][Index];
+#endif
 					LOD.bHasUV = true;
 				}
 				else
 				{
+#if ENGINE_MAJOR_VERSION > 4
+					ModelVertex.TexCoord = FVector2f::ZeroVector;
+#else
 					ModelVertex.TexCoord = FVector2D::ZeroVector;
+#endif
 				}
 
 				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
@@ -631,32 +640,41 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				FVector Position0 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex);
 #if ENGINE_MAJOR_VERSION > 4
 				FVector4 TangentZ0 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex));
+				FVector2f UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
 #else
 				FVector4 TangentZ0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex);
-#endif
 				FVector2D UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
+#endif
 
 				FVector Position1 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex + 1);
 #if ENGINE_MAJOR_VERSION > 4
 				FVector4 TangentZ1 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 1));
+				FVector2f UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
 #else
 				FVector4 TangentZ1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 1);
-#endif
 				FVector2D UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
+#endif
 
 				FVector Position2 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex + 2);
 #if ENGINE_MAJOR_VERSION > 4
 				FVector4 TangentZ2 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 2));
+				FVector2f UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
 #else
 				FVector4 TangentZ2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 2);
-#endif
 				FVector2D UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
+#endif
 
 				FVector DeltaPosition0 = Position1 - Position0;
 				FVector DeltaPosition1 = Position2 - Position0;
 
+#if ENGINE_MAJOR_VERSION > 4
+				FVector2f DeltaUV0 = UV1 - UV0;
+				FVector2f DeltaUV1 = UV2 - UV0;
+#else
 				FVector2D DeltaUV0 = UV1 - UV0;
 				FVector2D DeltaUV1 = UV2 - UV0;
+#endif
+
 
 				float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
 
