@@ -723,28 +723,31 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					FVector CrossX0 = FVector::CrossProduct(TangentZ0, TangentX0);
 					TangentX0 *= (FVector::DotProduct(CrossX0, TriangleTangentY) < 0) ? -1.0f : 1.0f;
 					TangentX0.Normalize();
-					FixVectorIfNan(TangentX0, 0);
 
 					FVector TangentX1 = TriangleTangentX - (TangentZ1 * FVector::DotProduct(TangentZ1, TriangleTangentX));
 					FVector CrossX1 = FVector::CrossProduct(TangentZ1, TangentX1);
 					TangentX1 *= (FVector::DotProduct(CrossX1, TriangleTangentY) < 0) ? -1.0f : 1.0f;
 					TangentX1.Normalize();
-					FixVectorIfNan(TangentX1, 0);
 
 					FVector TangentX2 = TriangleTangentX - (TangentZ2 * FVector::DotProduct(TangentZ2, TriangleTangentX));
 					FVector CrossX2 = FVector::CrossProduct(TangentZ2, TangentX2);
 					TangentX2 *= (FVector::DotProduct(CrossX2, TriangleTangentY) < 0) ? -1.0f : 1.0f;
 					TangentX2.Normalize();
+
+#if PLATFORM_ANDROID
+					FixVectorIfNan(TangentX0, 0);
+					FixVectorIfNan(TangentX1, 0);
 					FixVectorIfNan(TangentX2, 0);
+#endif
 
 					FVector TangentY0 = GetTangentY(TangentZ0, TangentX0);
 					FVector TangentY1 = GetTangentY(TangentZ1, TangentX1);
 					FVector TangentY2 = GetTangentY(TangentZ2, TangentX2);
-
+#if PLATFORM_ANDROID
 					FixVectorIfNan(TangentY0, 1);
 					FixVectorIfNan(TangentY1, 1);
 					FixVectorIfNan(TangentY2, 1);
-
+#endif
 					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, TangentX0, TangentY0, TangentZ0);
 					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, TangentX1, TangentY1, TangentZ1);
 					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, TangentX2, TangentY2, TangentZ2);
