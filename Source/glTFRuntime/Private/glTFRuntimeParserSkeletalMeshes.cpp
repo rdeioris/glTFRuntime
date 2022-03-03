@@ -669,6 +669,16 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				return (TanZ ^ TanX) * Normal.W;
 			};
 
+			//normals with NaNs are incorrectly handled on Android
+			auto FixVectorIfNan = [](FVector &Tangent, int Index)
+			{
+                if (Tangent.ContainsNaN() && Index >= 0 && Index < 3)
+				{
+					Tangent.Set(0.0, 0.0, 0.0);
+					Tangent[Index] = 1.0;
+				}
+			};
+
 			for (int32 VertexIndex = 0; VertexIndex < TotalVertexIndex; VertexIndex += 3)
 			{
 				const FVector& Position0 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex);
@@ -708,7 +718,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 					FVector TriangleTangentX = ((DeltaPosition0 * DeltaUV1.Y) - (DeltaPosition1 * DeltaUV0.Y)) * Factor;
 					FVector TriangleTangentY = ((DeltaPosition0 * DeltaUV1.X) - (DeltaPosition1 * DeltaUV0.X)) * Factor;
-
+					
 					FVector TangentX0 = TriangleTangentX - (TangentZ0 * FVector::DotProduct(TangentZ0, TriangleTangentX));
 					FVector CrossX0 = FVector::CrossProduct(TangentZ0, TangentX0);
 					TangentX0 *= (FVector::DotProduct(CrossX0, TriangleTangentY) < 0) ? -1.0f : 1.0f;
@@ -724,9 +734,23 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					TangentX2 *= (FVector::DotProduct(CrossX2, TriangleTangentY) < 0) ? -1.0f : 1.0f;
 					TangentX2.Normalize();
 
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, TangentX0, GetTangentY(TangentZ0, TangentX0), TangentZ0);
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, TangentX1, GetTangentY(TangentZ1, TangentX1), TangentZ1);
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, TangentX2, GetTangentY(TangentZ2, TangentX2), TangentZ2);
+#if PLATFORM_ANDROID
+					FixVectorIfNan(TangentX0, 0);
+					FixVectorIfNan(TangentX1, 0);
+					FixVectorIfNan(TangentX2, 0);
+#endif
+
+					FVector TangentY0 = GetTangentY(TangentZ0, TangentX0);
+					FVector TangentY1 = GetTangentY(TangentZ1, TangentX1);
+					FVector TangentY2 = GetTangentY(TangentZ2, TangentX2);
+#if PLATFORM_ANDROID
+					FixVectorIfNan(TangentY0, 1);
+					FixVectorIfNan(TangentY1, 1);
+					FixVectorIfNan(TangentY2, 1);
+#endif
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, TangentX0, TangentY0, TangentZ0);
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, TangentX1, TangentY1, TangentZ1);
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, TangentX2, TangentY2, TangentZ2);
 				}
 				else if (!LOD.bHasNormals) // if we are here we need to reapply normals
 				{
