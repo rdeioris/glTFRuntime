@@ -1069,7 +1069,9 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 
 	FglTFRuntimeNode Node;
 	if (!LoadNode(NodeIndex, Node))
+	{
 		return AnimationCurves;
+	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
 	if (!Root->TryGetArrayField("animations", JsonAnimations))

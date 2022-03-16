@@ -37,6 +37,7 @@ protected:
 
 	TMap<USceneComponent*, FName> SocketMapping;
 	TArray<USkeletalMeshComponent*> DiscoveredSkeletalMeshComponents;
+	bool bAllowNodeAnimations;
 
 public:	
 	// Called every frame
