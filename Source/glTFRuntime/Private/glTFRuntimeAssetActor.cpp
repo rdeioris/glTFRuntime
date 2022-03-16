@@ -14,6 +14,7 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 
 	AssetRoot = CreateDefaultSubobject<USceneComponent>(TEXT("AssetRoot"));
 	RootComponent = AssetRoot;
+	bAllowNodeAnimations = true;
 }
 
 // Called when the game starts or when spawned
@@ -175,19 +176,22 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	// check for animations
 	if (!NewComponent->IsA<USkeletalMeshComponent>())
 	{
-		TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
-		TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
-		for (UglTFRuntimeAnimationCurve* ComponentAnimationCurve : ComponentAnimationCurves)
+		if (bAllowNodeAnimations)
 		{
-			if (!CurveBasedAnimations.Contains(NewComponent))
+			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
+			TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
+			for (UglTFRuntimeAnimationCurve* ComponentAnimationCurve : ComponentAnimationCurves)
 			{
-				CurveBasedAnimations.Add(NewComponent, ComponentAnimationCurve);
-				CurveBasedAnimationsTimeTracker.Add(NewComponent, 0);
+				if (!CurveBasedAnimations.Contains(NewComponent))
+				{
+					CurveBasedAnimations.Add(NewComponent, ComponentAnimationCurve);
+					CurveBasedAnimationsTimeTracker.Add(NewComponent, 0);
+				}
+				DiscoveredCurveAnimationsNames.Add(ComponentAnimationCurve->glTFCurveAnimationName);
+				ComponentAnimationCurvesMap.Add(ComponentAnimationCurve->glTFCurveAnimationName, ComponentAnimationCurve);
 			}
-			DiscoveredCurveAnimationsNames.Add(ComponentAnimationCurve->glTFCurveAnimationName);
-			ComponentAnimationCurvesMap.Add(ComponentAnimationCurve->glTFCurveAnimationName, ComponentAnimationCurve);
+			DiscoveredCurveAnimations.Add(NewComponent, ComponentAnimationCurvesMap);
 		}
-		DiscoveredCurveAnimations.Add(NewComponent, ComponentAnimationCurvesMap);
 	}
 	else
 	{
