@@ -40,16 +40,39 @@ void AglTFRuntimeAssetActor::BeginPlay()
 			{
 				return;
 			}
-			ProcessNode(SceneComponent, Node);
+			ProcessNode(SceneComponent, NAME_None, Node);
+		}
+	}
+
+	for (TPair<USceneComponent*, FName>& Pair : SocketMapping)
+	{
+		for (USkeletalMeshComponent* SkeletalMeshComponent : DiscoveredSkeletalMeshComponents)
+		{
+			if (SkeletalMeshComponent->DoesSocketExist(Pair.Value))
+			{
+				Pair.Key->AttachToComponent(SkeletalMeshComponent, FAttachmentTransformRules::KeepRelativeTransform, Pair.Value);
+				Pair.Key->SetRelativeTransform(FTransform::Identity);
+				CurveBasedAnimations.Remove(Pair.Key);
+				break;
+			}
 		}
 	}
 }
 
-void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, FglTFRuntimeNode& Node)
+void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, const FName SocketName, FglTFRuntimeNode& Node)
 {
-	// skip bones/joints
+	// special case for bones/joints
 	if (Asset->NodeIsBone(Node.Index))
 	{
+		for (int32 ChildIndex : Node.ChildrenIndices)
+		{
+			FglTFRuntimeNode Child;
+			if (!Asset->GetNode(ChildIndex, Child))
+			{
+				return;
+			}
+			ProcessNode(NodeParentComponent, *Child.Name, Child);
+		}
 		return;
 	}
 
@@ -112,6 +135,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 			AddInstanceComponent(SkeletalMeshComponent);
 			USkeletalMesh* SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfig);
 			SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
+			DiscoveredSkeletalMeshComponents.Add(SkeletalMeshComponent);
 			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
 			NewComponent = SkeletalMeshComponent;
 		}
@@ -120,6 +144,16 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	if (!NewComponent)
 	{
 		return;
+	}
+	else
+	{
+		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("GLTFRuntime:NodeName:%s"), *Node.Name));
+		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("GLTFRuntime:NodeIndex:%d"), Node.Index));
+
+		if (SocketName != NAME_None)
+		{
+			SocketMapping.Add(NewComponent, SocketName);
+		}
 	}
 
 	// check for audio emitters
@@ -176,7 +210,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		{
 			return;
 		}
-		ProcessNode(NewComponent, Child);
+		ProcessNode(NewComponent, NAME_None, Child);
 	}
 }
 

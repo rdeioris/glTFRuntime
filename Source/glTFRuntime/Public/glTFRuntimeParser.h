@@ -51,6 +51,15 @@ enum class EglTFRuntimeTangentsGenerationStrategy : uint8
 	Always
 };
 
+UENUM()
+enum class EglTFRuntimeMorphTargetsDuplicateStrategy : uint8
+{
+	Ignore,
+	Merge,
+	AppendMorphIndex,
+	AppendDuplicateCounter
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeBasisMatrix
 {
@@ -603,6 +612,15 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bPerPolyCollision;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bDisableMorphTargets;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bIgnoreEmptyMorphTargets;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeMorphTargetsDuplicateStrategy MorphTargetsDuplicateStrategy;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -616,6 +634,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 		bMergeAllBonesToBoneTree = false;
 		Outer = nullptr;
 		bPerPolyCollision = false;
+		bDisableMorphTargets = false;
+		bIgnoreEmptyMorphTargets = true;
+		MorphTargetsDuplicateStrategy = EglTFRuntimeMorphTargetsDuplicateStrategy::Ignore;
 	}
 };
 
@@ -1271,7 +1292,7 @@ protected:
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("Unsupported type %d"), ComponentType);
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Unsupported type %d"), ComponentType);
 				return false;
 			}
 
@@ -1348,7 +1369,7 @@ protected:
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("Unsupported type %d"), ComponentType);
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Unsupported type %d"), ComponentType);
 				return false;
 			}
 
