@@ -806,6 +806,11 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 		SkinIndex = -1;
 	}
 
+	FString GetReferencerName() const override
+	{
+		return "FglTFRuntimeSkeletalMeshContext_Referencer";
+	}
+
 	void AddReferencedObjects(FReferenceCollector& Collector)
 	{
 		Collector.AddReferencedObject(SkeletalMesh);
@@ -825,6 +830,11 @@ struct FglTFRuntimeStaticMeshContext : public FGCObject
 	TArray<FStaticMaterial> StaticMaterials;
 
 	FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig);
+
+	FString GetReferencerName() const override
+	{
+		return "FglTFRuntimeStaticMeshContext_Referencer";
+	}
 
 	void AddReferencedObjects(FReferenceCollector& Collector)
 	{
@@ -1081,6 +1091,11 @@ public:
 	int64 GetTypeSize(const FString& Type) const;
 
 	bool ParseBase64Uri(const FString& Uri, TArray64<uint8>& Bytes);
+
+	FString GetReferencerName() const override
+	{
+		return "FglTFRuntimeParser_Referencer";
+	}
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
 
