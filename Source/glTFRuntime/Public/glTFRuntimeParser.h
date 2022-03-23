@@ -621,6 +621,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	EglTFRuntimeMorphTargetsDuplicateStrategy MorphTargetsDuplicateStrategy;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector ShiftBounds;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -637,6 +640,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		bDisableMorphTargets = false;
 		bIgnoreEmptyMorphTargets = true;
 		MorphTargetsDuplicateStrategy = EglTFRuntimeMorphTargetsDuplicateStrategy::Ignore;
+		ShiftBounds = FVector::ZeroVector;
 	}
 };
 
