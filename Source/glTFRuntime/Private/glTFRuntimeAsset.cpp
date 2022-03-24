@@ -534,7 +534,7 @@ int32 UglTFRuntimeAsset::GetNumImages() const
 	return Parser->GetNumImages();
 }
 
-UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const TEnumAsByte<TextureCompressionSettings> Compression, const bool bSRGB)
+UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 	TArray64<uint8> UncompressedBytes;
@@ -552,7 +552,7 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const TEnumAsBy
 		Mip.Width = Width;
 		Mip.Height = Height;
 		TArray<FglTFRuntimeMipMap> Mips = { Mip };
-		return Parser->BuildTexture(this, Mips, Compression, bSRGB);
+		return Parser->BuildTexture(this, Mips, ImagesConfig);
 	}
 
 	return nullptr;

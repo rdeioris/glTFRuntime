@@ -190,20 +190,20 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	UMaterialInterface* Material = nullptr;
 
 	FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, Index, MaterialName, &Material, &RuntimeMaterial, MaterialsConfig, bUseVertexColors]()
-	{
-		// this is mainly for editor ...
-		if (IsGarbageCollecting())
 		{
-			return;
-		}
-		Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
-	}, TStatId(), nullptr, ENamedThreads::GameThread);
+			// this is mainly for editor ...
+			if (IsGarbageCollecting())
+			{
+				return;
+			}
+			Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+		}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 
 	return Material;
 }
 
-UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB)
+UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
 
@@ -246,8 +246,9 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 		Mip->BulkData.Unlock();
 	}
 
-	Texture->CompressionSettings = Compression;
-	Texture->SRGB = sRGB;
+	Texture->CompressionSettings = ImagesConfig.Compression;
+	Texture->LODGroup = ImagesConfig.Group;
+	Texture->SRGB = ImagesConfig.bSRGB;
 
 	Texture->UpdateResource();
 
@@ -331,7 +332,10 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		{
 			if (Mips.Num() > 0)
 			{
-				Texture = BuildTexture(Material, Mips, Compression, sRGB);
+				FglTFRuntimeImagesConfig ImagesConfig = MaterialsConfig.ImagesConfig;
+				ImagesConfig.Compression = Compression;
+				ImagesConfig.bSRGB = sRGB;
+				Texture = BuildTexture(Material, Mips, ImagesConfig);
 			}
 		}
 		if (Texture)

@@ -305,6 +305,28 @@ struct FglTFRuntimeMorphTarget
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeImagesConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureCompressionSettings> Compression;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureGroup> Group;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bSRGB;
+
+	FglTFRuntimeImagesConfig()
+	{
+		Compression = TextureCompressionSettings::TC_Default;
+		Group = TextureGroup::TEXTUREGROUP_World;
+		bSRGB = false;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimeMaterialsConfig
 {
 	GENERATED_BODY()
@@ -344,6 +366,9 @@ struct FglTFRuntimeMaterialsConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, float> ParamsMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeImagesConfig ImagesConfig;
 
 	FglTFRuntimeMaterialsConfig()
 	{
@@ -1129,7 +1154,7 @@ public:
 	TArray<FString> ExtensionsRequired;
 
 	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height);
-	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB);
+	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig);
 
 protected:
 	TSharedRef<FJsonObject> Root;
