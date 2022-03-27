@@ -540,7 +540,7 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRunt
 	TArray64<uint8> UncompressedBytes;
 	int32 Width = 0;
 	int32 Height = 0;
-	if (!Parser->LoadImage(ImageIndex, UncompressedBytes, Width, Height))
+	if (!Parser->LoadImage(ImageIndex, UncompressedBytes, Width, Height, ImagesConfig))
 	{
 		return nullptr;
 	}
