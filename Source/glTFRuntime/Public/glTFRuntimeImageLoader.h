@@ -17,6 +17,6 @@ class GLTFRUNTIME_API UglTFRuntimeImageLoader : public UObject
 
 public:
 
-	virtual bool LoadImage(TSharedRef<FglTFRuntimeParser> Parser, const int32 ImageIndex, TSharedRef<FJsonObject> JsonImageObject, const TArray64<uint8>& Data, TArray64<uint8> OutData, int32& Width, int32& Height) { return false; };
+	virtual bool LoadImage(TSharedRef<FglTFRuntimeParser> Parser, const int32 ImageIndex, TSharedRef<FJsonObject> JsonImageObject, const TArray64<uint8>& Data, TArray64<uint8>& OutData, int32& Width, int32& Height) { return false; };
 	
 };
