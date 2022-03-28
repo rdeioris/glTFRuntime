@@ -1,4 +1,4 @@
-// Copyright 2020, Roberto De Ioris.
+// Copyright 2020-2022, Roberto De Ioris.
 
 #pragma once
 
@@ -305,6 +305,32 @@ struct FglTFRuntimeMorphTarget
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeImagesConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureCompressionSettings> Compression;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureGroup> Group;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bSRGB;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<TSubclassOf<class UglTFRuntimeImageLoader>> AdditionalImageLoaders;
+
+	FglTFRuntimeImagesConfig()
+	{
+		Compression = TextureCompressionSettings::TC_Default;
+		Group = TextureGroup::TEXTUREGROUP_World;
+		bSRGB = false;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimeMaterialsConfig
 {
 	GENERATED_BODY()
@@ -344,6 +370,9 @@ struct FglTFRuntimeMaterialsConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, float> ParamsMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeImagesConfig ImagesConfig;
 
 	FglTFRuntimeMaterialsConfig()
 	{
@@ -621,6 +650,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	EglTFRuntimeMorphTargetsDuplicateStrategy MorphTargetsDuplicateStrategy;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector ShiftBounds;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -637,6 +669,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		bDisableMorphTargets = false;
 		bIgnoreEmptyMorphTargets = true;
 		MorphTargetsDuplicateStrategy = EglTFRuntimeMorphTargetsDuplicateStrategy::Ignore;
+		ShiftBounds = FVector::ZeroVector;
 	}
 };
 
@@ -1124,8 +1157,8 @@ public:
 	TArray<FString> ExtensionsUsed;
 	TArray<FString> ExtensionsRequired;
 
-	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height);
-	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB);
+	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig);
+	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig);
 
 protected:
 	TSharedRef<FJsonObject> Root;

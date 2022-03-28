@@ -173,7 +173,7 @@ public:
 	void LoadStaticMeshLODsAsync(const TArray<int32> MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
-	UTexture2D* LoadImage(const int32 ImageIndex, const TEnumAsByte<TextureCompressionSettings> Compression, const bool bSRGB);
+	UTexture2D* LoadImage(const int32 ImageIndex, const FglTFRuntimeImagesConfig& ImagesConfig);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FString> GetExtensionsUsed() const;

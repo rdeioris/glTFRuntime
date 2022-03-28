@@ -1,7 +1,7 @@
-// Copyright 2020, Roberto De Ioris.
+// Copyright 2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
-
+#include "glTFRuntimeImageLoader.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
@@ -190,20 +190,20 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	UMaterialInterface* Material = nullptr;
 
 	FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this, Index, MaterialName, &Material, &RuntimeMaterial, MaterialsConfig, bUseVertexColors]()
-	{
-		// this is mainly for editor ...
-		if (IsGarbageCollecting())
 		{
-			return;
-		}
-		Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
-	}, TStatId(), nullptr, ENamedThreads::GameThread);
+			// this is mainly for editor ...
+			if (IsGarbageCollecting())
+			{
+				return;
+			}
+			Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+		}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 
 	return Material;
 }
 
-UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB)
+UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
 
@@ -246,8 +246,9 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 		Mip->BulkData.Unlock();
 	}
 
-	Texture->CompressionSettings = Compression;
-	Texture->SRGB = sRGB;
+	Texture->CompressionSettings = ImagesConfig.Compression;
+	Texture->LODGroup = ImagesConfig.Group;
+	Texture->SRGB = ImagesConfig.bSRGB;
 
 	Texture->UpdateResource();
 
@@ -331,7 +332,10 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		{
 			if (Mips.Num() > 0)
 			{
-				Texture = BuildTexture(Material, Mips, Compression, sRGB);
+				FglTFRuntimeImagesConfig ImagesConfig = MaterialsConfig.ImagesConfig;
+				ImagesConfig.Compression = Compression;
+				ImagesConfig.bSRGB = sRGB;
+				Texture = BuildTexture(Material, Mips, ImagesConfig);
 			}
 		}
 		if (Texture)
@@ -412,7 +416,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	return Material;
 }
 
-bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height)
+bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 
 	TSharedPtr<FJsonObject> JsonImageObject = GetJsonObjectFromRootIndex("images", ImageIndex);
@@ -429,8 +433,27 @@ bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& Unco
 		return false;
 	}
 
-	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
+	for (TSubclassOf<UglTFRuntimeImageLoader> ImageLoaderClass : ImagesConfig.AdditionalImageLoaders)
+	{
+		// maybe overengineering but avoids custom loaders making mess
+		UncompressedBytes.Empty();
+		Width = 0;
+		Height = 0;
+		UglTFRuntimeImageLoader* ImageLoader = NewObject<UglTFRuntimeImageLoader>(GetTransientPackage(), ImageLoaderClass);
+		if (ImageLoader)
+		{
+			if (ImageLoader->LoadImage(AsShared(), ImageIndex, JsonImageObject.ToSharedRef(), Bytes, UncompressedBytes, Width, Height))
+			{
+				return true;
+			}
+		}
+		else
+		{
+			AddError("LoadImage()", FString::Printf(TEXT("Unable to instantiate glTFRuntimeImageLoader %s"), *ImageLoaderClass->GetName()));
+		}
+	}
 
+	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
 
 	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Bytes.GetData(), Bytes.Num());
 	if (ImageFormat == EImageFormat::Invalid)
@@ -516,7 +539,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
 	int32 Width = 0;
 	int32 Height = 0;
-	if (!LoadImage(ImageIndex, UncompressedBytes, Width, Height))
+	if (!LoadImage(ImageIndex, UncompressedBytes, Width, Height, MaterialsConfig.ImagesConfig))
 	{
 		return nullptr;
 	}
