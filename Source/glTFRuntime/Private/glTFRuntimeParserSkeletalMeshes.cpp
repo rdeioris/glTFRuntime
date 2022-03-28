@@ -21,7 +21,7 @@
 #include "Animation/AnimCurveTypes.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 
-//#define UPDATEDEPRICATIONS
+#define UPDATEDEPRICATIONS
 
 struct FglTFRuntimeSkeletalMeshContextFinalizer
 {
