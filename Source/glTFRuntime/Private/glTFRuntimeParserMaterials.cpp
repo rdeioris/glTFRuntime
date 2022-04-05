@@ -206,11 +206,16 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
+	FTexturePlatformData* PlatformData = new FTexturePlatformData();
+	PlatformData->SizeX = Mips[0].Width;
+	PlatformData->SizeY = Mips[0].Height;
+	PlatformData->PixelFormat = EPixelFormat::PF_B8G8R8A8;
 
-	Texture->PlatformData = new FTexturePlatformData();
-	Texture->PlatformData->SizeX = Mips[0].Width;
-	Texture->PlatformData->SizeY = Mips[0].Height;
-	Texture->PlatformData->PixelFormat = EPixelFormat::PF_B8G8R8A8;
+#if ENGINE_MAJOR_VERSION > 4
+	Texture->SetPlatformData(PlatformData);
+#else
+	Texture->PlatformData = PlatformData;
+#endif
 
 	for (const FglTFRuntimeMipMap& MipMap : Mips)
 	{
