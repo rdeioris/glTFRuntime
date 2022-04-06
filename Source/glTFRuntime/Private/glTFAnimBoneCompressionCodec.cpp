@@ -16,7 +16,11 @@ FQuat UglTFAnimBoneCompressionCodec::GetTrackRotation(FAnimSequenceDecompression
 	int32 FrameB = 0;
 
 	float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].RotKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+#if ENGINE_MAJOR_VERSION > 4
+	return FQuat::Slerp(FQuat(Tracks[TrackIndex].RotKeys[FrameA]), FQuat(Tracks[TrackIndex].RotKeys[FrameB]), Alpha);
+#else
 	return FQuat::Slerp(Tracks[TrackIndex].RotKeys[FrameA], Tracks[TrackIndex].RotKeys[FrameB], Alpha);
+#endif
 }
 
 FVector UglTFAnimBoneCompressionCodec::GetTrackLocation(FAnimSequenceDecompressionContext& DecompContext, const int32 TrackIndex) const
@@ -25,7 +29,11 @@ FVector UglTFAnimBoneCompressionCodec::GetTrackLocation(FAnimSequenceDecompressi
 	int32 FrameB = 0;
 
 	float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].PosKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+#if ENGINE_MAJOR_VERSION > 4
+	return FMath::Lerp(FVector(Tracks[TrackIndex].PosKeys[FrameA]), FVector(Tracks[TrackIndex].PosKeys[FrameB]), Alpha);
+#else
 	return FMath::Lerp(Tracks[TrackIndex].PosKeys[FrameA], Tracks[TrackIndex].PosKeys[FrameB], Alpha);
+#endif
 }
 
 FVector UglTFAnimBoneCompressionCodec::GetTrackScale(FAnimSequenceDecompressionContext& DecompContext, const int32 TrackIndex) const
@@ -34,7 +42,11 @@ FVector UglTFAnimBoneCompressionCodec::GetTrackScale(FAnimSequenceDecompressionC
 	int32 FrameB = 0;
 
 	float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].ScaleKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+#if ENGINE_MAJOR_VERSION > 4
+	return FMath::Lerp(FVector(Tracks[TrackIndex].ScaleKeys[FrameA]), FVector(Tracks[TrackIndex].ScaleKeys[FrameB]), Alpha);
+#else
 	return FMath::Lerp(Tracks[TrackIndex].ScaleKeys[FrameA], Tracks[TrackIndex].ScaleKeys[FrameB], Alpha);
+#endif
 }
 
 void UglTFAnimBoneCompressionCodec::DecompressPose(FAnimSequenceDecompressionContext& DecompContext, const BoneTrackArray& RotationPairs, const BoneTrackArray& TranslationPairs, const BoneTrackArray& ScalePairs, TArrayView<FTransform>& OutAtoms) const
