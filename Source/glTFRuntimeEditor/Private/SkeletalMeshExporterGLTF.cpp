@@ -15,7 +15,7 @@ USkeletalMeshExporterGLTF::USkeletalMeshExporterGLTF(const FObjectInitializer& O
 
 void FglTFExportContextSkeletalMesh::GenerateSkeletalMesh(USkeletalMesh* SkeletalMesh)
 {
-#if ENGINE_MAJOR_VERSION > 4
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	if (!SkeletalMesh->GetSkeleton())
 	{
 		return;
