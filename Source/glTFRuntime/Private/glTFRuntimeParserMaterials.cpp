@@ -220,7 +220,7 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	for (const FglTFRuntimeMipMap& MipMap : Mips)
 	{
 		FTexture2DMipMap* Mip = new FTexture2DMipMap();
-		Texture->PlatformData->Mips.Add(Mip);
+		PlatformData->Mips.Add(Mip);
 		Mip->SizeX = MipMap.Width;
 		Mip->SizeY = MipMap.Height;
 
