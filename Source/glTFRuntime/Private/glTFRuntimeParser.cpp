@@ -857,7 +857,9 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 	{
 		TSharedPtr<FJsonObject> JsonSamplerObject = (*JsonSamplers)[SamplerIndex]->AsObject();
 		if (!JsonSamplerObject)
+		{
 			return false;
+		}
 
 		TArray<float> Timeline;
 		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", Timeline, { 5126 }, false))
@@ -1068,7 +1070,9 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 
 	FglTFRuntimeNode Node;
 	if (!LoadNode(NodeIndex, Node))
+	{
 		return AnimationCurves;
+	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
 	if (!Root->TryGetArrayField("animations", JsonAnimations))
