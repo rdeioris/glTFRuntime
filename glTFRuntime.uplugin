@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
   "Version": 1,
-  "VersionName": "20210826",
+  "VersionName": "20220323",
   "FriendlyName": "glTFRuntime",
   "Description": "Manage glTF files at runtime",
   "Category": "Runtime",
@@ -13,7 +13,7 @@
   "CanContainContent": true,
   "IsBetaVersion": false,
   "IsExperimentalVersion": false,
-  "Installed": false,
+  "Installed": true,
   "Modules": [
     {
       "Name": "glTFRuntime",

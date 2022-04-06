@@ -20,7 +20,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	virtual void ProcessNode(USceneComponent* NodeParentComponent, FglTFRuntimeNode& Node);
+	virtual void ProcessNode(USceneComponent* NodeParentComponent, const FName SocketName, FglTFRuntimeNode& Node);
 
 	TMap<USceneComponent*, float>  CurveBasedAnimationsTimeTracker;
 
@@ -34,6 +34,10 @@ protected:
 	{
 		return MakeUniqueObjectName(this, T::StaticClass(), *Node.Name);
 	}
+
+	TMap<USceneComponent*, FName> SocketMapping;
+	TArray<USkeletalMeshComponent*> DiscoveredSkeletalMeshComponents;
+	bool bAllowNodeAnimations;
 
 public:	
 	// Called every frame

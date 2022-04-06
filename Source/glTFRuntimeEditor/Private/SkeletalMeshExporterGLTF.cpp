@@ -54,7 +54,11 @@ void FglTFExportContextSkeletalMesh::GenerateSkeletalMesh(USkeletalMesh* Skeleta
 
 		for (uint32 PositionIndex = 0; PositionIndex < NumPositions; PositionIndex++)
 		{
+#if ENGINE_MAJOR_VERSION > 4
+			FVector Position = FVector(RenderData->LODRenderData[LodIndex].StaticVertexBuffers.PositionVertexBuffer.VertexPosition(PositionIndex));
+#else
 			FVector Position = RenderData->LODRenderData[LodIndex].StaticVertexBuffers.PositionVertexBuffer.VertexPosition(PositionIndex);
+#endif
 			SectionPositions.Add(SceneBasisMatrix.TransformPosition(Position) * SceneScale);
 		}
 
