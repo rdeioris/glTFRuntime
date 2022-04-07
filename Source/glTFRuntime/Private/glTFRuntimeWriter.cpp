@@ -53,19 +53,147 @@ bool FglTFRuntimeWriter::AddMesh(USkeletalMesh* SkeletalMesh, const int32 LOD)
 	BinaryData.Append(reinterpret_cast<uint8*>(Indices.GetData()), Indices.Num() * sizeof(uint32));
 
 	TArray<FVector> Positions;
+
+	FVector PositionMin;
+	FVector PositionMax;
 	for (uint32 PositionIndex = 0; PositionIndex < LODRenderData.StaticVertexBuffers.PositionVertexBuffer.GetNumVertices(); PositionIndex++)
 	{
-		const FVector& Position = LODRenderData.StaticVertexBuffers.PositionVertexBuffer.VertexPosition(PositionIndex);
-		Positions.Add(SceneBasisMatrix.TransformPosition(Position) * SceneScale);
+		FVector Position = LODRenderData.StaticVertexBuffers.PositionVertexBuffer.VertexPosition(PositionIndex);
+		Position = SceneBasisMatrix.TransformPosition(Position) * SceneScale;
+
+		if (PositionIndex == 0)
+		{
+			PositionMin = Position;
+			PositionMax = Position;
+		}
+		else
+		{
+			if (Position.X < PositionMin.X)
+			{
+				PositionMin.X = Position.X;
+			}
+			if (Position.Y < PositionMin.Y)
+			{
+				PositionMin.Y = Position.Y;
+			}
+			if (Position.Z < PositionMin.Z)
+			{
+				PositionMin.Z = Position.Z;
+			}
+			if (Position.X > PositionMax.X)
+			{
+				PositionMax.X = Position.X;
+			}
+			if (Position.Y > PositionMax.Y)
+			{
+				PositionMax.Y = Position.Y;
+			}
+			if (Position.Z > PositionMax.Z)
+			{
+				PositionMax.Z = Position.Z;
+			}
+		}
+		Positions.Add(Position);
 	}
 
 	int64 PositionOffset = BinaryData.Num();
 	BinaryData.Append(reinterpret_cast<uint8*>(Positions.GetData()), Positions.Num() * sizeof(FVector));
 
 	FglTFRuntimeAccessor PositionAccessor("VEC3", 5126, Positions.Num(), PositionOffset, Positions.Num() * sizeof(FVector), false);
+	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.X));
+	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.Y));
+	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.Z));
+	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.X));
+	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.Y));
+	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.Z));
+
 	int32 PositionAccessorIndex = Accessors.Add(PositionAccessor);
 
+	TArray<FVector> Normals;
+	for (uint32 VertexIndex = 0; VertexIndex < LODRenderData.StaticVertexBuffers.StaticMeshVertexBuffer.GetNumVertices(); VertexIndex++)
+	{
+		FVector Normal = LODRenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex);
+		Normal = SceneBasisMatrix.TransformVector(Normal);
+		Normals.Add(Normal.GetSafeNormal());
+	}
+	int64 NormalOffset = BinaryData.Num();
+	BinaryData.Append(reinterpret_cast<uint8*>(Normals.GetData()), Normals.Num() * sizeof(FVector));
+
+	FglTFRuntimeAccessor NormalAccessor("VEC3", 5126, Normals.Num(), NormalOffset, Normals.Num() * sizeof(FVector), false);
+	int32 NormalAccessorIndex = Accessors.Add(NormalAccessor);
+
 	TArray<TSharedPtr<FJsonValue>> JsonPrimitives;
+
+	TArray<TPair<FString, TArray<FVector>>> MorphTargetsValues;
+	TMap<FString, TPair<FVector, FVector>> MorphTargetsMinMaxValues;
+	TArray<TPair<FString, int32>> MorphTargetsAccessors;
+	TArray<TSharedPtr<FJsonValue>> JsonMorphTargetsNames;
+
+	TArray<UMorphTarget*> MorphTargets = SkeletalMesh->GetMorphTargets();
+	for (UMorphTarget* MorphTarget : MorphTargets)
+	{
+		if (MorphTarget->MorphLODModels.IsValidIndex(LOD))
+		{
+			const FMorphTargetLODModel& MorphTargetLodModel = MorphTarget->MorphLODModels[LOD];
+
+			if (MorphTargetLodModel.Vertices.Num() > 0)
+			{
+				TArray<FVector> Values;
+				Values.AddZeroed(Positions.Num());
+				MorphTargetsMinMaxValues.Add(MorphTarget->GetName(), TPair<FVector, FVector>(FVector::ZeroVector, FVector::ZeroVector));
+				for (const FMorphTargetDelta& Delta : MorphTargetLodModel.Vertices)
+				{
+					//uint32 PositionIndex = Indices[Delta.SourceIdx];
+					Values[Delta.SourceIdx] = SceneBasisMatrix.TransformPosition(Delta.PositionDelta) * SceneScale;
+
+					const FVector Position = Values[Delta.SourceIdx];
+					TPair<FVector, FVector>& Pair = MorphTargetsMinMaxValues[MorphTarget->GetName()];
+					if (Position.X < Pair.Key.X)
+					{
+						Pair.Key.X = Position.X;
+					}
+					if (Position.Y < Pair.Key.Y)
+					{
+						Pair.Key.Y = Position.Y;
+					}
+					if (Position.Z < Pair.Key.Z)
+					{
+						Pair.Key.Z = Position.Z;
+					}
+					if (Position.X > Pair.Value.X)
+					{
+						Pair.Value.X = Position.X;
+					}
+					if (Position.Y > Pair.Value.Y)
+					{
+						Pair.Value.Y = Position.Y;
+					}
+					if (Position.Z > Pair.Value.Z)
+					{
+						Pair.Value.Z = Position.Z;
+					}
+				}
+				MorphTargetsValues.Add(TPair<FString, TArray<FVector>>(MorphTarget->GetName(), Values));
+
+				JsonMorphTargetsNames.Add(MakeShared<FJsonValueString>(MorphTarget->GetName()));
+			}
+		}
+	}
+
+	for (const TPair<FString, TArray<FVector>>& Pair : MorphTargetsValues)
+	{
+		int64 MorphTargetOffset = BinaryData.Num();
+		BinaryData.Append(reinterpret_cast<const uint8*>(Pair.Value.GetData()), Pair.Value.Num() * sizeof(FVector));
+
+		FglTFRuntimeAccessor MorphTargetAccessor("VEC3", 5126, Pair.Value.Num(), MorphTargetOffset, Pair.Value.Num() * sizeof(FVector), false);
+		MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.X));
+		MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.Y));
+		MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.Z));
+		MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.X));
+		MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.Y));
+		MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.Z));
+		MorphTargetsAccessors.Add(TPair<FString, int32>(Pair.Key, Accessors.Add(MorphTargetAccessor)));
+	}
 
 	for (int32 SectionIndex = 0; SectionIndex < LODRenderData.RenderSections.Num(); SectionIndex++)
 	{
@@ -81,13 +209,34 @@ bool FglTFRuntimeWriter::AddMesh(USkeletalMesh* SkeletalMesh, const int32 LOD)
 		TSharedRef<FJsonObject> JsonPrimitiveAttributes = MakeShared<FJsonObject>();
 
 		JsonPrimitiveAttributes->SetNumberField("POSITION", PositionAccessorIndex);
+		JsonPrimitiveAttributes->SetNumberField("NORMAL", NormalAccessorIndex);
 
 		JsonPrimitive->SetObjectField("attributes", JsonPrimitiveAttributes);
+
+		if (MorphTargetsAccessors.Num() > 0)
+		{
+			TArray<TSharedPtr<FJsonValue>> JsonMorphTargets;
+			for (const TPair<FString, int32>& Pair : MorphTargetsAccessors)
+			{
+				TSharedRef<FJsonObject> JsonMorphTarget = MakeShared<FJsonObject>();
+				JsonMorphTarget->SetNumberField("POSITION", Pair.Value);
+				JsonMorphTargets.Add(MakeShared<FJsonValueObject>(JsonMorphTarget));
+			}
+			JsonPrimitive->SetArrayField("targets", JsonMorphTargets);
+		}
 
 		JsonPrimitives.Add(MakeShared<FJsonValueObject>(JsonPrimitive));
 	}
 
 	JsonMesh->SetArrayField("primitives", JsonPrimitives);
+
+	if (MorphTargetsAccessors.Num() > 0)
+	{
+		TSharedRef<FJsonObject> JsonExtras = MakeShared<FJsonObject>();
+		JsonExtras->SetArrayField("targetNames", JsonMorphTargetsNames);
+
+		JsonMesh->SetObjectField("extras", JsonExtras);
+	}
 
 	JsonMeshes.Add(MakeShared<FJsonValueObject>(JsonMesh));
 
@@ -129,6 +278,16 @@ bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
 		JsonAccessor->SetNumberField("count", Accessor.Count);
 		JsonAccessor->SetStringField("type", Accessor.Type);
 		JsonAccessor->SetBoolField("normalized", Accessor.bNormalized);
+
+		if (Accessor.Min.Num() > 0)
+		{
+			JsonAccessor->SetArrayField("min", Accessor.Min);
+		}
+
+		if (Accessor.Max.Num() > 0)
+		{
+			JsonAccessor->SetArrayField("max", Accessor.Max);
+		}
 
 		JsonAccessors.Add(MakeShared<FJsonValueObject>(JsonAccessor));
 	}

@@ -43,6 +43,9 @@ struct FglTFRuntimeAccessor
 	int64 ByteLength;
 	bool bNormalized;
 
+	TArray<TSharedPtr<FJsonValue>> Min;
+	TArray<TSharedPtr<FJsonValue>> Max;
+
 	FglTFRuntimeAccessor() = delete;
 	FglTFRuntimeAccessor(const FString& InType, const int32 InComponentType, const int64 InCount, const int64 InByteOffset, const int64 InByteLength, const bool bInNormalized) :
 		Type(InType),
@@ -52,7 +55,6 @@ struct FglTFRuntimeAccessor
 		ByteLength(InByteLength),
 		bNormalized(bInNormalized)
 	{
-
 	}
 };
 
