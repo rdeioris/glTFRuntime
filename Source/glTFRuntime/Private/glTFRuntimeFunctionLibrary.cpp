@@ -55,14 +55,14 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<
 	}
 
 	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
-	{
-		UglTFRuntimeAsset* Asset = nullptr;
-		if (bSuccess)
 		{
-			Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
-		}
-		Completed.ExecuteIfBound(Asset);
-	}, Completed, LoaderConfig);
+			UglTFRuntimeAsset* Asset = nullptr;
+			if (bSuccess)
+			{
+				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+			}
+			Completed.ExecuteIfBound(Asset);
+		}, Completed, LoaderConfig);
 
 	HttpRequest->ProcessRequest();
 }
@@ -81,4 +81,11 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 	}
 
 	return Asset;
+}
+
+bool UglTFRuntimeFunctionLibrary::glTFSaveSkeletalMeshToFile(USkeletalMesh* SkeletalMesh, const int32 LOD, const FString& Filename, const FglTFRuntimeWriterConfig& WriterConfig)
+{
+	TSharedRef<FglTFRuntimeWriter> Writer = MakeShared<FglTFRuntimeWriter>();
+	Writer->AddMesh(SkeletalMesh, LOD);
+	return Writer->WriteToFile(Filename);
 }

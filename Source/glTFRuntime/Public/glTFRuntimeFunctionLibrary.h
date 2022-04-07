@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "glTFRuntimeAsset.h"
+#include "glTFRuntimeWriter.h"
 #include "glTFRuntimeFunctionLibrary.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeHttpResponse, UglTFRuntimeAsset*, Asset);
@@ -29,4 +30,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Data", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
 	static UglTFRuntimeAsset* glTFLoadAssetFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Save SkeletalMesh in File", AutoCreateRefTerm = "WriterConfig"), Category = "glTFRuntime")
+	static bool glTFSaveSkeletalMeshToFile(USkeletalMesh* SkeletalMesh, const int32 LOD, const FString& Filename, const FglTFRuntimeWriterConfig& WriterConfig);
 };
