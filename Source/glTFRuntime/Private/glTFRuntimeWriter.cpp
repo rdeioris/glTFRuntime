@@ -1,7 +1,9 @@
-// Copyright 2020-2022, Roberto De Ioris.
+// Copyright 2020-2022, Roberto De Ioris 
+// Copyright 2022, Avatus LLC
 
 
 #include "glTFRuntimeWriter.h"
+#include "Animation/MorphTarget.h"
 #include "Misc/FileHelper.h"
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Serialization/ArrayWriter.h"
