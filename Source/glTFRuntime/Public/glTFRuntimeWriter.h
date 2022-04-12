@@ -68,14 +68,15 @@ public:
 	FglTFRuntimeWriter();
 	~FglTFRuntimeWriter();
 
-	bool AddMesh(USkeletalMesh* SkeletalMesh, const int32 LOD);
+	bool AddMesh(USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations);
 
 	bool WriteToFile(const FString& Filename);
 
 protected:
 	TSharedPtr<FJsonObject> JsonRoot;
 	TArray<TSharedPtr<FJsonValue>> JsonMeshes;
-
+	TArray<TSharedPtr<FJsonValue>> JsonAnimations;
+	TArray<TSharedPtr<FJsonValue>> JsonNodes;
 	TArray<FglTFRuntimeAccessor> Accessors;
 
 	TArray<uint8> BinaryData;

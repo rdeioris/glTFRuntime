@@ -32,5 +32,5 @@ public:
 	static UglTFRuntimeAsset* glTFLoadAssetFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Save SkeletalMesh in File", AutoCreateRefTerm = "WriterConfig"), Category = "glTFRuntime")
-	static bool glTFSaveSkeletalMeshToFile(USkeletalMesh* SkeletalMesh, const int32 LOD, const FString& Filename, const FglTFRuntimeWriterConfig& WriterConfig);
+	static bool glTFSaveSkeletalMeshToFile(USkeletalMesh* SkeletalMesh, const int32 LOD, const FString& Filename, const TArray<UAnimSequence*>& Animations, const FglTFRuntimeWriterConfig& WriterConfig);
 };
