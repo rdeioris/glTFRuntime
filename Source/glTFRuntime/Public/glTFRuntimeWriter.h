@@ -32,6 +32,25 @@ struct FglTFRuntimeWriterConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	EglTFRuntimeCompressionMode CompressionMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bExportSkin;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bExportMorphTargets;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString PivotToBone;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector PivotDelta;
+
+	FglTFRuntimeWriterConfig()
+	{
+		bExportSkin = true;
+		bExportMorphTargets = true;
+		PivotDelta = FVector::ZeroVector;
+	}
 };
 
 struct FglTFRuntimeAccessor
@@ -65,10 +84,10 @@ struct FglTFRuntimeAccessor
 class GLTFRUNTIME_API FglTFRuntimeWriter
 {
 public:
-	FglTFRuntimeWriter();
+	FglTFRuntimeWriter(const FglTFRuntimeWriterConfig& InConfig);
 	~FglTFRuntimeWriter();
 
-	bool AddMesh(USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations);
+	bool AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations);
 
 	bool WriteToFile(const FString& Filename);
 
@@ -76,8 +95,12 @@ protected:
 	TSharedPtr<FJsonObject> JsonRoot;
 	TArray<TSharedPtr<FJsonValue>> JsonMeshes;
 	TArray<TSharedPtr<FJsonValue>> JsonAnimations;
+	TArray<TSharedPtr<FJsonValue>> JsonMaterials;
+	TArray<TSharedPtr<FJsonValue>> JsonImages;
 	TArray<TSharedPtr<FJsonValue>> JsonNodes;
 	TArray<FglTFRuntimeAccessor> Accessors;
 
 	TArray<uint8> BinaryData;
+
+	FglTFRuntimeWriterConfig Config;
 };
