@@ -97,8 +97,10 @@ protected:
 	TArray<TSharedPtr<FJsonValue>> JsonAnimations;
 	TArray<TSharedPtr<FJsonValue>> JsonMaterials;
 	TArray<TSharedPtr<FJsonValue>> JsonImages;
+	TArray<TSharedPtr<FJsonValue>> JsonTextures;
 	TArray<TSharedPtr<FJsonValue>> JsonNodes;
 	TArray<FglTFRuntimeAccessor> Accessors;
+	TArray<TPair<int64, int64>> ImagesBuffers;
 
 	TArray<uint8> BinaryData;
 

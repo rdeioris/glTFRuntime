@@ -4,6 +4,7 @@
 #include "glTFRuntimeWriter.h"
 #include "Animation/MorphTarget.h"
 #include "Engine/Canvas.h"
+#include "glTFRuntimeMaterialBaker.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "Kismet/KismetRenderingLibrary.h"
@@ -278,6 +279,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 	TArray<FVector> Normals;
 	TArray<FVector4> Tangents;
+	TArray<FVector2D> TexCoords;
 
 	for (uint32 VertexIndex = 0; VertexIndex < LODRenderData.StaticVertexBuffers.StaticMeshVertexBuffer.GetNumVertices(); VertexIndex++)
 	{
@@ -286,7 +288,9 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		Normals.Add(Normal.GetSafeNormal());
 		FVector4 Tangent = LODRenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex);
 		Tangent = SceneBasisMatrix.TransformFVector4(Tangent);
-		Tangents.Add(Tangent);
+		Tangents.Add(Tangent.GetSafeNormal());
+		FVector2D UV = LODRenderData.StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
+		TexCoords.Add(UV);
 	}
 	int64 NormalOffset = BinaryData.Num();
 	BinaryData.Append(reinterpret_cast<uint8*>(Normals.GetData()), Normals.Num() * sizeof(FVector));
@@ -297,6 +301,11 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 	BinaryData.Append(reinterpret_cast<uint8*>(Tangents.GetData()), Tangents.Num() * sizeof(FVector4));
 	FglTFRuntimeAccessor TangentAccessor("VEC4", 5126, Tangents.Num(), TangentOffset, Tangents.Num() * sizeof(FVector4), false);
 	int32 TangentAccessorIndex = Accessors.Add(TangentAccessor);
+
+	int64 TexCoordOffset = BinaryData.Num();
+	BinaryData.Append(reinterpret_cast<uint8*>(TexCoords.GetData()), TexCoords.Num() * sizeof(FVector2D));
+	FglTFRuntimeAccessor TexCoordAccessor("VEC2", 5126, TexCoords.Num(), TexCoordOffset, TexCoords.Num() * sizeof(FVector2D), false);
+	int32 TexCoordAccessorIndex = Accessors.Add(TexCoordAccessor);
 
 	TArray<int32> JointAccessorIndices;
 	TArray<int32> WeightAccessorIndices;
@@ -438,6 +447,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		MorphTargetsAccessors.Add(TPair<FString, int32>(Pair.Key, Accessors.Add(MorphTargetAccessor)));
 	}
 
+	int32 TextureIndex = 0;
 	for (int32 SectionIndex = 0; SectionIndex < LODRenderData.RenderSections.Num(); SectionIndex++)
 	{
 		FSkelMeshRenderSection& Section = LODRenderData.RenderSections[SectionIndex];
@@ -454,6 +464,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		JsonPrimitiveAttributes->SetNumberField("POSITION", PositionAccessorIndex);
 		JsonPrimitiveAttributes->SetNumberField("NORMAL", NormalAccessorIndex);
 		JsonPrimitiveAttributes->SetNumberField("TANGENT", TangentAccessorIndex);
+		JsonPrimitiveAttributes->SetNumberField("TEXCOORD_0", TexCoordAccessorIndex);
 
 		if (Config.bExportSkin)
 		{
@@ -481,7 +492,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 		const uint16 MaterialIndex = Section.MaterialIndex;
 		const FSkeletalMaterial& SkeletalMaterial = SkeletalMesh->GetMaterials()[MaterialIndex];
-		UCanvas* Canvas = nullptr;
+		/*UCanvas* Canvas = nullptr;
 		UTextureRenderTarget2D* RenderTarget = NewObject<UTextureRenderTarget2D>();
 		RenderTarget->InitCustomFormat(2048, 2048, EPixelFormat::PF_R8G8B8A8, true);
 		RenderTarget->TargetGamma = 2.2;
@@ -500,9 +511,69 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::JPEG);
 		ImageWrapper->SetRaw(Pixels.GetData(), Pixels.Num() * sizeof(FColor), 2048, 2048, ERGBFormat::RGBA, 8);
 
-		TArray64<uint8> PNGData = ImageWrapper->GetCompressed(100);
+		TArray64<uint8> PNGData = ImageWrapper->GetCompressed(100);*/
 
-		FFileHelper::SaveArrayToFile(PNGData, TEXT("D:/TextureAvatus.jpg"));
+		AglTFRuntimeMaterialBaker* MaterialBaker = World->SpawnActor<AglTFRuntimeMaterialBaker>();
+
+		TArray<uint8> PNGBaseColor;
+		TArray<uint8> PNGNormalMap;
+		TArray<uint8> PNGMetallicRoughness;
+
+
+		if (MaterialBaker->BakeMaterialToPng(SkeletalMaterial.MaterialInterface, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness))
+		{
+			
+			int64 ImageBufferViewBaseColorOffset = BinaryData.Num();
+			BinaryData.Append(PNGBaseColor.GetData(), PNGBaseColor.Num());
+			if (BinaryData.Num() % 4)
+			{
+				BinaryData.AddZeroed(4 - (BinaryData.Num() % 4));
+			}
+			ImagesBuffers.Add(TPair<int64, int64>(ImageBufferViewBaseColorOffset, PNGBaseColor.Num()));
+
+			int64 ImageBufferViewNormalMapOffset = BinaryData.Num();
+			BinaryData.Append(PNGNormalMap.GetData(), PNGNormalMap.Num());
+			if (BinaryData.Num() % 4)
+			{
+				BinaryData.AddZeroed(4 - (BinaryData.Num() % 4));
+			}
+			ImagesBuffers.Add(TPair<int64, int64>(ImageBufferViewNormalMapOffset, PNGNormalMap.Num()));
+
+			int64 ImageBufferViewMetallicRoughnessOffset = BinaryData.Num();
+			BinaryData.Append(PNGMetallicRoughness.GetData(), PNGMetallicRoughness.Num());
+			if (BinaryData.Num() % 4)
+			{
+				BinaryData.AddZeroed(4 - (BinaryData.Num() % 4));
+			}
+			ImagesBuffers.Add(TPair<int64, int64>(ImageBufferViewMetallicRoughnessOffset, PNGMetallicRoughness.Num()));
+
+			TSharedRef<FJsonObject> JsonMaterial = MakeShared<FJsonObject>();
+			JsonMaterial->SetStringField("name", SkeletalMaterial.MaterialInterface->GetFullName());
+
+			TSharedRef<FJsonObject> JsonPBRMaterial = MakeShared<FJsonObject>();
+			TSharedRef<FJsonObject> JsonBaseColorTexture = MakeShared<FJsonObject>();
+			JsonBaseColorTexture->SetNumberField("index", TextureIndex++);
+			JsonPBRMaterial->SetObjectField("baseColorTexture", JsonBaseColorTexture);
+
+			TSharedRef<FJsonObject> JsonNormalTexture = MakeShared<FJsonObject>();
+			JsonNormalTexture->SetNumberField("index", TextureIndex++);
+			JsonMaterial->SetObjectField("normalTexture", JsonNormalTexture);
+
+			TSharedRef<FJsonObject> JsonMetallicRoughnessTexture = MakeShared<FJsonObject>();
+			JsonMetallicRoughnessTexture->SetNumberField("index", TextureIndex++);
+			JsonPBRMaterial->SetObjectField("metallicRoughnessTexture", JsonMetallicRoughnessTexture);
+
+			JsonMaterial->SetObjectField("pbrMetallicRoughness", JsonPBRMaterial);
+
+
+			int32 JsonMaterialIndex = JsonMaterials.Add(MakeShared<FJsonValueObject>(JsonMaterial));
+			JsonPrimitive->SetNumberField("material", JsonMaterialIndex);
+			
+		}
+
+		//FFileHelper::SaveArrayToFile(PNGBaseColor, TEXT("D:/TextureAvatusBaseColor.png"));
+		//FFileHelper::SaveArrayToFile(PNGNormalMap, TEXT("D:/TextureAvatusNormalMap.png"));
+		//FFileHelper::SaveArrayToFile(PNGMetallicRoughness, TEXT("D:/TextureAvatusMetallicRoughness.png"));
 
 		JsonPrimitives.Add(MakeShared<FJsonValueObject>(JsonPrimitive));
 	}
@@ -524,6 +595,10 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 		for (const UAnimSequence* AnimSequence : Animations)
 		{
+			if (!AnimSequence)
+			{
+				continue;
+			}
 			TArray<float> Timeline;
 			const float FrameDeltaTime = AnimSequence->SequenceLength / AnimSequence->GetRawNumberOfFrames();
 			for (int32 FrameIndex = 0; FrameIndex < AnimSequence->GetRawNumberOfFrames(); FrameIndex++)
@@ -650,6 +725,27 @@ bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
 		JsonAccessors.Add(MakeShared<FJsonValueObject>(JsonAccessor));
 	}
 
+	for (const TPair<int64, int64>& Pair : ImagesBuffers)
+	{
+		TSharedRef<FJsonObject> JsonBufferView = MakeShared<FJsonObject>();
+		JsonBufferView->SetNumberField("buffer", 0);
+		JsonBufferView->SetNumberField("byteOffset", Pair.Key);
+		JsonBufferView->SetNumberField("byteLength", Pair.Value);
+
+		int32 BufferViewIndex = JsonBufferViews.Add(MakeShared<FJsonValueObject>(JsonBufferView));
+
+		TSharedRef<FJsonObject> JsonImage = MakeShared<FJsonObject>();
+		JsonImage->SetNumberField("bufferView", BufferViewIndex);
+		JsonImage->SetStringField("mimeType", "image/png");
+
+		int32 ImageIndex = JsonImages.Add(MakeShared<FJsonValueObject>(JsonImage));
+
+		TSharedRef<FJsonObject> JsonTexture = MakeShared<FJsonObject>();
+		JsonTexture->SetNumberField("source", ImageIndex);
+
+		JsonTextures.Add(MakeShared<FJsonValueObject>(JsonTexture));
+	}
+
 	TSharedRef<FJsonObject> JsonNode = MakeShared<FJsonObject>();
 	JsonNode->SetStringField("name", "Test");
 	JsonNode->SetNumberField("mesh", 0);
@@ -678,6 +774,9 @@ bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
 	JsonRoot->SetArrayField("buffers", JsonBuffers);
 	JsonRoot->SetArrayField("meshes", JsonMeshes);
 	JsonRoot->SetArrayField("animations", JsonAnimations);
+	JsonRoot->SetArrayField("images", JsonImages);
+	JsonRoot->SetArrayField("textures", JsonTextures);
+	JsonRoot->SetArrayField("materials", JsonMaterials);
 
 	FArrayWriter Json;
 	TSharedRef<TJsonWriter<UTF8CHAR>> JsonWriter = TJsonWriterFactory<UTF8CHAR>::Create(&Json);
