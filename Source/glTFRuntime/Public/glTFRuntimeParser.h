@@ -956,6 +956,8 @@ struct FglTFRuntimeMaterial
 	UTexture2D* TransmissionTextureCache;
 	int32 TransmissionTexCoord;
 
+	float AlphaMask;
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -991,6 +993,7 @@ struct FglTFRuntimeMaterial
 		TransmissionFactor = 0;
 		TransmissionTextureCache = nullptr;
 		TransmissionTexCoord = 0;
+		AlphaMask = 0;
 	}
 };
 

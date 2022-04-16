@@ -35,6 +35,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	else if (AlphaMode == "MASK")
 	{
 		RuntimeMaterial.bTranslucent = true;
+		RuntimeMaterial.AlphaMask = 1;
 		double AlphaCutoffDouble;
 		if (!JsonMaterialObject->TryGetNumberField("alphaCutoff", AlphaCutoffDouble))
 		{
@@ -403,6 +404,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	}
 
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
+	Material->SetScalarParameterValue("AlphaMask", RuntimeMaterial.AlphaMask);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ParamsMultiplier)
 	{
