@@ -242,6 +242,8 @@ enum class EglTFRuntimeMaterialType : uint8
 	Translucent,
 	TwoSided,
 	TwoSidedTranslucent,
+	Masked,
+	TwoSidedMasked
 };
 
 UENUM()
@@ -956,7 +958,7 @@ struct FglTFRuntimeMaterial
 	UTexture2D* TransmissionTextureCache;
 	int32 TransmissionTexCoord;
 
-	float AlphaMask;
+	bool bMasked;
 
 	FglTFRuntimeMaterial()
 	{
@@ -993,7 +995,7 @@ struct FglTFRuntimeMaterial
 		TransmissionFactor = 0;
 		TransmissionTextureCache = nullptr;
 		TransmissionTexCoord = 0;
-		AlphaMask = 0;
+		bMasked = false;
 	}
 };
 
