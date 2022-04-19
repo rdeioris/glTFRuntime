@@ -2331,16 +2331,17 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 
 		FinalSize = Stride * Count;
 
-		if (ByteOffset > 0)
-		{
-			TArray64<uint8> OffsetBytes;
-			OffsetBytes.Append(&Bytes[ByteOffset], FinalSize);
-			Bytes = OffsetBytes;
-		}
-
 		if (FinalSize > (uint64)Bytes.Num())
 		{
 			return false;
+		}
+
+		if (ByteOffset > 0)
+		{
+			FinalSize -= ByteOffset;
+			TArray64<uint8> OffsetBytes;
+			OffsetBytes.Append(&Bytes[ByteOffset], FinalSize);
+			Bytes = OffsetBytes;
 		}
 
 		if (!bHasSparse)
