@@ -811,7 +811,10 @@ bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
 	JsonRoot->SetArrayField("bufferViews", JsonBufferViews);
 	JsonRoot->SetArrayField("buffers", JsonBuffers);
 	JsonRoot->SetArrayField("meshes", JsonMeshes);
-	JsonRoot->SetArrayField("animations", JsonAnimations);
+	if (JsonAnimations.Num() > 0)
+	{
+		JsonRoot->SetArrayField("animations", JsonAnimations);
+	}
 	JsonRoot->SetArrayField("images", JsonImages);
 	JsonRoot->SetArrayField("textures", JsonTextures);
 	JsonRoot->SetArrayField("materials", JsonMaterials);
