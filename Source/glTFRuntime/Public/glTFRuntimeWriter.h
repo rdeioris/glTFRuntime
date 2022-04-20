@@ -11,6 +11,7 @@ UENUM()
 enum class EglTFRuntimeWriterMode : uint8
 {
 	Text,
+	TextEmbedded,
 	Binary,
 };
 
@@ -45,11 +46,19 @@ struct FglTFRuntimeWriterConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FVector PivotDelta;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bBakeMorphTargets;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bBakePose;
+
 	FglTFRuntimeWriterConfig()
 	{
 		bExportSkin = true;
 		bExportMorphTargets = true;
 		PivotDelta = FVector::ZeroVector;
+		bBakeMorphTargets = false;
+		bBakePose = false;
 	}
 };
 
@@ -87,7 +96,7 @@ public:
 	FglTFRuntimeWriter(const FglTFRuntimeWriterConfig& InConfig);
 	~FglTFRuntimeWriter();
 
-	bool AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations);
+	bool AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent);
 
 	bool WriteToFile(const FString& Filename);
 

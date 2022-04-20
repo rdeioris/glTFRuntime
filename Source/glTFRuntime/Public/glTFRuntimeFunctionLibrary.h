@@ -33,4 +33,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "glTF Save SkeletalMesh in File", AutoCreateRefTerm = "Animations, WriterConfig"), Category = "glTFRuntime")
 	static bool glTFSaveSkeletalMeshToFile(UObject* WorldContextObject, USkeletalMesh* SkeletalMesh, const int32 LOD, const FString& Filename, const TArray<UAnimSequence*>& Animations, const FglTFRuntimeWriterConfig& WriterConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "glTF Save SkeletalMeshComponent in File", AutoCreateRefTerm = "Animations, WriterConfig"), Category = "glTFRuntime")
+	static bool glTFSaveSkeletalMeshComponentToFile(UObject* WorldContextObject, USkeletalMeshComponent* SkeletalMeshComponent, const int32 LOD, const FString& Filename, const TArray<UAnimSequence*>& Animations, const FglTFRuntimeWriterConfig& WriterConfig);
 };

@@ -49,9 +49,19 @@ FglTFRuntimeWriter::~FglTFRuntimeWriter()
 {
 }
 
-bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations)
+bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent)
 {
 	if (LOD < 0)
+	{
+		return false;
+	}
+
+	if (!SkeletalMesh && SkeletalMeshComponent)
+	{
+		SkeletalMesh = SkeletalMeshComponent->SkeletalMesh;
+	}
+
+	if (!SkeletalMesh)
 	{
 		return false;
 	}
@@ -225,6 +235,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 	for (uint32 PositionIndex = 0; PositionIndex < LODRenderData.StaticVertexBuffers.PositionVertexBuffer.GetNumVertices(); PositionIndex++)
 	{
 		FVector Position = LODRenderData.StaticVertexBuffers.PositionVertexBuffer.VertexPosition(PositionIndex);
+
 		Position = SceneBasisMatrix.TransformPosition(Position) * SceneScale;
 
 		Position -= PivotDelta;
@@ -264,18 +275,6 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		Positions.Add(Position);
 	}
 
-	int64 PositionOffset = BinaryData.Num();
-	BinaryData.Append(reinterpret_cast<uint8*>(Positions.GetData()), Positions.Num() * sizeof(FVector));
-
-	FglTFRuntimeAccessor PositionAccessor("VEC3", 5126, Positions.Num(), PositionOffset, Positions.Num() * sizeof(FVector), false);
-	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.X));
-	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.Y));
-	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.Z));
-	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.X));
-	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.Y));
-	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.Z));
-
-	int32 PositionAccessorIndex = Accessors.Add(PositionAccessor);
 
 	TArray<FVector> Normals;
 	TArray<FVector4> Tangents;
@@ -287,25 +286,12 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		Normal = SceneBasisMatrix.TransformVector(Normal);
 		Normals.Add(Normal.GetSafeNormal());
 		FVector4 Tangent = LODRenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex);
-		Tangent = SceneBasisMatrix.TransformFVector4(Tangent);
-		Tangents.Add(Tangent.GetSafeNormal());
+		Tangent = SceneBasisMatrix.TransformFVector4(Tangent).GetSafeNormal();
+		Tangent.W = -1; // left handed
+		Tangents.Add(Tangent);
 		FVector2D UV = LODRenderData.StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
 		TexCoords.Add(UV);
 	}
-	int64 NormalOffset = BinaryData.Num();
-	BinaryData.Append(reinterpret_cast<uint8*>(Normals.GetData()), Normals.Num() * sizeof(FVector));
-	FglTFRuntimeAccessor NormalAccessor("VEC3", 5126, Normals.Num(), NormalOffset, Normals.Num() * sizeof(FVector), false);
-	int32 NormalAccessorIndex = Accessors.Add(NormalAccessor);
-
-	int64 TangentOffset = BinaryData.Num();
-	BinaryData.Append(reinterpret_cast<uint8*>(Tangents.GetData()), Tangents.Num() * sizeof(FVector4));
-	FglTFRuntimeAccessor TangentAccessor("VEC4", 5126, Tangents.Num(), TangentOffset, Tangents.Num() * sizeof(FVector4), false);
-	int32 TangentAccessorIndex = Accessors.Add(TangentAccessor);
-
-	int64 TexCoordOffset = BinaryData.Num();
-	BinaryData.Append(reinterpret_cast<uint8*>(TexCoords.GetData()), TexCoords.Num() * sizeof(FVector2D));
-	FglTFRuntimeAccessor TexCoordAccessor("VEC2", 5126, TexCoords.Num(), TexCoordOffset, TexCoords.Num() * sizeof(FVector2D), false);
-	int32 TexCoordAccessorIndex = Accessors.Add(TexCoordAccessor);
 
 	TArray<int32> JointAccessorIndices;
 	TArray<int32> WeightAccessorIndices;
@@ -380,6 +366,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 	TMap<FString, TPair<FVector, FVector>> MorphTargetsMinMaxValues;
 	TArray<TPair<FString, int32>> MorphTargetsAccessors;
 	TArray<TSharedPtr<FJsonValue>> JsonMorphTargetsNames;
+	TMap<FString, int32> MorphTargetNameMap;
 
 	TArray<UMorphTarget*> MorphTargets = SkeletalMesh->GetMorphTargets();
 	for (UMorphTarget* MorphTarget : MorphTargets)
@@ -427,24 +414,97 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 				}
 				MorphTargetsValues.Add(TPair<FString, TArray<FVector>>(MorphTarget->GetName(), Values));
 
-				JsonMorphTargetsNames.Add(MakeShared<FJsonValueString>(MorphTarget->GetName()));
+				MorphTargetNameMap.Add(MorphTarget->GetName(), JsonMorphTargetsNames.Add(MakeShared<FJsonValueString>(MorphTarget->GetName())));
 			}
 		}
 	}
 
-	for (const TPair<FString, TArray<FVector>>& Pair : MorphTargetsValues)
+	if (Config.bBakeMorphTargets && SkeletalMeshComponent && SkeletalMeshComponent->SkeletalMesh == SkeletalMesh)
 	{
-		int64 MorphTargetOffset = BinaryData.Num();
-		BinaryData.Append(reinterpret_cast<const uint8*>(Pair.Value.GetData()), Pair.Value.Num() * sizeof(FVector));
+		for (UMorphTarget* MorphTarget : MorphTargets)
+		{
+			const FString& MorphTargetName = MorphTarget->GetName();
+			if (MorphTargetNameMap.Contains(MorphTargetName))
+			{
+				float Weight = SkeletalMeshComponent->GetMorphTarget(*MorphTargetName);
+				for (int32 PositionIndex = 0; PositionIndex < Positions.Num(); PositionIndex++)
+				{
+					int32 MorphTargetIndex = MorphTargetNameMap[MorphTargetName];
+					FVector& Position = Positions[PositionIndex];
+					Position += MorphTargetsValues[MorphTargetIndex].Value[PositionIndex] * Weight;
+					if (Position.X < PositionMin.X)
+					{
+						PositionMin.X = Position.X;
+					}
+					if (Position.Y < PositionMin.Y)
+					{
+						PositionMin.Y = Position.Y;
+					}
+					if (Position.Z < PositionMin.Z)
+					{
+						PositionMin.Z = Position.Z;
+					}
+					if (Position.X > PositionMax.X)
+					{
+						PositionMax.X = Position.X;
+					}
+					if (Position.Y > PositionMax.Y)
+					{
+						PositionMax.Y = Position.Y;
+					}
+					if (Position.Z > PositionMax.Z)
+					{
+						PositionMax.Z = Position.Z;
+					}
+				}
+			}
+		}
+	}
 
-		FglTFRuntimeAccessor MorphTargetAccessor("VEC3", 5126, Pair.Value.Num(), MorphTargetOffset, Pair.Value.Num() * sizeof(FVector), false);
-		MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.X));
-		MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.Y));
-		MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.Z));
-		MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.X));
-		MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.Y));
-		MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.Z));
-		MorphTargetsAccessors.Add(TPair<FString, int32>(Pair.Key, Accessors.Add(MorphTargetAccessor)));
+	int64 PositionOffset = BinaryData.Num();
+	BinaryData.Append(reinterpret_cast<uint8*>(Positions.GetData()), Positions.Num() * sizeof(FVector));
+
+	FglTFRuntimeAccessor PositionAccessor("VEC3", 5126, Positions.Num(), PositionOffset, Positions.Num() * sizeof(FVector), false);
+	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.X));
+	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.Y));
+	PositionAccessor.Min.Add(MakeShared<FJsonValueNumber>(PositionMin.Z));
+	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.X));
+	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.Y));
+	PositionAccessor.Max.Add(MakeShared<FJsonValueNumber>(PositionMax.Z));
+
+	int32 PositionAccessorIndex = Accessors.Add(PositionAccessor);
+
+	int64 NormalOffset = BinaryData.Num();
+	BinaryData.Append(reinterpret_cast<uint8*>(Normals.GetData()), Normals.Num() * sizeof(FVector));
+	FglTFRuntimeAccessor NormalAccessor("VEC3", 5126, Normals.Num(), NormalOffset, Normals.Num() * sizeof(FVector), false);
+	int32 NormalAccessorIndex = Accessors.Add(NormalAccessor);
+
+	int64 TangentOffset = BinaryData.Num();
+	BinaryData.Append(reinterpret_cast<uint8*>(Tangents.GetData()), Tangents.Num() * sizeof(FVector4));
+	FglTFRuntimeAccessor TangentAccessor("VEC4", 5126, Tangents.Num(), TangentOffset, Tangents.Num() * sizeof(FVector4), false);
+	int32 TangentAccessorIndex = Accessors.Add(TangentAccessor);
+
+	int64 TexCoordOffset = BinaryData.Num();
+	BinaryData.Append(reinterpret_cast<uint8*>(TexCoords.GetData()), TexCoords.Num() * sizeof(FVector2D));
+	FglTFRuntimeAccessor TexCoordAccessor("VEC2", 5126, TexCoords.Num(), TexCoordOffset, TexCoords.Num() * sizeof(FVector2D), false);
+	int32 TexCoordAccessorIndex = Accessors.Add(TexCoordAccessor);
+
+	if (Config.bExportMorphTargets)
+	{
+		for (const TPair<FString, TArray<FVector>>& Pair : MorphTargetsValues)
+		{
+			int64 MorphTargetOffset = BinaryData.Num();
+			BinaryData.Append(reinterpret_cast<const uint8*>(Pair.Value.GetData()), Pair.Value.Num() * sizeof(FVector));
+
+			FglTFRuntimeAccessor MorphTargetAccessor("VEC3", 5126, Pair.Value.Num(), MorphTargetOffset, Pair.Value.Num() * sizeof(FVector), false);
+			MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.X));
+			MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.Y));
+			MorphTargetAccessor.Min.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Key.Z));
+			MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.X));
+			MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.Y));
+			MorphTargetAccessor.Max.Add(MakeShared<FJsonValueNumber>(MorphTargetsMinMaxValues[Pair.Key].Value.Z));
+			MorphTargetsAccessors.Add(TPair<FString, int32>(Pair.Key, Accessors.Add(MorphTargetAccessor)));
+		}
 	}
 
 	int32 TextureIndex = 0;
@@ -478,7 +538,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 		JsonPrimitive->SetObjectField("attributes", JsonPrimitiveAttributes);
 
-		if (MorphTargetsAccessors.Num() > 0)
+		if (Config.bExportMorphTargets && MorphTargetsAccessors.Num() > 0)
 		{
 			TArray<TSharedPtr<FJsonValue>> JsonMorphTargets;
 			for (const TPair<FString, int32>& Pair : MorphTargetsAccessors)
@@ -492,26 +552,6 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 		const uint16 MaterialIndex = Section.MaterialIndex;
 		const FSkeletalMaterial& SkeletalMaterial = SkeletalMesh->GetMaterials()[MaterialIndex];
-		/*UCanvas* Canvas = nullptr;
-		UTextureRenderTarget2D* RenderTarget = NewObject<UTextureRenderTarget2D>();
-		RenderTarget->InitCustomFormat(2048, 2048, EPixelFormat::PF_R8G8B8A8, true);
-		RenderTarget->TargetGamma = 2.2;
-		FDrawToRenderTargetContext Context;
-		FVector2D Size;
-		UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(World, RenderTarget, Canvas, Size, Context);
-		Canvas->K2_DrawMaterial(SkeletalMaterial.MaterialInterface, FVector2D::ZeroVector, Size, FVector2D::ZeroVector);
-		UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(World, Context);
-
-		FRenderTarget* RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
-		TArray<FColor> Pixels;
-		RenderTargetResource->ReadPixels(Pixels);
-
-		IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
-
-		TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::JPEG);
-		ImageWrapper->SetRaw(Pixels.GetData(), Pixels.Num() * sizeof(FColor), 2048, 2048, ERGBFormat::RGBA, 8);
-
-		TArray64<uint8> PNGData = ImageWrapper->GetCompressed(100);*/
 
 		AglTFRuntimeMaterialBaker* MaterialBaker = World->SpawnActor<AglTFRuntimeMaterialBaker>();
 
@@ -522,7 +562,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 		if (MaterialBaker->BakeMaterialToPng(SkeletalMaterial.MaterialInterface, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness))
 		{
-			
+
 			int64 ImageBufferViewBaseColorOffset = BinaryData.Num();
 			BinaryData.Append(PNGBaseColor.GetData(), PNGBaseColor.Num());
 			if (BinaryData.Num() % 4)
@@ -568,19 +608,17 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 			int32 JsonMaterialIndex = JsonMaterials.Add(MakeShared<FJsonValueObject>(JsonMaterial));
 			JsonPrimitive->SetNumberField("material", JsonMaterialIndex);
-			
+
 		}
 
-		//FFileHelper::SaveArrayToFile(PNGBaseColor, TEXT("D:/TextureAvatusBaseColor.png"));
-		//FFileHelper::SaveArrayToFile(PNGNormalMap, TEXT("D:/TextureAvatusNormalMap.png"));
-		//FFileHelper::SaveArrayToFile(PNGMetallicRoughness, TEXT("D:/TextureAvatusMetallicRoughness.png"));
+		MaterialBaker->Destroy();
 
 		JsonPrimitives.Add(MakeShared<FJsonValueObject>(JsonPrimitive));
 	}
 
 	JsonMesh->SetArrayField("primitives", JsonPrimitives);
 
-	if (MorphTargetsAccessors.Num() > 0)
+	if (Config.bExportMorphTargets && MorphTargetsAccessors.Num() > 0)
 	{
 		TSharedRef<FJsonObject> JsonExtras = MakeShared<FJsonObject>();
 		JsonExtras->SetArrayField("targetNames", JsonMorphTargetsNames);

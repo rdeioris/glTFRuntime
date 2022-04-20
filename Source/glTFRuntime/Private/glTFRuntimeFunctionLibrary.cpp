@@ -86,6 +86,13 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 bool UglTFRuntimeFunctionLibrary::glTFSaveSkeletalMeshToFile(UObject* WorldContextObject, USkeletalMesh* SkeletalMesh, const int32 LOD, const FString& Filename, const TArray<UAnimSequence*>& Animations, const FglTFRuntimeWriterConfig& WriterConfig)
 {
 	TSharedRef<FglTFRuntimeWriter> Writer = MakeShared<FglTFRuntimeWriter>(WriterConfig);
-	Writer->AddMesh(WorldContextObject->GetWorld(), SkeletalMesh, LOD, Animations);
+	Writer->AddMesh(WorldContextObject->GetWorld(), SkeletalMesh, LOD, Animations, nullptr);
+	return Writer->WriteToFile(Filename);
+}
+
+bool UglTFRuntimeFunctionLibrary::glTFSaveSkeletalMeshComponentToFile(UObject* WorldContextObject, USkeletalMeshComponent* SkeletalMeshComponent, const int32 LOD, const FString& Filename, const TArray<UAnimSequence*>& Animations, const FglTFRuntimeWriterConfig& WriterConfig)
+{
+	TSharedRef<FglTFRuntimeWriter> Writer = MakeShared<FglTFRuntimeWriter>(WriterConfig);
+	Writer->AddMesh(WorldContextObject->GetWorld(), SkeletalMeshComponent->SkeletalMesh, LOD, Animations, SkeletalMeshComponent);
 	return Writer->WriteToFile(Filename);
 }
