@@ -113,7 +113,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				ParamTransform.TexCoord = 0;
 			}
 
-			ParamTransform.Rotation = (1.0 / PI) * GetJsonExtensionObjectNumber(JsonTextureObject->ToSharedRef(), "KHR_texture_transform", "rotation", 0);
+			ParamTransform.Rotation = (1.0 / (PI * 2)) * GetJsonExtensionObjectNumber(JsonTextureObject->ToSharedRef(), "KHR_texture_transform", "rotation", 0);
 			TArray<double> Offset = GetJsonExtensionObjectNumbers(JsonTextureObject->ToSharedRef(), "KHR_texture_transform", "offset");
 			if (Offset.Num() >= 2)
 			{
@@ -372,7 +372,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			UVSet[Transform.TexCoord] = 1;
 			Material->SetVectorParameterValue(FName(TransformPrefix + "TexCoord"), FLinearColor(UVSet));
 			Material->SetVectorParameterValue(FName(TransformPrefix + "Offset"), Transform.Offset);
-			Material->SetScalarParameterValue(FName(TransformPrefix + "Offset"), Transform.Rotation);
+			Material->SetScalarParameterValue(FName(TransformPrefix + "Rotation"), Transform.Rotation);
 			Material->SetVectorParameterValue(FName(TransformPrefix + "Scale"), Transform.Scale);
 		}
 	};
