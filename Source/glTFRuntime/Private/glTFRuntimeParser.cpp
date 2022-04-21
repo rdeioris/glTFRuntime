@@ -2338,7 +2338,6 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 
 		if (ByteOffset > 0)
 		{
-			FinalSize -= ByteOffset;
 			TArray64<uint8> OffsetBytes;
 			OffsetBytes.Append(&Bytes[ByteOffset], FinalSize);
 			Bytes = OffsetBytes;
