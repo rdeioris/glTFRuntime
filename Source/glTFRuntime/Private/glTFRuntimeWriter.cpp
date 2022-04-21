@@ -551,7 +551,8 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		}
 
 		const uint16 MaterialIndex = Section.MaterialIndex;
-		const FSkeletalMaterial& SkeletalMaterial = SkeletalMesh->GetMaterials()[MaterialIndex];
+
+		UMaterialInterface* SkeletalMaterial = SkeletalMeshComponent ? SkeletalMeshComponent->GetMaterial(MaterialIndex) : SkeletalMesh->GetMaterials()[MaterialIndex].MaterialInterface;
 
 		AglTFRuntimeMaterialBaker* MaterialBaker = World->SpawnActor<AglTFRuntimeMaterialBaker>();
 
@@ -563,19 +564,19 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		bool bAlpha = false;
 		float CutOff = 0;
 
-		if (SkeletalMaterial.MaterialInterface->GetBlendMode() == EBlendMode::BLEND_Translucent)
+		if (SkeletalMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
 		{
 			AlphaMode = "BLEND";
 			bAlpha = true;
-			CutOff = SkeletalMaterial.MaterialInterface->GetOpacityMaskClipValue();
+			CutOff = SkeletalMaterial->GetOpacityMaskClipValue();
 		}
-		else if (SkeletalMaterial.MaterialInterface->GetBlendMode() == EBlendMode::BLEND_Masked)
+		else if (SkeletalMaterial->GetBlendMode() == EBlendMode::BLEND_Masked)
 		{
 			AlphaMode = "MASK";
 			bAlpha = true;
 		}
 
-		if (MaterialBaker->BakeMaterialToPng(SkeletalMaterial.MaterialInterface, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness, bAlpha, CutOff))
+		if (MaterialBaker->BakeMaterialToPng(SkeletalMaterial, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness, bAlpha, CutOff))
 		{
 
 			int64 ImageBufferViewBaseColorOffset = BinaryData.Num();
@@ -586,37 +587,40 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 			}
 			ImagesBuffers.Add(TPair<int64, int64>(ImageBufferViewBaseColorOffset, PNGBaseColor.Num()));
 
-			int64 ImageBufferViewNormalMapOffset = BinaryData.Num();
-			BinaryData.Append(PNGNormalMap.GetData(), PNGNormalMap.Num());
-			if (BinaryData.Num() % 4)
-			{
-				BinaryData.AddZeroed(4 - (BinaryData.Num() % 4));
-			}
-			ImagesBuffers.Add(TPair<int64, int64>(ImageBufferViewNormalMapOffset, PNGNormalMap.Num()));
-
-			int64 ImageBufferViewMetallicRoughnessOffset = BinaryData.Num();
-			BinaryData.Append(PNGMetallicRoughness.GetData(), PNGMetallicRoughness.Num());
-			if (BinaryData.Num() % 4)
-			{
-				BinaryData.AddZeroed(4 - (BinaryData.Num() % 4));
-			}
-			ImagesBuffers.Add(TPair<int64, int64>(ImageBufferViewMetallicRoughnessOffset, PNGMetallicRoughness.Num()));
-
 			TSharedRef<FJsonObject> JsonMaterial = MakeShared<FJsonObject>();
-			JsonMaterial->SetStringField("name", SkeletalMaterial.MaterialInterface->GetFullName());
+			JsonMaterial->SetStringField("name", SkeletalMaterial->GetPathName());
 
 			TSharedRef<FJsonObject> JsonPBRMaterial = MakeShared<FJsonObject>();
 			TSharedRef<FJsonObject> JsonBaseColorTexture = MakeShared<FJsonObject>();
 			JsonBaseColorTexture->SetNumberField("index", TextureIndex++);
 			JsonPBRMaterial->SetObjectField("baseColorTexture", JsonBaseColorTexture);
 
-			TSharedRef<FJsonObject> JsonNormalTexture = MakeShared<FJsonObject>();
-			JsonNormalTexture->SetNumberField("index", TextureIndex++);
-			JsonMaterial->SetObjectField("normalTexture", JsonNormalTexture);
+			if (AlphaMode != "BLEND")
+			{
+				int64 ImageBufferViewNormalMapOffset = BinaryData.Num();
+				BinaryData.Append(PNGNormalMap.GetData(), PNGNormalMap.Num());
+				if (BinaryData.Num() % 4)
+				{
+					BinaryData.AddZeroed(4 - (BinaryData.Num() % 4));
+				}
+				ImagesBuffers.Add(TPair<int64, int64>(ImageBufferViewNormalMapOffset, PNGNormalMap.Num()));
 
-			TSharedRef<FJsonObject> JsonMetallicRoughnessTexture = MakeShared<FJsonObject>();
-			JsonMetallicRoughnessTexture->SetNumberField("index", TextureIndex++);
-			JsonPBRMaterial->SetObjectField("metallicRoughnessTexture", JsonMetallicRoughnessTexture);
+				int64 ImageBufferViewMetallicRoughnessOffset = BinaryData.Num();
+				BinaryData.Append(PNGMetallicRoughness.GetData(), PNGMetallicRoughness.Num());
+				if (BinaryData.Num() % 4)
+				{
+					BinaryData.AddZeroed(4 - (BinaryData.Num() % 4));
+				}
+				ImagesBuffers.Add(TPair<int64, int64>(ImageBufferViewMetallicRoughnessOffset, PNGMetallicRoughness.Num()));
+
+				TSharedRef<FJsonObject> JsonNormalTexture = MakeShared<FJsonObject>();
+				JsonNormalTexture->SetNumberField("index", TextureIndex++);
+				JsonMaterial->SetObjectField("normalTexture", JsonNormalTexture);
+
+				TSharedRef<FJsonObject> JsonMetallicRoughnessTexture = MakeShared<FJsonObject>();
+				JsonMetallicRoughnessTexture->SetNumberField("index", TextureIndex++);
+				JsonPBRMaterial->SetObjectField("metallicRoughnessTexture", JsonMetallicRoughnessTexture);
+			}			
 
 			JsonMaterial->SetObjectField("pbrMetallicRoughness", JsonPBRMaterial);
 
@@ -624,10 +628,10 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 			if (AlphaMode == "MASK")
 			{
-				JsonMaterial->SetNumberField("alphaCutoff", SkeletalMaterial.MaterialInterface->GetOpacityMaskClipValue());
+				JsonMaterial->SetNumberField("alphaCutoff", SkeletalMaterial->GetOpacityMaskClipValue());
 			}
 
-			if (SkeletalMaterial.MaterialInterface->IsTwoSided())
+			if (SkeletalMaterial->IsTwoSided())
 			{
 				JsonMaterial->SetBoolField("doubleSided", true);
 			}

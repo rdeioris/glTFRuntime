@@ -105,12 +105,15 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 		RenderTargetResource->ReadLinearColorPixels(AlphaValues);
 	}
 
-	SceneCaptureComponent->ShowFlags.Translucency = false;
+	SceneCaptureComponent->ShowFlags.Translucency = true;
 	SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 
 	/* BaseColor */
 	RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_R8G8B8A8, false);
-	SceneCaptureComponent->PostProcessSettings.AddBlendable(ExtractBaseColor, 1);
+	if (!bAlpha || CutOff == 0)
+	{
+		SceneCaptureComponent->PostProcessSettings.AddBlendable(ExtractBaseColor, 1);
+	}
 	SceneCaptureComponent->CaptureScene();
 
 	RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
@@ -121,7 +124,7 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 		int32 AlphaPixelsNum = 0;
 		for (int32 PixelIndex = 0; PixelIndex < Pixels.Num(); PixelIndex++)
 		{
-			const float Alpha = AlphaValues[PixelIndex].A;
+			const float Alpha = 1 - AlphaValues[PixelIndex].A;
 			Pixels[PixelIndex].A = Alpha * 255.0f;
 			if (CutOff > 0)
 			{
