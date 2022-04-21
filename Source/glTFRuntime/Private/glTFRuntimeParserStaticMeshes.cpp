@@ -416,6 +416,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		}
 
 		LODResources.VertexBuffers.PositionVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
+		LODResources.VertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(StaticMeshConfig.bUseHighPrecisionUVs);
 		LODResources.VertexBuffers.StaticMeshVertexBuffer.Init(StaticMeshBuildVertices, NumUVs, StaticMesh->bAllowCPUAccess);
 		if (bHasVertexColors)
 		{
