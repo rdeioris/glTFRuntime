@@ -559,8 +559,23 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		TArray<uint8> PNGNormalMap;
 		TArray<uint8> PNGMetallicRoughness;
 
+		FString AlphaMode = "OPAQUE";
+		bool bAlpha = false;
+		float CutOff = 0;
 
-		if (MaterialBaker->BakeMaterialToPng(SkeletalMaterial.MaterialInterface, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness))
+		if (SkeletalMaterial.MaterialInterface->GetBlendMode() == EBlendMode::BLEND_Translucent)
+		{
+			AlphaMode = "BLEND";
+			bAlpha = true;
+			CutOff = SkeletalMaterial.MaterialInterface->GetOpacityMaskClipValue();
+		}
+		else if (SkeletalMaterial.MaterialInterface->GetBlendMode() == EBlendMode::BLEND_Masked)
+		{
+			AlphaMode = "MASK";
+			bAlpha = true;
+		}
+
+		if (MaterialBaker->BakeMaterialToPng(SkeletalMaterial.MaterialInterface, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness, bAlpha, CutOff))
 		{
 
 			int64 ImageBufferViewBaseColorOffset = BinaryData.Num();
@@ -605,6 +620,17 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 			JsonMaterial->SetObjectField("pbrMetallicRoughness", JsonPBRMaterial);
 
+			JsonMaterial->SetStringField("alphaMode", AlphaMode);
+
+			if (AlphaMode == "MASK")
+			{
+				JsonMaterial->SetNumberField("alphaCutoff", SkeletalMaterial.MaterialInterface->GetOpacityMaskClipValue());
+			}
+
+			if (SkeletalMaterial.MaterialInterface->IsTwoSided())
+			{
+				JsonMaterial->SetBoolField("doubleSided", true);
+			}
 
 			int32 JsonMaterialIndex = JsonMaterials.Add(MakeShared<FJsonValueObject>(JsonMaterial));
 			JsonPrimitive->SetNumberField("material", JsonMaterialIndex);

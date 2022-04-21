@@ -26,7 +26,6 @@ AglTFRuntimeMaterialBaker::AglTFRuntimeMaterialBaker()
 	SceneCaptureComponent->ShowFlags.Landscape = false;
 	SceneCaptureComponent->ShowFlags.Particles = false;
 	SceneCaptureComponent->ShowFlags.SkeletalMeshes = false;
-	SceneCaptureComponent->ShowFlags.Translucency = false;
 	SceneCaptureComponent->ShowFlags.DeferredLighting = false;
 	SceneCaptureComponent->ShowFlags.AmbientCubemap = false;
 	SceneCaptureComponent->ShowFlags.AmbientOcclusion = false;
@@ -73,7 +72,7 @@ void AglTFRuntimeMaterialBaker::Tick(float DeltaTime)
 
 }
 
-bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness)
+bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness, const bool bAlpha, const float CutOff)
 {
 	const uint32 TextureSize = 2048;
 
@@ -84,26 +83,59 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
 
 	RenderingPlaneComponent->SetMaterial(0, Material);
-	SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 	SceneCaptureComponent->ProjectionType = ECameraProjectionMode::Orthographic;
 	SceneCaptureComponent->OrthoWidth = 100;
 	SceneCaptureComponent->ShowOnlyComponent(RenderingPlaneComponent);
+
 	UTextureRenderTarget2D* RenderTarget = NewObject<UTextureRenderTarget2D>();
-	RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_R8G8B8A8, false);
 	SceneCaptureComponent->TextureTarget = RenderTarget;
 
+	FRenderTarget* RenderTargetResource = nullptr;
+	TArray<FColor> Pixels;
+	TArray<FLinearColor> AlphaValues;
+
+	/* Translucency (if required) */
+	if (bAlpha)
+	{
+		SceneCaptureComponent->ShowFlags.Translucency = true;
+		SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneColorHDR;
+		RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_FloatRGBA, false);
+		SceneCaptureComponent->CaptureScene();
+		RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
+		RenderTargetResource->ReadLinearColorPixels(AlphaValues);
+	}
+
+	SceneCaptureComponent->ShowFlags.Translucency = false;
+	SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+
 	/* BaseColor */
+	RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_R8G8B8A8, false);
 	SceneCaptureComponent->PostProcessSettings.AddBlendable(ExtractBaseColor, 1);
 	SceneCaptureComponent->CaptureScene();
 
-	FRenderTarget* RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
-	TArray<FColor> Pixels;
+	RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
 	RenderTargetResource->ReadPixels(Pixels);
+
+	if (bAlpha)
+	{
+		int32 AlphaPixelsNum = 0;
+		for (int32 PixelIndex = 0; PixelIndex < Pixels.Num(); PixelIndex++)
+		{
+			const float Alpha = AlphaValues[PixelIndex].A;
+			Pixels[PixelIndex].A = Alpha * 255.0f;
+			if (CutOff > 0)
+			{
+				if (Alpha <= CutOff)
+				{
+					Pixels[PixelIndex].A = 0;
+				}
+			}
+		}
+	}
 
 	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
 	ImageWrapper->SetRaw(Pixels.GetData(), Pixels.Num() * sizeof(FColor), TextureSize, TextureSize, ERGBFormat::BGRA, 8);
 	BaseColor = ImageWrapper->GetCompressed();
-
 
 	/* NormalMap */
 	RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_R8G8B8A8, true);
