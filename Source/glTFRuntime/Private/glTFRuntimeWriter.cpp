@@ -561,7 +561,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		TArray<uint8> PNGMetallicRoughness;
 
 		FString AlphaMode = "OPAQUE";
-		
+
 		if (SkeletalMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
 		{
 			AlphaMode = "BLEND";
@@ -586,8 +586,10 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 			JsonMaterial->SetStringField("name", SkeletalMaterial->GetPathName());
 
 			TSharedRef<FJsonObject> JsonPBRMaterial = MakeShared<FJsonObject>();
+
 			TSharedRef<FJsonObject> JsonBaseColorTexture = MakeShared<FJsonObject>();
 			JsonBaseColorTexture->SetNumberField("index", TextureIndex++);
+
 			JsonPBRMaterial->SetObjectField("baseColorTexture", JsonBaseColorTexture);
 
 			if (AlphaMode != "BLEND")
@@ -615,7 +617,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 				TSharedRef<FJsonObject> JsonMetallicRoughnessTexture = MakeShared<FJsonObject>();
 				JsonMetallicRoughnessTexture->SetNumberField("index", TextureIndex++);
 				JsonPBRMaterial->SetObjectField("metallicRoughnessTexture", JsonMetallicRoughnessTexture);
-			}			
+			}
 
 			JsonMaterial->SetObjectField("pbrMetallicRoughness", JsonPBRMaterial);
 

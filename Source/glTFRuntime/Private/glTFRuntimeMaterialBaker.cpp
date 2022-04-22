@@ -128,6 +128,13 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 			Pixels[PixelIndex].A = Alpha * 255.0f;
 			if (Material->GetBlendMode() == EBlendMode::BLEND_Translucent)
 			{
+				if (Material->GetShadingModels().IsUnlit())
+				{
+					if (Pixels[PixelIndex].R == 0 && Pixels[PixelIndex].G == 0 && Pixels[PixelIndex].B == 0)
+					{
+						Pixels[PixelIndex].A = 0;
+					}
+				}
 				if (Alpha <= Material->GetOpacityMaskClipValue())
 				{
 					Pixels[PixelIndex].A = 0;
