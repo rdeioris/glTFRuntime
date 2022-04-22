@@ -72,7 +72,7 @@ void AglTFRuntimeMaterialBaker::Tick(float DeltaTime)
 
 }
 
-bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness, const bool bAlpha, const float CutOff)
+bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness)
 {
 	const uint32 TextureSize = 2048;
 
@@ -94,8 +94,8 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 	TArray<FColor> Pixels;
 	TArray<FLinearColor> AlphaValues;
 
-	/* Translucency (if required) */
-	if (bAlpha)
+	/* Alpha (if required) */
+	if (Material->GetBlendMode() == EBlendMode::BLEND_Translucent || Material->GetBlendMode() == EBlendMode::BLEND_Masked)
 	{
 		SceneCaptureComponent->ShowFlags.Translucency = true;
 		SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneColorHDR;
@@ -110,7 +110,7 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 
 	/* BaseColor */
 	RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_R8G8B8A8, false);
-	if (!bAlpha || CutOff == 0)
+	if (Material->GetBlendMode() != EBlendMode::BLEND_Translucent)
 	{
 		SceneCaptureComponent->PostProcessSettings.AddBlendable(ExtractBaseColor, 1);
 	}
@@ -119,16 +119,16 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 	RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
 	RenderTargetResource->ReadPixels(Pixels);
 
-	if (bAlpha)
+	if (Material->GetBlendMode() == EBlendMode::BLEND_Translucent || Material->GetBlendMode() == EBlendMode::BLEND_Masked)
 	{
 		int32 AlphaPixelsNum = 0;
 		for (int32 PixelIndex = 0; PixelIndex < Pixels.Num(); PixelIndex++)
 		{
 			const float Alpha = 1 - AlphaValues[PixelIndex].A;
 			Pixels[PixelIndex].A = Alpha * 255.0f;
-			if (CutOff > 0)
+			if (Material->GetBlendMode() == EBlendMode::BLEND_Translucent)
 			{
-				if (Alpha <= CutOff)
+				if (Alpha <= Material->GetOpacityMaskClipValue())
 				{
 					Pixels[PixelIndex].A = 0;
 				}
@@ -167,7 +167,6 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 	ImageWrapper->SetRaw(Pixels.GetData(), Pixels.Num() * sizeof(FColor), TextureSize, TextureSize, ERGBFormat::BGRA, 8);
 
 	MetallicRoughness = ImageWrapper->GetCompressed();
-
 
 	return true;
 }

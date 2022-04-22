@@ -30,6 +30,6 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	bool BakeMaterialToPng(UMaterialInterface* Material, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness, const bool bAlpha, const float CutOff);
+	bool BakeMaterialToPng(UMaterialInterface* Material, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness);
 
 };

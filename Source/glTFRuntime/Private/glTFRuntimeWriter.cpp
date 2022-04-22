@@ -561,22 +561,17 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		TArray<uint8> PNGMetallicRoughness;
 
 		FString AlphaMode = "OPAQUE";
-		bool bAlpha = false;
-		float CutOff = 0;
-
+		
 		if (SkeletalMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
 		{
 			AlphaMode = "BLEND";
-			bAlpha = true;
-			CutOff = SkeletalMaterial->GetOpacityMaskClipValue();
 		}
 		else if (SkeletalMaterial->GetBlendMode() == EBlendMode::BLEND_Masked)
 		{
 			AlphaMode = "MASK";
-			bAlpha = true;
 		}
 
-		if (MaterialBaker->BakeMaterialToPng(SkeletalMaterial, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness, bAlpha, CutOff))
+		if (MaterialBaker->BakeMaterialToPng(SkeletalMaterial, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness))
 		{
 
 			int64 ImageBufferViewBaseColorOffset = BinaryData.Num();
