@@ -135,6 +135,17 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 			FTransform NodeTransform;
 			NodeTransform.SetFromMatrix(Matrix);
+
+			if (Config.OverrideBonesByIndex.Contains(BoneIndex))
+			{
+				NodeTransform = Config.OverrideBonesByIndex[BoneIndex];
+			}
+
+			if (Config.OverrideBonesByName.Contains(SkeletonRef.GetBoneName(BoneIndex)))
+			{
+				NodeTransform = Config.OverrideBonesByName[SkeletonRef.GetBoneName(BoneIndex)];
+			}
+
 			FVector NodeTranslation = NodeTransform.GetLocation();
 			FQuat NodeRotation = NodeTransform.GetRotation();
 			FVector NodeScale = NodeTransform.GetScale3D();
@@ -522,9 +533,21 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 		TSharedRef<FJsonObject> JsonPrimitiveAttributes = MakeShared<FJsonObject>();
 
 		JsonPrimitiveAttributes->SetNumberField("POSITION", PositionAccessorIndex);
-		JsonPrimitiveAttributes->SetNumberField("NORMAL", NormalAccessorIndex);
-		JsonPrimitiveAttributes->SetNumberField("TANGENT", TangentAccessorIndex);
-		JsonPrimitiveAttributes->SetNumberField("TEXCOORD_0", TexCoordAccessorIndex);
+
+		if (Config.bExportNormals)
+		{
+			JsonPrimitiveAttributes->SetNumberField("NORMAL", NormalAccessorIndex);
+		}
+
+		if (Config.bExportTangents)
+		{
+			JsonPrimitiveAttributes->SetNumberField("TANGENT", TangentAccessorIndex);
+		}
+
+		if (Config.bExportUVs)
+		{
+			JsonPrimitiveAttributes->SetNumberField("TEXCOORD_0", TexCoordAccessorIndex);
+		}
 
 		if (Config.bExportSkin)
 		{
@@ -657,6 +680,32 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 
 	if (Config.bExportSkin)
 	{
+		const FReferenceSkeleton& AnimSkeletonRef = SkeletalMesh->GetSkeleton()->GetReferenceSkeleton();
+
+		TArray<FTransform> AnimBoneTransforms = AnimSkeletonRef.GetRefBonePose();
+		TMap<FName, FTransform> AnimBoneRetargetingTransforms;
+
+		auto GetBoneTransform = [](const FReferenceSkeleton& SkeletonRef, const int32 BoneIndex) -> FTransform
+		{
+			TArray<FTransform> Transforms = SkeletonRef.GetRefBonePose();
+			int32 CurrentBoneIndex = BoneIndex;
+			FTransform Transform = FTransform::Identity;
+			while (CurrentBoneIndex != INDEX_NONE)
+			{
+				Transform *= Transforms[CurrentBoneIndex];
+				CurrentBoneIndex = SkeletonRef.GetParentIndex(CurrentBoneIndex);
+			}
+			return Transform;
+		};
+
+		for (int32 SkelIndex = 0; SkelIndex < AnimBoneTransforms.Num(); SkelIndex++)
+		{
+			FName BoneName = AnimSkeletonRef.GetBoneName(SkelIndex);
+			int32 RefIndex = SkeletonRef.FindBoneIndex(BoneName);
+			FTransform SkeletonAnimTransform = AnimBoneTransforms[SkelIndex];
+			FTransform SkeletalMeshAnimTransform = BoneTransforms[RefIndex];
+			AnimBoneRetargetingTransforms.Add(BoneName, SkeletalMeshAnimTransform * SkeletonAnimTransform.Inverse());
+		}
 
 		for (const UAnimSequence* AnimSequence : Animations)
 		{
@@ -666,6 +715,7 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 			}
 			TArray<float> Timeline;
 			const float FrameDeltaTime = AnimSequence->SequenceLength / AnimSequence->GetRawNumberOfFrames();
+			UE_LOG(LogTemp, Warning, TEXT("Number Of Frames: %d"), AnimSequence->GetRawNumberOfFrames());
 			for (int32 FrameIndex = 0; FrameIndex < AnimSequence->GetRawNumberOfFrames(); FrameIndex++)
 			{
 				Timeline.Add(FrameIndex * FrameDeltaTime);
@@ -687,44 +737,147 @@ bool FglTFRuntimeWriter::AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, con
 			TArray<FName> Tracks = AnimSequence->GetAnimationTrackNames();
 			for (int32 TrackIndex = 0; TrackIndex < Tracks.Num(); TrackIndex++)
 			{
+				// only bones based animations supported for now
+				int32 AnimSkelIndex = AnimSkeletonRef.FindBoneIndex(Tracks[TrackIndex]);
+				if (AnimSkelIndex == INDEX_NONE)
+				{
+					continue;
+				}
+
+				int32 BoneIndex = SkeletonRef.FindBoneIndex(Tracks[TrackIndex]);
+				if (BoneIndex == INDEX_NONE)
+				{
+					continue;
+				}
+
 				const FRawAnimSequenceTrack& Track = AnimSequence->GetRawAnimationTrack(TrackIndex);
-				TSharedRef<FJsonObject> JsonAnimationSampler = MakeShared<FJsonObject>();
 
-				JsonAnimationSampler->SetNumberField("input", InputAccessorIndex);
-				JsonAnimationSampler->SetStringField("interpolation", "LINEAR");
+				/* Rotation curves */
+				/* {
+					TSharedRef<FJsonObject> JsonAnimationRotationSampler = MakeShared<FJsonObject>();
 
-				TArray<FQuat> RotKeys;
-				RotKeys.AddUninitialized(Timeline.Num());
-				for (FQuat& RotKey : RotKeys)
+					JsonAnimationRotationSampler->SetNumberField("input", InputAccessorIndex);
+					JsonAnimationRotationSampler->SetStringField("interpolation", "LINEAR");
+
+					TArray<FQuat> RotKeys;
+					RotKeys.AddUninitialized(Timeline.Num());
+					for (FQuat& RotKey : RotKeys)
+					{
+						FMatrix RotationMatrix = SceneBasisMatrix.Inverse() * FQuatRotationMatrix(BoneTransforms[SkeletonRef.FindBoneIndex(Tracks[TrackIndex])].GetRotation()) * SceneBasisMatrix;
+						RotKey = RotationMatrix.ToQuat();
+					}
+					int32 RotIndex = 0;
+					UE_LOG(LogTemp, Warning, TEXT("Number Of Rot Frames: %d"), Track.RotKeys.Num());
+					for (FQuat Quat : Track.RotKeys)
+					{
+						FMatrix RotationMatrix = SceneBasisMatrix.Inverse() * FQuatRotationMatrix(Quat) * SceneBasisMatrix;
+						RotKeys[RotIndex++] = RotationMatrix.ToQuat();
+					}
+
+					int64 AnimRotationOffset = BinaryData.Num();
+					BinaryData.Append(reinterpret_cast<uint8*>(RotKeys.GetData()), RotKeys.Num() * sizeof(FQuat));
+					FglTFRuntimeAccessor OutputAccessor("VEC4", 5126, RotKeys.Num(), AnimRotationOffset, RotKeys.Num() * sizeof(FQuat), false);
+					int32 OutputAccessorIndex = Accessors.Add(OutputAccessor);
+
+					JsonAnimationRotationSampler->SetNumberField("output", OutputAccessorIndex);
+
+					int32 SamplerIndex = JsonAnimationSamplers.Add(MakeShared<FJsonValueObject>(JsonAnimationRotationSampler));
+
+					TSharedRef<FJsonObject> JsonAnimationRotationChannel = MakeShared<FJsonObject>();
+					JsonAnimationRotationChannel->SetNumberField("sampler", SamplerIndex);
+
+					TSharedRef<FJsonObject> JsonAnimationRotationChannelTarget = MakeShared<FJsonObject>();
+					JsonAnimationRotationChannelTarget->SetNumberField("node", SkeletonRef.FindBoneIndex(Tracks[TrackIndex]));
+					JsonAnimationRotationChannelTarget->SetStringField("path", "rotation");
+
+					JsonAnimationRotationChannel->SetObjectField("target", JsonAnimationRotationChannelTarget);
+
+					JsonAnimationChannels.Add(MakeShared<FJsonValueObject>(JsonAnimationRotationChannel));
+				}*/
+
+				/* Translation curves */
 				{
-					RotKey = FQuat::Identity;
+					TSharedRef<FJsonObject> JsonAnimationTranslationSampler = MakeShared<FJsonObject>();
+
+					JsonAnimationTranslationSampler->SetNumberField("input", InputAccessorIndex);
+					JsonAnimationTranslationSampler->SetStringField("interpolation", "LINEAR");
+
+					TArray<FVector> PosKeys;
+					PosKeys.AddUninitialized(Timeline.Num());
+					for (FVector& PosKey : PosKeys)
+					{
+						FMatrix TranslationMatrix = SceneBasisMatrix.Inverse() * FTranslationMatrix(BoneTransforms[BoneIndex].GetLocation()) * SceneBasisMatrix;
+						PosKey = FTransform(TranslationMatrix).GetLocation() * SceneScale;
+					}
+					int32 PosIndex = 0;
+					for (FVector Pos : Track.PosKeys)
+					{
+						FMatrix TranslationMatrix = SceneBasisMatrix.Inverse() * FTranslationMatrix(Pos - AnimBoneRetargetingTransforms[Tracks[TrackIndex]].GetLocation()) * SceneBasisMatrix;
+						PosKeys[PosIndex++] = FTransform(TranslationMatrix).GetLocation() * SceneScale;
+					}
+
+					int64 AnimPositionOffset = BinaryData.Num();
+					BinaryData.Append(reinterpret_cast<uint8*>(PosKeys.GetData()), PosKeys.Num() * sizeof(FVector));
+					FglTFRuntimeAccessor OutputAccessor("VEC3", 5126, PosKeys.Num(), AnimPositionOffset, PosKeys.Num() * sizeof(FVector), false);
+					int32 OutputAccessorIndex = Accessors.Add(OutputAccessor);
+
+					JsonAnimationTranslationSampler->SetNumberField("output", OutputAccessorIndex);
+
+					int32 SamplerIndex = JsonAnimationSamplers.Add(MakeShared<FJsonValueObject>(JsonAnimationTranslationSampler));
+
+					TSharedRef<FJsonObject> JsonAnimationTranslationChannel = MakeShared<FJsonObject>();
+					JsonAnimationTranslationChannel->SetNumberField("sampler", SamplerIndex);
+
+					TSharedRef<FJsonObject> JsonAnimationTranslationChannelTarget = MakeShared<FJsonObject>();
+					JsonAnimationTranslationChannelTarget->SetNumberField("node", SkeletonRef.FindBoneIndex(Tracks[TrackIndex]));
+					JsonAnimationTranslationChannelTarget->SetStringField("path", "translation");
+
+					JsonAnimationTranslationChannel->SetObjectField("target", JsonAnimationTranslationChannelTarget);
+
+					JsonAnimationChannels.Add(MakeShared<FJsonValueObject>(JsonAnimationTranslationChannel));
 				}
-				int32 RotIndex = 0;
-				for (FQuat Quat : Track.RotKeys)
-				{
-					FMatrix RotationMatrix = SceneBasisMatrix.Inverse() * FQuatRotationMatrix(Quat) * SceneBasisMatrix;
-					RotKeys[RotIndex++] = RotationMatrix.ToQuat();
-				}
 
-				int64 RotationOffset = BinaryData.Num();
-				BinaryData.Append(reinterpret_cast<uint8*>(RotKeys.GetData()), RotKeys.Num() * sizeof(FQuat));
-				FglTFRuntimeAccessor OutputAccessor("VEC4", 5126, RotKeys.Num(), RotationOffset, RotKeys.Num() * sizeof(FQuat), false);
-				int32 OutputAccessorIndex = Accessors.Add(OutputAccessor);
+				/* Scale curves */
+				/* {
+					TSharedRef<FJsonObject> JsonAnimationScaleSampler = MakeShared<FJsonObject>();
 
-				JsonAnimationSampler->SetNumberField("output", OutputAccessorIndex);
+					JsonAnimationScaleSampler->SetNumberField("input", InputAccessorIndex);
+					JsonAnimationScaleSampler->SetStringField("interpolation", "LINEAR");
 
-				int32 SamplerIndex = JsonAnimationSamplers.Add(MakeShared<FJsonValueObject>(JsonAnimationSampler));
+					TArray<FVector> ScaleKeys;
+					ScaleKeys.AddUninitialized(Timeline.Num());
+					for (FVector& ScaleKey : ScaleKeys)
+					{
+						FMatrix ScaleMatrix = SceneBasisMatrix.Inverse() * FScaleMatrix(AnimBoneTransforms[AnimSkeletonRef.FindBoneIndex(Tracks[TrackIndex])].GetScale3D()) * SceneBasisMatrix;
+						ScaleKey = ScaleMatrix.ExtractScaling();
+					}
+					int32 ScaleIndex = 0;
+					for (FVector Scale : Track.ScaleKeys)
+					{
+						FMatrix ScaleMatrix = SceneBasisMatrix.Inverse() * FScaleMatrix(Scale) * SceneBasisMatrix;
+						ScaleKeys[ScaleIndex++] = FTransform(ScaleMatrix).GetScale3D();
+					}
 
-				TSharedRef<FJsonObject> JsonAnimationChannel = MakeShared<FJsonObject>();
-				JsonAnimationChannel->SetNumberField("sampler", SamplerIndex);
+					int64 AnimScaleOffset = BinaryData.Num();
+					BinaryData.Append(reinterpret_cast<uint8*>(ScaleKeys.GetData()), ScaleKeys.Num() * sizeof(FVector));
+					FglTFRuntimeAccessor OutputAccessor("VEC3", 5126, ScaleKeys.Num(), AnimScaleOffset, ScaleKeys.Num() * sizeof(FVector), false);
+					int32 OutputAccessorIndex = Accessors.Add(OutputAccessor);
 
-				TSharedRef<FJsonObject> JsonAnimationChannelTarget = MakeShared<FJsonObject>();
-				JsonAnimationChannelTarget->SetNumberField("node", SkeletonRef.FindBoneIndex(Tracks[TrackIndex]));
-				JsonAnimationChannelTarget->SetStringField("path", "rotation");
+					JsonAnimationScaleSampler->SetNumberField("output", OutputAccessorIndex);
 
-				JsonAnimationChannel->SetObjectField("target", JsonAnimationChannelTarget);
+					int32 SamplerIndex = JsonAnimationSamplers.Add(MakeShared<FJsonValueObject>(JsonAnimationScaleSampler));
 
-				JsonAnimationChannels.Add(MakeShared<FJsonValueObject>(JsonAnimationChannel));
+					TSharedRef<FJsonObject> JsonAnimationScaleChannel = MakeShared<FJsonObject>();
+					JsonAnimationScaleChannel->SetNumberField("sampler", SamplerIndex);
+
+					TSharedRef<FJsonObject> JsonAnimationScaleChannelTarget = MakeShared<FJsonObject>();
+					JsonAnimationScaleChannelTarget->SetNumberField("node", SkeletonRef.FindBoneIndex(Tracks[TrackIndex]));
+					JsonAnimationScaleChannelTarget->SetStringField("path", "scale");
+
+					JsonAnimationScaleChannel->SetObjectField("target", JsonAnimationScaleChannelTarget);
+
+					JsonAnimationChannels.Add(MakeShared<FJsonValueObject>(JsonAnimationScaleChannel));
+				}*/
 			}
 
 			for (FSmartName SmartName : AnimSequence->GetCompressedCurveNames())
@@ -812,7 +965,7 @@ bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
 	}
 
 	TSharedRef<FJsonObject> JsonNode = MakeShared<FJsonObject>();
-	JsonNode->SetStringField("name", "Test");
+	JsonNode->SetStringField("name", "Mesh");
 	JsonNode->SetNumberField("mesh", 0);
 	if (Config.bExportSkin)
 	{
@@ -821,13 +974,61 @@ bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
 
 	int32 JsonNodeIndex = JsonNodes.Add(MakeShared<FJsonValueObject>(JsonNode));
 
+	int32 JsonParentNodeIndex = INDEX_NONE;
+
+	if (Config.bAddParentNode)
+	{
+		TSharedRef<FJsonObject> JsonParentNode = MakeShared<FJsonObject>();
+
+		TArray<TSharedPtr<FJsonValue>> JsonParentNodeTranslation;
+		TArray<TSharedPtr<FJsonValue>> JsonParentNodeRotation;
+		TArray<TSharedPtr<FJsonValue>> JsonParentNodeScale;
+
+		FMatrix Basis = FBasisVectorMatrix(FVector(0, 1, 0), FVector(0, 0, 1), FVector(-1, 0, 0), FVector::ZeroVector);
+		FMatrix Matrix = Basis.Inverse() * Config.ParentNodeTransform.ToMatrixWithScale() * Basis;
+		Matrix.ScaleTranslation(FVector::OneVector / 100);
+
+		FTransform ParentNodeTransform = FTransform(Matrix);
+
+		FVector ParentNodeTranslation = ParentNodeTransform.GetLocation();
+		FQuat ParentNodeRotation = ParentNodeTransform.GetRotation();
+		FVector ParentNodeScale = ParentNodeTransform.GetScale3D();
+
+		JsonParentNodeTranslation.Add(MakeShared<FJsonValueNumber>(ParentNodeTranslation.X));
+		JsonParentNodeTranslation.Add(MakeShared<FJsonValueNumber>(ParentNodeTranslation.Y));
+		JsonParentNodeTranslation.Add(MakeShared<FJsonValueNumber>(ParentNodeTranslation.Z));
+
+		JsonParentNodeRotation.Add(MakeShared<FJsonValueNumber>(ParentNodeRotation.X));
+		JsonParentNodeRotation.Add(MakeShared<FJsonValueNumber>(ParentNodeRotation.Y));
+		JsonParentNodeRotation.Add(MakeShared<FJsonValueNumber>(ParentNodeRotation.Z));
+		JsonParentNodeRotation.Add(MakeShared<FJsonValueNumber>(ParentNodeRotation.W));
+
+		JsonParentNodeScale.Add(MakeShared<FJsonValueNumber>(ParentNodeScale.X));
+		JsonParentNodeScale.Add(MakeShared<FJsonValueNumber>(ParentNodeScale.Y));
+		JsonParentNodeScale.Add(MakeShared<FJsonValueNumber>(ParentNodeScale.Z));
+
+		JsonParentNode->SetStringField("name", "Parent");
+
+		JsonParentNode->SetArrayField("translation", JsonParentNodeTranslation);
+		JsonParentNode->SetArrayField("rotation", JsonParentNodeRotation);
+		JsonParentNode->SetArrayField("scale", JsonParentNodeScale);
+
+		TArray<TSharedPtr<FJsonValue>> JsonParentNodeChildren;
+		JsonParentNodeChildren.Add(MakeShared<FJsonValueNumber>(JsonNodeIndex));
+
+		JsonParentNode->SetArrayField("children", JsonParentNodeChildren);
+
+		JsonParentNodeIndex = JsonNodes.Add(MakeShared<FJsonValueObject>(JsonParentNode));
+	}
+
 	TSharedRef<FJsonObject> JsonScene = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> JsonSceneNodes;
 	if (Config.bExportSkin)
 	{
 		JsonSceneNodes.Add(MakeShared<FJsonValueNumber>(0));
 	}
-	JsonSceneNodes.Add(MakeShared<FJsonValueNumber>(JsonNodeIndex));
+
+	JsonSceneNodes.Add(MakeShared<FJsonValueNumber>(JsonParentNodeIndex != INDEX_NONE ? JsonParentNodeIndex : JsonNodeIndex));
 	JsonScene->SetArrayField("nodes", JsonSceneNodes);
 
 	JsonScenes.Add(MakeShared<FJsonValueObject>(JsonScene));

@@ -52,6 +52,27 @@ struct FglTFRuntimeWriterConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bBakePose;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<int32, FTransform> OverrideBonesByIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FName, FTransform> OverrideBonesByName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bExportNormals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bExportTangents;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bExportUVs;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAddParentNode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FTransform ParentNodeTransform;
+
 	FglTFRuntimeWriterConfig()
 	{
 		bExportSkin = true;
@@ -59,6 +80,10 @@ struct FglTFRuntimeWriterConfig
 		PivotDelta = FVector::ZeroVector;
 		bBakeMorphTargets = false;
 		bBakePose = false;
+		bExportNormals = true;
+		bExportTangents = true;
+		bExportUVs = true;
+		ParentNodeTransform = FTransform::Identity;
 	}
 };
 
