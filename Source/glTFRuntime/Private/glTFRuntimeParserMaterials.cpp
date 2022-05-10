@@ -277,6 +277,19 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	Texture->LODGroup = ImagesConfig.Group;
 	Texture->SRGB = ImagesConfig.bSRGB;
 
+	if (Sampler.MinFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MinFilter;
+	}
+
+	if (Sampler.MagFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MagFilter;
+	}
+
+	Texture->AddressX = Sampler.TileX;
+	Texture->AddressY = Sampler.TileY;
+
 	Texture->UpdateResource();
 
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
@@ -647,7 +660,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	}
 
 	int64 SamplerIndex;
-	if (!JsonTextureObject->TryGetNumberField("sampler", SamplerIndex))
+	if (JsonTextureObject->TryGetNumberField("sampler", SamplerIndex))
 	{
 		const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
 		// no samplers ?
