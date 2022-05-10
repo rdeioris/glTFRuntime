@@ -552,7 +552,7 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRunt
 		Mip.Width = Width;
 		Mip.Height = Height;
 		TArray<FglTFRuntimeMipMap> Mips = { Mip };
-		return Parser->BuildTexture(this, Mips, ImagesConfig);
+		return Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
 	}
 
 	return nullptr;

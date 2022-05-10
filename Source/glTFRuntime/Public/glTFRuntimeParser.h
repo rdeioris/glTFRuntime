@@ -333,6 +333,32 @@ struct FglTFRuntimeImagesConfig
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeTextureSampler
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureAddress> TileX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureAddress> TileY;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureFilter> MinFilter;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureFilter> MagFilter;
+
+	FglTFRuntimeTextureSampler()
+	{
+		TileX = TextureAddress::TA_Wrap;
+		TileY = TextureAddress::TA_Wrap;
+		MinFilter = TextureFilter::TF_Default;
+		MagFilter = TextureFilter::TF_Default;;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimeMaterialsConfig
 {
 	GENERATED_BODY()
@@ -928,6 +954,7 @@ struct FglTFRuntimeMaterial
 	TArray<FglTFRuntimeMipMap> BaseColorTextureMips;
 	UTexture2D* BaseColorTextureCache;
 	FglTFRuntimeTextureTransform BaseColorTransform;
+	FglTFRuntimeTextureSampler BaseColorSampler;
 
 	bool bHasMetallicFactor;
 	double MetallicFactor;
@@ -937,14 +964,17 @@ struct FglTFRuntimeMaterial
 	TArray<FglTFRuntimeMipMap> MetallicRoughnessTextureMips;
 	UTexture2D* MetallicRoughnessTextureCache;
 	FglTFRuntimeTextureTransform MetallicRoughnessTransform;
+	FglTFRuntimeTextureSampler MetallicRoughnessSampler;
 
 	TArray<FglTFRuntimeMipMap> NormalTextureMips;
 	UTexture2D* NormalTextureCache;
 	FglTFRuntimeTextureTransform NormalTransform;
+	FglTFRuntimeTextureSampler NormalSampler;
 
 	TArray<FglTFRuntimeMipMap> OcclusionTextureMips;
 	UTexture2D* OcclusionTextureCache;
 	FglTFRuntimeTextureTransform OcclusionTransform;
+	FglTFRuntimeTextureSampler OcclusionSampler;
 
 	bool bHasEmissiveFactor;
 	FLinearColor EmissiveFactor;
@@ -952,6 +982,7 @@ struct FglTFRuntimeMaterial
 	TArray<FglTFRuntimeMipMap> EmissiveTextureMips;
 	UTexture2D* EmissiveTextureCache;
 	FglTFRuntimeTextureTransform EmissiveTransform;
+	FglTFRuntimeTextureSampler EmissiveSampler;
 
 	bool bHasSpecularFactor;
 	FLinearColor SpecularFactor;
@@ -962,6 +993,7 @@ struct FglTFRuntimeMaterial
 	TArray<FglTFRuntimeMipMap> SpecularGlossinessTextureMips;
 	UTexture2D* SpecularGlossinessTextureCache;
 	FglTFRuntimeTextureTransform SpecularGlossinessTransform;
+	FglTFRuntimeTextureSampler SpecularGlossinessSampler;
 
 	float BaseSpecularFactor;
 
@@ -971,6 +1003,7 @@ struct FglTFRuntimeMaterial
 	TArray<FglTFRuntimeMipMap> DiffuseTextureMips;
 	UTexture2D* DiffuseTextureCache;
 	FglTFRuntimeTextureTransform DiffuseTransform;
+	FglTFRuntimeTextureSampler DiffuseSampler;
 
 	bool bKHR_materials_pbrSpecularGlossiness;
 	double NormalTextureScale;
@@ -981,6 +1014,7 @@ struct FglTFRuntimeMaterial
 	TArray<FglTFRuntimeMipMap> TransmissionTextureMips;
 	UTexture2D* TransmissionTextureCache;
 	FglTFRuntimeTextureTransform TransmissionTransform;
+	FglTFRuntimeTextureSampler TransmissionSampler;
 
 	bool bMasked;
 
@@ -1100,7 +1134,7 @@ public:
 	UStaticMesh* LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UMaterialInterface* LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName);
-	UTexture2D* LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UTexture2D* LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig, FglTFRuntimeTextureSampler& Sampler);
 
 	bool LoadNodes();
 	bool LoadNode(int32 NodeIndex, FglTFRuntimeNode& Node);
@@ -1194,7 +1228,7 @@ public:
 	TArray<FString> ExtensionsRequired;
 
 	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig);
-	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig);
+	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 
 protected:
 	TSharedRef<FJsonObject> Root;
