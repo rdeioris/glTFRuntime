@@ -152,6 +152,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 		if ((*JsonPBRObject)->TryGetNumberField("roughnessFactor", RuntimeMaterial.RoughnessFactor))
 		{
 			RuntimeMaterial.bHasRoughnessFactor = true;
+			RuntimeMaterial.BaseSpecularFactor = .18f;
 		}
 
 		GetMaterialTexture(JsonPBRObject->ToSharedRef(), "metallicRoughnessTexture", false, RuntimeMaterial.MetallicRoughnessTextureCache, RuntimeMaterial.MetallicRoughnessTextureMips, RuntimeMaterial.MetallicRoughnessTransform, RuntimeMaterial.MetallicRoughnessSampler);
