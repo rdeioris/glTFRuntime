@@ -354,7 +354,7 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 	{
 		MetallicRoughnessMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, MaskedMaterial);
 	}
-	
+
 	UMaterialInterface* TwoSidedMaskedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeTwoSidedMasked_Inst"));
 	if (TwoSidedMaskedMaterial)
 	{
@@ -463,7 +463,7 @@ int32 FglTFRuntimeParser::GetNumMeshes() const
 {
 	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
 	if (Root->TryGetArrayField("meshes", JsonArray))
-	{	
+	{
 		return JsonArray->Num();
 	}
 	return 0;
@@ -1598,7 +1598,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	int64 inverseBindMatricesIndex;
 	if (JsonSkinObject->TryGetNumberField("inverseBindMatrices", inverseBindMatricesIndex))
 	{
-		TArray64<uint8> InverseBindMatricesBytes;
+		FglTFRuntimeBlob InverseBindMatricesBytes;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		bool bNormalized = false;
 		if (!GetAccessor(inverseBindMatricesIndex, ComponentType, Stride, Elements, ElementSize, Count, bNormalized, InverseBindMatricesBytes))
@@ -1615,7 +1615,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 			FMatrix Matrix;
 			int64 MatrixIndex = i * Stride;
 
-			float* MatrixCell = (float*)&InverseBindMatricesBytes[MatrixIndex];
+			float* MatrixCell = (float*)&InverseBindMatricesBytes.Data[MatrixIndex];
 
 			for (int32 j = 0; j < 16; j++)
 			{
@@ -2026,7 +2026,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	int64 IndicesAccessorIndex;
 	if (JsonPrimitiveObject->TryGetNumberField("indices", IndicesAccessorIndex))
 	{
-		TArray64<uint8> IndicesBytes;
+		FglTFRuntimeBlob IndicesBytes;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		bool bNormalized = false;
 		if (!GetAccessor(IndicesAccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bNormalized, IndicesBytes))
@@ -2040,9 +2040,9 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			return false;
 		}
 
-		if (IndicesBytes.Num() < (Count * Stride))
+		if (IndicesBytes.Num < (Count * Stride))
 		{
-			AddError("LoadPrimitive()", FString::Printf(TEXT("Invalid size for accessor indices: %lld"), IndicesBytes.Num()));
+			AddError("LoadPrimitive()", FString::Printf(TEXT("Invalid size for accessor indices: %lld"), IndicesBytes.Num));
 			return false;
 		}
 
@@ -2053,16 +2053,16 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			uint32 VertexIndex;
 			if (ComponentType == 5121)
 			{
-				VertexIndex = IndicesBytes[IndexIndex];
+				VertexIndex = IndicesBytes.Data[IndexIndex];
 			}
 			else if (ComponentType == 5123)
 			{
-				uint16* IndexPtr = (uint16*)&(IndicesBytes[IndexIndex]);
+				uint16* IndexPtr = (uint16*)&(IndicesBytes.Data[IndexIndex]);
 				VertexIndex = *IndexPtr;
 			}
 			else if (ComponentType == 5125)
 			{
-				uint32* IndexPtr = (uint32*)&(IndicesBytes[IndexIndex]);
+				uint32* IndexPtr = (uint32*)&(IndicesBytes.Data[IndexIndex]);
 				VertexIndex = *IndexPtr;
 			}
 			else
@@ -2097,9 +2097,9 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 				return false;
 			}
 
-			TArray64<uint8> DracoData;
+			FglTFRuntimeBlob DracoBlob;
 			int64 Stride;
-			if (!GetBufferView(BufferView, DracoData, Stride))
+			if (!GetBufferView(BufferView, DracoBlob, Stride))
 			{
 				AddError("LoadPrimitive()", "KHR_draco_mesh_compression has an invalid bufferView");
 				return false;
@@ -2129,21 +2129,25 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 }
 
 
-bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
+bool FglTFRuntimeParser::GetBuffer(int32 Index, FglTFRuntimeBlob& Blob)
 {
 	if (Index < 0)
+	{
 		return false;
+	}
 
 	if (Index == 0 && BinaryBuffer.Num() > 0)
 	{
-		Bytes = BinaryBuffer;
+		Blob.Data = BinaryBuffer.GetData();
+		Blob.Num = BinaryBuffer.Num();
 		return true;
 	}
 
 	// first check cache
 	if (BuffersCache.Contains(Index))
 	{
-		Bytes = BuffersCache[Index];
+		Blob.Data = BuffersCache[Index].GetData();
+		Blob.Num = BuffersCache[Index].Num();
 		return true;
 	}
 
@@ -2162,11 +2166,15 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 
 	TSharedPtr<FJsonObject> JsonBufferObject = (*JsonBuffers)[Index]->AsObject();
 	if (!JsonBufferObject)
+	{
 		return false;
+	}
 
 	int64 ByteLength;
 	if (!JsonBufferObject->TryGetNumberField("byteLength", ByteLength))
+	{
 		return false;
+	}
 
 	FString Uri;
 	if (!JsonBufferObject->TryGetStringField("uri", Uri))
@@ -2177,9 +2185,12 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 	// check it is a valid base64 data uri
 	if (Uri.StartsWith("data:"))
 	{
-		if (ParseBase64Uri(Uri, Bytes))
+		TArray64<uint8> Base64Data;
+		if (ParseBase64Uri(Uri, Base64Data))
 		{
-			BuffersCache.Add(Index, Bytes);
+			BuffersCache.Add(Index, Base64Data);
+			Blob.Data = BuffersCache[Index].GetData();
+			Blob.Num = BuffersCache[Index].Num();
 			return true;
 		}
 		return false;
@@ -2187,9 +2198,12 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 
 	if (ZipFile)
 	{
-		if (ZipFile->GetFileContent(Uri, Bytes))
+		TArray64<uint8> ZipData;
+		if (ZipFile->GetFileContent(Uri, ZipData))
 		{
-			BuffersCache.Add(Index, Bytes);
+			BuffersCache.Add(Index, ZipData);
+			Blob.Data = BuffersCache[Index].GetData();
+			Blob.Num = BuffersCache[Index].Num();
 			return true;
 		}
 	}
@@ -2197,9 +2211,12 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 	// fallback
 	if (!BaseDirectory.IsEmpty())
 	{
-		if (FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(BaseDirectory, Uri)))
+		TArray64<uint8> FileData;
+		if (FFileHelper::LoadFileToArray(FileData, *FPaths::Combine(BaseDirectory, Uri)))
 		{
-			BuffersCache.Add(Index, Bytes);
+			BuffersCache.Add(Index, FileData);
+			Blob.Data = BuffersCache[Index].GetData();
+			Blob.Num = BuffersCache[Index].Num();
 			return true;
 		}
 	}
@@ -2229,7 +2246,7 @@ bool FglTFRuntimeParser::ParseBase64Uri(const FString& Uri, TArray64<uint8>& Byt
 	return bSuccess;
 }
 
-bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int64& Stride)
+bool FglTFRuntimeParser::GetBufferView(int32 Index, FglTFRuntimeBlob& Blob, int64& Stride)
 {
 	if (Index < 0)
 	{
@@ -2262,8 +2279,8 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int6
 		return false;
 	}
 
-	TArray64<uint8> WholeData;
-	if (!GetBuffer(BufferIndex, WholeData))
+	FglTFRuntimeBlob BufferBlob;
+	if (!GetBuffer(BufferIndex, BufferBlob))
 	{
 		return false;
 	}
@@ -2285,16 +2302,17 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int6
 		Stride = 0;
 	}
 
-	if (ByteOffset + ByteLength > WholeData.Num())
+	if (ByteOffset + ByteLength > BufferBlob.Num)
 	{
 		return false;
 	}
 
-	Bytes.Append(&WholeData[ByteOffset], ByteLength);
+	Blob.Data = BufferBlob.Data + ByteOffset;
+	Blob.Num = ByteLength;
 	return true;
 }
 
-bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, TArray64<uint8>& Bytes)
+bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob)
 {
 
 	TSharedPtr<FJsonObject> JsonAccessorObject = GetJsonObjectFromRootIndex("accessors", Index);
@@ -2357,11 +2375,16 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 		return false;
 	}
 
-	uint64 FinalSize = ElementSize * Elements * Count;
+	int64 FinalSize = ElementSize * Elements * Count;
 
 	if (bInitWithZeros)
 	{
-		Bytes.AddZeroed(FinalSize);
+		if (ZeroBuffer.Num() < FinalSize)
+		{
+			ZeroBuffer.AddZeroed(FinalSize - ZeroBuffer.Num());
+		}
+		Blob.Data = ZeroBuffer.GetData();
+		Blob.Num = FinalSize;
 		if (!bHasSparse)
 		{
 			Stride = ElementSize * Elements;
@@ -2370,7 +2393,7 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 	}
 	else
 	{
-		if (!GetBufferView(BufferViewIndex, Bytes, Stride))
+		if (!GetBufferView(BufferViewIndex, Blob, Stride))
 		{
 			return false;
 		}
@@ -2382,23 +2405,22 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 
 		FinalSize = Stride * Count;
 
-		if (FinalSize > (uint64)Bytes.Num())
+		if (FinalSize > Blob.Num)
 		{
 			return false;
 		}
 
 		if (ByteOffset > 0)
 		{
-			TArray64<uint8> OffsetBytes;
+			Blob.Data += ByteOffset;
 			if (Stride > ElementSize * Elements)
 			{
-				OffsetBytes.Append(&Bytes[ByteOffset], FinalSize - (Stride - (ElementSize * Elements)));
+				Blob.Num = FinalSize - (Stride - (ElementSize * Elements));
 			}
 			else
 			{
-				OffsetBytes.Append(&Bytes[ByteOffset], FinalSize);
+				Blob.Num = FinalSize;
 			}
-			Bytes = OffsetBytes;
 		}
 
 		if (!bHasSparse)
@@ -2407,13 +2429,20 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 		}
 	}
 
+	if (SparseAccessorsCache.Contains(Index))
+	{
+		Blob.Data = SparseAccessorsCache[Index].GetData();
+		Blob.Num = SparseAccessorsCache[Index].Num();
+		return true;
+	}
+
 	int64 SparseCount;
 	if (!(*JsonSparseObject)->TryGetNumberField("count", SparseCount))
 	{
 		return false;
 	}
 
-	if (((uint64)SparseCount > FinalSize) || (SparseCount < 1))
+	if ((SparseCount > FinalSize) || (SparseCount < 1))
 	{
 		return false;
 	}
@@ -2442,7 +2471,7 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 		return false;
 	}
 
-	TArray64<uint8> SparseBytesIndices;
+	FglTFRuntimeBlob SparseBytesIndices;
 	int64 SparseBufferViewIndicesStride;
 	if (!GetBufferView(SparseBufferViewIndex, SparseBytesIndices, SparseBufferViewIndicesStride))
 	{
@@ -2455,14 +2484,13 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 	}
 
 
-	if (((SparseBytesIndices.Num() - SparseByteOffset) / SparseBufferViewIndicesStride) < SparseCount)
+	if (((SparseBytesIndices.Num - SparseByteOffset) / SparseBufferViewIndicesStride) < SparseCount)
 	{
 		return false;
 	}
 
 	TArray<uint32> SparseIndices;
-	uint8* SparseIndicesBase = &SparseBytesIndices[SparseByteOffset];
-
+	uint8* SparseIndicesBase = &SparseBytesIndices.Data[SparseByteOffset];
 
 	for (int32 SparseIndexOffset = 0; SparseIndexOffset < SparseCount; SparseIndexOffset++)
 	{
@@ -2508,7 +2536,7 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 		SparseValueByteOffset = 0;
 	}
 
-	TArray64<uint8> SparseBytesValues;
+	FglTFRuntimeBlob SparseBytesValues;
 	int64 SparseBufferViewValuesStride;
 	if (!GetBufferView(SparseValueBufferViewIndex, SparseBytesValues, SparseBufferViewValuesStride))
 	{
@@ -2522,18 +2550,24 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 
 	Stride = SparseBufferViewValuesStride;
 
+	SparseAccessorsCache.Add(Index);
+	TArray64<uint8>& SparseData = SparseAccessorsCache[Index];
+	SparseData.Append(Blob.Data, Blob.Num);
+
 	for (int32 IndexToChange = 0; IndexToChange < SparseCount; IndexToChange++)
 	{
 		uint32 SparseIndexToChange = SparseIndices[IndexToChange];
-		if (SparseIndexToChange >= (Bytes.Num() / Stride))
+		if (SparseIndexToChange >= (Blob.Num / Stride))
 		{
 			return false;
 		}
 
-		uint8* OriginalValuePtr = (uint8*)(Bytes.GetData() + Stride * SparseIndexToChange);
-		uint8* NewValuePtr = (uint8*)(SparseBytesValues.GetData() + SparseBufferViewValuesStride * IndexToChange);
+		uint8* OriginalValuePtr = (uint8*)(SparseData.GetData() + Stride * SparseIndexToChange);
+		uint8* NewValuePtr = (uint8*)(SparseBytesValues.Data + SparseBufferViewValuesStride * IndexToChange);
 		FMemory::Memcpy(OriginalValuePtr, NewValuePtr, SparseBufferViewValuesStride);
 	}
+
+	Blob.Data = SparseData.GetData();
 
 	return true;
 }
@@ -2996,11 +3030,13 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 		if (JsonObject->TryGetNumberField("bufferView", BufferViewIndex))
 		{
 			int64 Stride;
-			if (!GetBufferView(BufferViewIndex, Bytes, Stride))
+			FglTFRuntimeBlob Blob;
+			if (!GetBufferView(BufferViewIndex, Blob, Stride))
 			{
 				AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to get bufferView: %d"), BufferViewIndex));
 				return false;
 			}
+			Bytes.Append(Blob.Data, Blob.Num);
 		}
 	}
 

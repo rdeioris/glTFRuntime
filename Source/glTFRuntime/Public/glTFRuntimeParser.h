@@ -24,6 +24,23 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeError, const FString, E
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnStaticMeshCreated, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnSkeletalMeshCreated, USkeletalMesh*, SkeletalMesh);
 
+/*
+* Credits for giving me the idea for the blob structure
+* definitely go to Benjamin MICHEL (SBRK)
+* 
+*/
+struct FglTFRuntimeBlob
+{
+	uint8* Data;
+	int64 Num;
+
+	FglTFRuntimeBlob()
+	{
+		Data = nullptr;
+		Num = 0;
+	}
+};
+
 UENUM()
 enum class EglTFRuntimeTransformBaseType : uint8
 {
@@ -1163,9 +1180,9 @@ public:
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
 
-	bool GetBuffer(int32 BufferIndex, TArray64<uint8>& Bytes);
-	bool GetBufferView(int32 BufferViewIndex, TArray64<uint8>& Bytes, int64& Stride);
-	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, TArray64<uint8>& Bytes);
+	bool GetBuffer(int32 BufferIndex, FglTFRuntimeBlob& Blob);
+	bool GetBufferView(int32 BufferViewIndex, FglTFRuntimeBlob& Blob, int64& Stride);
+	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob);
 
 	bool GetAllNodes(TArray<FglTFRuntimeNode>& Nodes);
 
@@ -1322,12 +1339,14 @@ protected:
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
+		{
 			return false;
+		}
 
-		TArray64<uint8> Bytes;
+		FglTFRuntimeBlob Blob;
 		int64 ComponentType = 0, Stride = 0, Elements = 0, ElementSize = 0, Count = 0;
 		bool bOverrideNormalized = false;
-		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Bytes))
+		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob))
 		{
 			return false;
 		}
@@ -1354,7 +1373,7 @@ protected:
 			// FLOAT
 			if (ComponentType == 5126)
 			{
-				float* Ptr = (float*)&(Bytes[Index]);
+				float* Ptr = (float*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
 				{
 					Value[i] = Ptr[i];
@@ -1363,7 +1382,7 @@ protected:
 			// BYTE
 			else if (ComponentType == 5120)
 			{
-				int8* Ptr = (int8*)&(Bytes[Index]);
+				int8* Ptr = (int8*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
 				{
 					Value[i] = bNormalized ? FMath::Max(((float)Ptr[i]) / 127.f, -1.f) : Ptr[i];
@@ -1373,7 +1392,7 @@ protected:
 			// UNSIGNED_BYTE
 			else if (ComponentType == 5121)
 			{
-				uint8* Ptr = (uint8*)&(Bytes[Index]);
+				uint8* Ptr = (uint8*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
 				{
 					Value[i] = bNormalized ? ((float)Ptr[i]) / 255.f : Ptr[i];
@@ -1382,7 +1401,7 @@ protected:
 			// SHORT
 			else if (ComponentType == 5122)
 			{
-				int16* Ptr = (int16*)&(Bytes[Index]);
+				int16* Ptr = (int16*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
 				{
 					Value[i] = bNormalized ? FMath::Max(((float)Ptr[i]) / 32767.f, -1.f) : Ptr[i];
@@ -1391,7 +1410,7 @@ protected:
 			// UNSIGNED_SHORT
 			else if (ComponentType == 5123)
 			{
-				uint16* Ptr = (uint16*)&(Bytes[Index]);
+				uint16* Ptr = (uint16*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
 				{
 					Value[i] = bNormalized ? ((float)Ptr[i]) / 65535.f : Ptr[i];
@@ -1418,10 +1437,10 @@ protected:
 			return false;
 		}
 
-		TArray64<uint8> Bytes;
+		FglTFRuntimeBlob Blob;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		bool bOverrideNormalized = false;
-		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Bytes))
+		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob))
 		{
 			return false;
 		}
@@ -1448,32 +1467,32 @@ protected:
 			// FLOAT
 			if (ComponentType == 5126)
 			{
-				float* Ptr = (float*)&(Bytes[Index]);
+				float* Ptr = (float*)&(Blob.Data[Index]);
 				Value = *Ptr;
 			}
 			// BYTE
 			else if (ComponentType == 5120)
 			{
-				int8* Ptr = (int8*)&(Bytes[Index]);
+				int8* Ptr = (int8*)&(Blob.Data[Index]);
 				Value = bNormalized ? FMath::Max(((float)(*Ptr)) / 127.f, -1.f) : *Ptr;
 
 			}
 			// UNSIGNED_BYTE
 			else if (ComponentType == 5121)
 			{
-				uint8* Ptr = (uint8*)&(Bytes[Index]);
+				uint8* Ptr = (uint8*)&(Blob.Data[Index]);
 				Value = bNormalized ? ((float)(*Ptr)) / 255.f : *Ptr;
 			}
 			// SHORT
 			else if (ComponentType == 5122)
 			{
-				int16* Ptr = (int16*)&(Bytes[Index]);
+				int16* Ptr = (int16*)&(Blob.Data[Index]);
 				Value = bNormalized ? FMath::Max(((float)(*Ptr)) / 32767.f, -1.f) : *Ptr;
 			}
 			// UNSIGNED_SHORT
 			else if (ComponentType == 5123)
 			{
-				uint16* Ptr = (uint16*)&(Bytes[Index]);
+				uint16* Ptr = (uint16*)&(Blob.Data[Index]);
 				Value = bNormalized ? ((float)(*Ptr)) / 65535.f : *Ptr;
 			}
 			else
@@ -1532,4 +1551,7 @@ protected:
 
 	FVector ComputeTangentY(const FVector Normal, const FVector TangetX);
 	FVector ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W);
+
+	TArray64<uint8> ZeroBuffer;
+	TMap<int32, TArray64<uint8>> SparseAccessorsCache;
 };

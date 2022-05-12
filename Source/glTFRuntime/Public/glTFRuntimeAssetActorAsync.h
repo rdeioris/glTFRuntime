@@ -59,4 +59,6 @@ private:
 	// this is safe to share between game and async threads because everything is sequential
 	UPrimitiveComponent* CurrentPrimitiveComponent;
 
+	double LoadingStartTime;
+
 };
