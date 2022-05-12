@@ -349,6 +349,18 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 		MetallicRoughnessMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, TwoSidedTranslucentMaterial);
 	}
 
+	UMaterialInterface* MaskedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeMasked_Inst"));
+	if (TwoSidedTranslucentMaterial)
+	{
+		MetallicRoughnessMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, MaskedMaterial);
+	}
+	
+	UMaterialInterface* TwoSidedMaskedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeTwoSidedMasked_Inst"));
+	if (TwoSidedMaskedMaterial)
+	{
+		MetallicRoughnessMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, TwoSidedMaskedMaterial);
+	}
+
 	// KHR_materials_pbrSpecularGlossiness
 	UMaterialInterface* SGOpaqueMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntime_SG_Base"));
 	if (SGOpaqueMaterial)
@@ -592,16 +604,33 @@ int32 FglTFRuntimeParser::GetJsonExtensionObjectIndex(TSharedRef<FJsonObject> Js
 	const TSharedPtr<FJsonObject>* JsonExtensionsObject;
 	if (!JsonObject->TryGetObjectField("extensions", JsonExtensionsObject))
 	{
-		return false;
+		return DefaultValue;
 	}
 
 	const TSharedPtr<FJsonObject>* JsonExtensionObject = nullptr;
-	if (!(*JsonExtensionObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
+	if (!(*JsonExtensionsObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
 	{
-		return false;
+		return DefaultValue;
 	}
 
 	return GetJsonObjectIndex(JsonExtensionObject->ToSharedRef(), FieldName, DefaultValue);
+}
+
+double FglTFRuntimeParser::GetJsonExtensionObjectNumber(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName, const double DefaultValue)
+{
+	const TSharedPtr<FJsonObject>* JsonExtensionsObject;
+	if (!JsonObject->TryGetObjectField("extensions", JsonExtensionsObject))
+	{
+		return DefaultValue;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonExtensionObject = nullptr;
+	if (!(*JsonExtensionsObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
+	{
+		return DefaultValue;
+	}
+
+	return GetJsonObjectNumber(JsonExtensionObject->ToSharedRef(), FieldName, DefaultValue);
 }
 
 TArray<int32> FglTFRuntimeParser::GetJsonExtensionObjectIndices(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName)
@@ -636,6 +665,40 @@ TArray<int32> FglTFRuntimeParser::GetJsonExtensionObjectIndices(TSharedRef<FJson
 	}
 
 	return Indices;
+}
+
+TArray<double> FglTFRuntimeParser::GetJsonExtensionObjectNumbers(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName)
+{
+	TArray<double> Numbers;
+	const TSharedPtr<FJsonObject>* JsonExtensionsObject;
+	if (!JsonObject->TryGetObjectField("extensions", JsonExtensionsObject))
+	{
+		return Numbers;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonExtensionObject = nullptr;
+	if (!(*JsonExtensionsObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
+	{
+		return Numbers;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (!(*JsonExtensionObject)->TryGetArrayField(FieldName, JsonArray))
+	{
+		return Numbers;
+	}
+
+	for (TSharedPtr<FJsonValue> JsonItem : *JsonArray)
+	{
+		double Value;
+		if (!JsonItem->TryGetNumber(Value))
+		{
+			return Numbers;
+		}
+		Numbers.Add(Value);
+	}
+
+	return Numbers;
 }
 
 bool FglTFRuntimeParser::LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene)
@@ -2319,16 +2382,23 @@ bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& S
 
 		FinalSize = Stride * Count;
 
-		if (ByteOffset > 0)
-		{
-			TArray64<uint8> OffsetBytes;
-			OffsetBytes.Append(&Bytes[ByteOffset], FinalSize);
-			Bytes = OffsetBytes;
-		}
-
 		if (FinalSize > (uint64)Bytes.Num())
 		{
 			return false;
+		}
+
+		if (ByteOffset > 0)
+		{
+			TArray64<uint8> OffsetBytes;
+			if (Stride > ElementSize * Elements)
+			{
+				OffsetBytes.Append(&Bytes[ByteOffset], FinalSize - (Stride - (ElementSize * Elements)));
+			}
+			else
+			{
+				OffsetBytes.Append(&Bytes[ByteOffset], FinalSize);
+			}
+			Bytes = OffsetBytes;
 		}
 
 		if (!bHasSparse)
