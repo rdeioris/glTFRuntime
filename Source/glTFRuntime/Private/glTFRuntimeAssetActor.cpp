@@ -15,6 +15,7 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 	AssetRoot = CreateDefaultSubobject<USceneComponent>(TEXT("AssetRoot"));
 	RootComponent = AssetRoot;
 	bAllowNodeAnimations = true;
+	bStaticMeshesAsSkeletal = false;
 }
 
 // Called when the game starts or when spawned
@@ -103,7 +104,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 	else
 	{
-		if (Node.SkinIndex < 0)
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
 		{
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
