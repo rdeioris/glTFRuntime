@@ -180,10 +180,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			bool bMissingTangents = false;
 			bool bMissingIgnore = false;
 
+			LODIndices.AddUninitialized(NumVertexInstancesPerSection);
 			for (int32 VertexInstanceSectionIndex = 0; VertexInstanceSectionIndex < NumVertexInstancesPerSection; VertexInstanceSectionIndex++)
 			{
 				uint32 VertexIndex = Primitive.Indices[VertexInstanceSectionIndex];
-				LODIndices.Add(VertexInstanceBaseIndex + VertexInstanceSectionIndex);
+				LODIndices[VertexInstanceBaseIndex + VertexInstanceSectionIndex] = VertexInstanceBaseIndex + VertexInstanceSectionIndex;
 
 				FStaticMeshBuildVertex& StaticMeshVertex = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
 
@@ -216,8 +217,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #else
 						StaticMeshVertex.UVs[UVIndex] = GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore);
 #endif
-					}
 				}
+			}
 
 				if (bHasVertexColors)
 				{
@@ -230,7 +231,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 						StaticMeshVertex.Color = FColor::White;
 					}
 				}
-			}
+		}
 
 			if (StaticMeshConfig.bReverseWinding && (NumVertexInstancesPerSection % 3) == 0)
 			{
@@ -368,7 +369,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			}
 
 			VertexInstanceBaseIndex += NumVertexInstancesPerSection;
-		}
+	}
 
 		// check for pivot repositioning
 		if (StaticMeshConfig.PivotPosition != EglTFRuntimePivotPosition::Asset)
@@ -393,13 +394,13 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #else
 				StaticMeshVertex.Position -= PivotDelta;
 #endif
-			}
+		}
 
 			if (CurrentLODIndex == 0)
 			{
 				StaticMeshContext->LOD0PivotDelta = PivotDelta;
 			}
-		}
+}
 
 		if (CurrentLODIndex == 0)
 		{
@@ -412,7 +413,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #else
 				StaticMeshContext->BoundingBoxAndSphere.SphereRadius = FMath::Max((StaticMeshVertex.Position - StaticMeshContext->BoundingBoxAndSphere.Origin).Size(), StaticMeshContext->BoundingBoxAndSphere.SphereRadius);
 #endif
-			}
+		}
 		}
 
 		LODResources.VertexBuffers.PositionVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
@@ -476,7 +477,7 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 #else
 		BodySetup = StaticMesh->BodySetup;
 #endif
-	}
+}
 
 	if (!StaticMesh->bAllowCPUAccess)
 	{
@@ -748,19 +749,22 @@ bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 M
 			UV = Primitive.UVs[0];
 		}
 		TArray<int32> Triangles;
-		for (uint32 Index : Primitive.Indices)
+		Triangles.AddUninitialized(Primitive.Indices.Num());
+		for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
 		{
-			Triangles.Add(Index);
+			Triangles[Index] = Primitive.Indices[Index];
 		}
 		TArray<FLinearColor> Colors;
-		for (FVector4 Color : Primitive.Colors)
+		Colors.AddUninitialized(Primitive.Colors.Num());
+		for (int32 Index = 0; Index < Primitive.Colors.Num(); Index++)
 		{
-			Colors.Add(FLinearColor(Color));
+			Colors[Index] = FLinearColor(Primitive.Colors[Index]);
 		}
 		TArray<FProcMeshTangent> Tangents;
-		for (FVector Tangent : Primitive.Tangents)
+		Tangents.AddUninitialized(Primitive.Tangents.Num());
+		for (int32 Index = 0; Index < Primitive.Tangents.Num(); Index++)
 		{
-			Tangents.Add(FProcMeshTangent(Tangent, false));
+			Tangents[Index] = FProcMeshTangent(Primitive.Tangents[Index], false);
 		}
 		ProceduralMeshComponent->CreateMeshSection_LinearColor(SectionIndex, Primitive.Positions, Triangles, Primitive.Normals, UV, Colors, Tangents, ProceduralMeshConfig.bBuildSimpleCollision);
 		ProceduralMeshComponent->SetMaterial(SectionIndex, Primitive.Material);

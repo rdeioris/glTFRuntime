@@ -410,10 +410,15 @@ bool FglTFRuntimeParser::LoadNodes()
 	{
 		TSharedPtr<FJsonObject> JsonNodeObject = (*JsonNodes)[Index]->AsObject();
 		if (!JsonNodeObject)
+		{
 			return false;
+		}
+
 		FglTFRuntimeNode Node;
 		if (!LoadNode_Internal(Index, JsonNodeObject.ToSharedRef(), JsonNodes->Num(), Node))
+		{
 			return false;
+		}
 
 		AllNodesCache.Add(Node);
 	}
@@ -492,7 +497,9 @@ bool FglTFRuntimeParser::LoadScenes(TArray<FglTFRuntimeScene>& Scenes)
 	{
 		FglTFRuntimeScene Scene;
 		if (!LoadScene(Index, Scene))
+		{
 			return false;
+		}
 		Scenes.Add(Scene);
 	}
 
@@ -719,10 +726,15 @@ bool FglTFRuntimeParser::LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene)
 		{
 			int64 NodeIndex;
 			if (!JsonSceneNode->TryGetNumber(NodeIndex))
+			{
 				return false;
+			}
+
 			FglTFRuntimeNode SceneNode;
 			if (!LoadNode(NodeIndex, SceneNode))
+			{
 				return false;
+			}
 			Scene.RootNodesIndices.Add(SceneNode.Index);
 		}
 	}
@@ -2046,6 +2058,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			return false;
 		}
 
+		Primitive.Indices.AddUninitialized(Count);
 		for (int64 i = 0; i < Count; i++)
 		{
 			int64 IndexIndex = i * Stride;
@@ -2071,14 +2084,15 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 				return false;
 			}
 
-			Primitive.Indices.Add(VertexIndex);
+			Primitive.Indices[i] = VertexIndex;
 		}
 	}
 	else
 	{
+		Primitive.Indices.AddUninitialized(Primitive.Positions.Num());
 		for (int32 VertexIndex = 0; VertexIndex < Primitive.Positions.Num(); VertexIndex++)
 		{
-			Primitive.Indices.Add(VertexIndex);
+			Primitive.Indices[VertexIndex] = VertexIndex;
 		}
 	}
 
