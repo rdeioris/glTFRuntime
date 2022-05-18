@@ -25,6 +25,8 @@ void AglTFRuntimeAssetActorAsync::BeginPlay()
 		return;
 	}
 
+	LoadingStartTime = FPlatformTime::Seconds();
+
 	TArray<FglTFRuntimeScene> Scenes = Asset->GetScenes();
 	for (FglTFRuntimeScene& Scene : Scenes)
 	{
@@ -164,6 +166,7 @@ void AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync(UStaticMesh* StaticMesh)
 	// trigger event
 	else
 	{
+		UE_LOG(LogGLTFRuntime, Log, TEXT("Asset loaded asynchronously in %f seconds"), FPlatformTime::Seconds() - LoadingStartTime);
 		ReceiveOnScenesLoaded();
 	}
 }
@@ -183,6 +186,7 @@ void AglTFRuntimeAssetActorAsync::LoadSkeletalMeshAsync(USkeletalMesh* SkeletalM
 	// trigger event
 	else
 	{
+		UE_LOG(LogGLTFRuntime, Log, TEXT("Asset loaded asynchronously in %f seconds"), FPlatformTime::Seconds() - LoadingStartTime);
 		ReceiveOnScenesLoaded();
 	}
 }
