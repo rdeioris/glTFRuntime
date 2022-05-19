@@ -1813,13 +1813,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	FloatProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), Duration);
 	IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfKeys")));
 	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
-	if (Duration > 0)
-	{
-		FFrameRate FrameRate(NumFrames, Duration);
-		FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
-		FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
-		*FrameRatePtr = FrameRate;
-	}
+
+	FFrameRate FrameRate(30, 1);
+	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
+	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
+	*FrameRatePtr = FrameRate;
 #else
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		AnimSequence->SequenceLength = Duration;
@@ -1880,7 +1878,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				Pair.Value.PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
 #endif
 			}
-		}
+			}
 		else if (Pair.Value.PosKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1910,7 +1908,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				Pair.Value.RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 #endif
 			}
-		}
+			}
 		else if (Pair.Value.RotKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1939,7 +1937,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				Pair.Value.ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 #endif
 			}
-		}
+			}
 		else if (Pair.Value.ScaleKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1997,7 +1995,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 					Pair.Value.ScaleKeys[FrameIndex] = FrameTransform.GetScale3D();
 #endif
 				}
-			}
+				}
 
 			if (SkeletalAnimationConfig.bRemoveRootMotion)
 			{
@@ -2006,7 +2004,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 					Pair.Value.PosKeys[FrameIndex] = Pair.Value.PosKeys[0];
 				}
 			}
-		}
+			}
 
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
@@ -2023,7 +2021,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
 #endif
 		bHasTracks = true;
-	}
+		}
 
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
@@ -2098,7 +2096,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-}
+		}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
