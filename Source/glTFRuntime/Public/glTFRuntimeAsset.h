@@ -181,6 +181,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FString> GetExtensionsRequired() const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	TArray<FString> GetMaterialsVariants() const;
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

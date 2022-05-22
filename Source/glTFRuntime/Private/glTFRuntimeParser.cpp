@@ -388,6 +388,23 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 
 	JsonObject->TryGetStringArrayField("extensionsUsed", ExtensionsUsed);
 	JsonObject->TryGetStringArrayField("extensionsRequired", ExtensionsRequired);
+
+	if (ExtensionsUsed.Contains("KHR_materials_variants"))
+	{
+		TArray<TSharedRef<FJsonObject>> MaterialsVariantsObjects = GetJsonObjectArrayFromRootExtension("KHR_materials_variants", "variants");
+		for (TSharedRef<FJsonObject> MaterialsVariantsObject : MaterialsVariantsObjects)
+		{
+			FString VariantName;
+			if (MaterialsVariantsObject->TryGetStringField("name", VariantName))
+			{
+				MaterialsVariants.Add(VariantName);
+			}
+			else
+			{
+				MaterialsVariants.Add("");
+			}
+		}
+	}
 }
 
 bool FglTFRuntimeParser::LoadNodes()
@@ -565,6 +582,33 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromExtensionIndex(TSha
 	return GetJsonObjectFromIndex(JsonExtensionObject->ToSharedRef(), FieldName, Index);
 }
 
+TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetJsonObjectArrayFromExtension(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName)
+{
+	TArray<TSharedRef<FJsonObject>> Objects;
+
+	const TSharedPtr<FJsonObject>* JsonExtensionsObject;
+	if (JsonObject->TryGetObjectField("extensions", JsonExtensionsObject))
+	{
+		const TSharedPtr<FJsonObject>* JsonExtensionObject = nullptr;
+		if ((*JsonExtensionsObject)->TryGetObjectField(ExtensionName, JsonExtensionObject))
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Items;
+			if ((*JsonExtensionObject)->TryGetArrayField(FieldName, Items))
+			{
+				for (TSharedPtr<FJsonValue> Item : (*Items))
+				{
+					const TSharedPtr<FJsonObject>* Object = nullptr;
+					if (Item->TryGetObject(Object))
+					{
+						Objects.Add(Object->ToSharedRef());
+					}
+				}
+			}
+		}
+	}
+
+	return Objects;
+}
 
 FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue)
 {
@@ -2124,8 +2168,46 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		}
 	}
 
-	int64 MaterialIndex;
-	if (JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
+	Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
+
+	int64 MaterialIndex = INDEX_NONE;
+	if (!MaterialsConfig.Variant.IsEmpty() && MaterialsVariants.Contains(MaterialsConfig.Variant))
+	{
+		int32 WantedIndex = MaterialsVariants.IndexOfByKey(MaterialsConfig.Variant);
+		TArray<TSharedRef<FJsonObject>> VariantsMappings = GetJsonObjectArrayFromExtension(JsonPrimitiveObject, "KHR_materials_variants", "mappings");
+		bool bMappingFound = false;
+		for (TSharedRef<FJsonObject> VariantsMapping : VariantsMappings)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Variants;
+			if (VariantsMapping->TryGetArrayField("variants", Variants))
+			{
+				for (TSharedPtr<FJsonValue> Variant : (*Variants))
+				{
+					int64 VariantIndex;
+					if (Variant->TryGetNumber(VariantIndex) && VariantIndex == WantedIndex)
+					{
+						MaterialIndex = VariantsMapping->GetNumberField("material");
+						bMappingFound = true;
+						break;
+					}
+				}
+			}
+			if (bMappingFound)
+			{
+				break;
+			}
+		}
+	}
+
+	if (MaterialIndex == INDEX_NONE)
+	{
+		if (!JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
+		{
+			MaterialIndex = INDEX_NONE;
+		}
+	}
+
+	if (MaterialIndex != INDEX_NONE)
 	{
 		Primitive.Material = LoadMaterial(MaterialIndex, MaterialsConfig, Primitive.Colors.Num() > 0, Primitive.MaterialName);
 		if (!Primitive.Material)
@@ -2133,10 +2215,6 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
 			return false;
 		}
-	}
-	else
-	{
-		Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
 	}
 
 	return true;

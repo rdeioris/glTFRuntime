@@ -569,3 +569,9 @@ TArray<FString> UglTFRuntimeAsset::GetExtensionsRequired() const
 	GLTF_CHECK_PARSER(TArray<FString>());
 	return Parser->ExtensionsRequired;
 }
+
+TArray<FString> UglTFRuntimeAsset::GetMaterialsVariants() const
+{
+	GLTF_CHECK_PARSER(TArray<FString>());
+	return Parser->MaterialsVariants;
+}
