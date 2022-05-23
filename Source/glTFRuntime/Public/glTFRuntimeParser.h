@@ -708,6 +708,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bUseHighPrecisionUVs;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UPhysicsAsset* PhysicsAssetTemplate;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -726,6 +729,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		MorphTargetsDuplicateStrategy = EglTFRuntimeMorphTargetsDuplicateStrategy::Ignore;
 		ShiftBounds = FVector::ZeroVector;
 		bUseHighPrecisionUVs = false;
+		PhysicsAssetTemplate = nullptr;
 	}
 };
 

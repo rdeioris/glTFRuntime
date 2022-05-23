@@ -23,6 +23,7 @@
 #include "Async/Async.h"
 #include "Animation/AnimCurveTypes.h"
 #include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/PhysicsConstraintTemplate.h"
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
 #include "UObject/SavePackage.h"
 #endif
@@ -1200,11 +1201,35 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 	}
 
-	if (SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies.Num() > 0)
+	if (SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies.Num() > 0 || SkeletalMeshContext->SkeletalMeshConfig.PhysicsAssetTemplate)
 	{
 		UPhysicsAsset* PhysicsAsset = NewObject<UPhysicsAsset>(SkeletalMeshContext->SkeletalMesh, NAME_None, RF_Public);
 		if (PhysicsAsset)
 		{
+			if (SkeletalMeshContext->SkeletalMeshConfig.PhysicsAssetTemplate)
+			{
+				UPhysicsAsset* PhysicsAssetTemplate = SkeletalMeshContext->SkeletalMeshConfig.PhysicsAssetTemplate;
+				for (USkeletalBodySetup* SourceBodySetup : PhysicsAssetTemplate->SkeletalBodySetups)
+				{
+					if (SkeletalMeshContext->SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(SourceBodySetup->BoneName) != INDEX_NONE)
+					{
+						USkeletalBodySetup* NewBodySetup = NewObject<USkeletalBodySetup>(PhysicsAsset, NAME_None, RF_Public);
+						NewBodySetup->CollisionTraceFlag = SourceBodySetup->CollisionTraceFlag;
+						NewBodySetup->PhysicsType = SourceBodySetup->PhysicsType;
+						NewBodySetup->BoneName = SourceBodySetup->BoneName;
+						NewBodySetup->bConsiderForBounds = SourceBodySetup->bConsiderForBounds;
+						NewBodySetup->AggGeom = SourceBodySetup->AggGeom;
+						PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
+					}
+				}
+				for (UPhysicsConstraintTemplate* ConstraintTemplate : PhysicsAssetTemplate->ConstraintSetup)
+				{
+					UPhysicsConstraintTemplate* NewConstraint = NewObject<UPhysicsConstraintTemplate>(PhysicsAsset, NAME_None, RF_Public);
+					NewConstraint->DefaultInstance = ConstraintTemplate->DefaultInstance;
+					NewConstraint->ProfileHandles = ConstraintTemplate->ProfileHandles;
+					PhysicsAsset->ConstraintSetup.Add(NewConstraint);
+				}
+			}
 			for (const TPair<FString, FglTFRuntimePhysicsBody>& PhysicsBody : SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies)
 			{
 				if (PhysicsBody.Key.IsEmpty())
@@ -1878,7 +1903,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				Pair.Value.PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
 #endif
 			}
-			}
+		}
 		else if (Pair.Value.PosKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1908,7 +1933,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				Pair.Value.RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 #endif
 			}
-			}
+		}
 		else if (Pair.Value.RotKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1937,7 +1962,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				Pair.Value.ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 #endif
 			}
-			}
+		}
 		else if (Pair.Value.ScaleKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1995,7 +2020,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 					Pair.Value.ScaleKeys[FrameIndex] = FrameTransform.GetScale3D();
 #endif
 				}
-				}
+			}
 
 			if (SkeletalAnimationConfig.bRemoveRootMotion)
 			{
@@ -2004,7 +2029,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 					Pair.Value.PosKeys[FrameIndex] = Pair.Value.PosKeys[0];
 				}
 			}
-			}
+		}
 
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
@@ -2021,7 +2046,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
 #endif
 		bHasTracks = true;
-		}
+	}
 
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
@@ -2096,7 +2121,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-		}
+}
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
