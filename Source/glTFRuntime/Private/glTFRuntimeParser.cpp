@@ -948,7 +948,9 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 			}
 
 			if (ChildIndex >= NodesCount)
+			{
 				return false;
+			}
 
 			Node.ChildrenIndices.Add(ChildIndex);
 		}
@@ -957,7 +959,7 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
+bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter, const TArray<FglTFRuntimePathItem>& OverrideTrackNameFromExtension)
 {
 	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
 
@@ -1026,10 +1028,14 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 
 		int32 Sampler;
 		if (!JsonChannelObject->TryGetNumberField("sampler", Sampler))
+		{
 			return false;
+		}
 
 		if (Sampler >= Samplers.Num())
+		{
 			return false;
+		}
 
 		const TSharedPtr<FJsonObject>* JsonTargetObject;
 		if (!JsonChannelObject->TryGetObjectField("target", JsonTargetObject))
@@ -1037,15 +1043,33 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			return false;
 		}
 
-		int64 NodeIndex;
-		if (!(*JsonTargetObject)->TryGetNumberField("node", NodeIndex))
-		{
-			return false;
-		}
-
 		FglTFRuntimeNode Node;
-		if (!LoadNode(NodeIndex, Node))
-			return false;
+		if (OverrideTrackNameFromExtension.Num() > 0)
+		{
+			const TSharedPtr<FJsonObject>* JsonTargetExtensions;
+			if ((*JsonTargetObject)->TryGetObjectField("extensions", JsonTargetExtensions))
+			{
+				TSharedPtr<FJsonValue> JsonTrackName = GetJSONObjectFromRelativePath(JsonTargetExtensions->ToSharedRef(), OverrideTrackNameFromExtension);
+				if (JsonTrackName)
+				{
+					JsonTrackName->TryGetString(Node.Name);
+				}
+			}
+		}
+		
+		if (Node.Name.IsEmpty())
+		{
+			int64 NodeIndex;
+			if (!(*JsonTargetObject)->TryGetNumberField("node", NodeIndex))
+			{
+				return false;
+			}
+
+			if (!LoadNode(NodeIndex, Node))
+			{
+				return false;
+			}
+		}
 
 		if (!NodeFilter(Node))
 		{
@@ -1097,7 +1121,9 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 {
 	FglTFRuntimeNode Node;
 	if (!LoadNode(NodeIndex, Node))
+	{
 		return nullptr;
+	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
 	if (!Root->TryGetArrayField("animations", JsonAnimations))
@@ -1161,10 +1187,12 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 	{
 		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[JsonAnimationIndex]->AsObject();
 		if (!JsonAnimationObject)
+		{
 			return nullptr;
+		}
 		float Duration;
 		FString Name;
-		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, Name, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }))
+		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, Name, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }, {}))
 		{
 			return nullptr;
 		}
@@ -1258,7 +1286,7 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 		bAnimationFound = false;
 		AnimationCurve = NewObject<UglTFRuntimeAnimationCurve>(GetTransientPackage(), NAME_None, RF_Public);
 		AnimationCurve->SetDefaultValues(OriginalTransform.GetLocation(), OriginalTransform.Rotator().Euler(), OriginalTransform.GetScale3D());
-		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, Name, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }))
+		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, Name, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }, {}))
 		{
 			continue;
 		}

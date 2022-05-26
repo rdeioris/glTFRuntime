@@ -370,7 +370,10 @@ bool UglTFRuntimeAsset::BuildTransformFromNodeForward(const int32 NodeIndex, con
 	while (Node.ParentIndex != INDEX_NONE)
 	{
 		if (!Parser->LoadNode(Node.ParentIndex, Node))
+		{
 			return false;
+		}
+
 		NodesTree.Add(Node.Transform);
 		if (Node.Index == NodeIndex)
 		{

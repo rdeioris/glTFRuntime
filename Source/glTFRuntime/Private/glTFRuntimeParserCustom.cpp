@@ -2,14 +2,15 @@
 
 #include "glTFRuntimeParser.h"
 
-TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromPath(const TArray<FglTFRuntimePathItem>& Path) const
+TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromRelativePath(TSharedRef<FJsonObject> JsonObject, const TArray<FglTFRuntimePathItem>& Path) const
 {
 	if (Path.Num() == 0)
 	{
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonObject> CurrentObject = Root;
+	TSharedPtr<FJsonObject> CurrentObject = JsonObject;
+
 	for (int32 PathIndex = 0; PathIndex < Path.Num() - 1; PathIndex++)
 	{
 		const FString& Part = Path[PathIndex].Path;
@@ -76,6 +77,11 @@ TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromPath(const TArray<Fg
 	}
 
 	return (*IsArray)[Path.Last().Index];
+}
+
+TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromPath(const TArray<FglTFRuntimePathItem>& Path) const
+{
+	return GetJSONObjectFromRelativePath(Root, Path);
 }
 
 FString FglTFRuntimeParser::GetJSONStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
