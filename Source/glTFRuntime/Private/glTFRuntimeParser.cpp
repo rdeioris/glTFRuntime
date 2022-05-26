@@ -1692,7 +1692,9 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 		}
 
 		if (Elements != 16 && ComponentType != 5126)
+		{
 			return false;
+		}
 
 		for (int64 i = 0; i < Count; i++)
 		{

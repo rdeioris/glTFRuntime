@@ -1259,6 +1259,8 @@ public:
 
 	TArray<FString> MaterialsVariants;
 
+	TSharedPtr<FJsonObject> GetJsonRoot() const { return Root; }
+
 protected:
 	TSharedRef<FJsonObject> Root;
 
@@ -1300,8 +1302,6 @@ protected:
 	int32 FindCommonRoot(const TArray<int32>& NodeIndices);
 	int32 FindTopRoot(int32 NodeIndex);
 	bool HasRoot(int32 NodeIndex, int32 RootIndex);
-
-	TSharedPtr<FJsonObject> GetJsonRoot() const { return Root; }
 
 	bool CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems);
 	bool CheckJsonRootIndex(const FString FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems) { return CheckJsonIndex(Root, FieldName, Index, JsonItems); }
