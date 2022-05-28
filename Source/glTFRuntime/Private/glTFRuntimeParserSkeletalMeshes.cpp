@@ -2128,6 +2128,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
 	{
+
+		if (SkeletalAnimationConfig.RemoveTracks.Contains(Node.Name))
+		{
+			return;
+		}
+
 		int32 NumFrames = Duration * 30;
 
 		float FrameDelta = 1.f / 30;

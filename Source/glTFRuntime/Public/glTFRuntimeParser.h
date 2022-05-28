@@ -782,6 +782,9 @@ struct FglTFRuntimeSkeletalAnimationConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FglTFRuntimePathItem> OverrideTrackNameFromExtension;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FString> RemoveTracks;
+
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
 		RootNodeIndex = INDEX_NONE;
