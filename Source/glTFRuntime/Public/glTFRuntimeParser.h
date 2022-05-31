@@ -575,6 +575,9 @@ struct FglTFRuntimeSkeletonConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	USkeleton* CopyRotationsFrom;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bSkipAlreadyExistentBoneNames;
+
 	FglTFRuntimeSkeletonConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -583,6 +586,7 @@ struct FglTFRuntimeSkeletonConfig
 		bAddRootBone = false;
 		bClearRotations = false;
 		CopyRotationsFrom = nullptr;
+		bSkipAlreadyExistentBoneNames = false;
 	}
 };
 

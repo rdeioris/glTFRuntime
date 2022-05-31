@@ -1723,7 +1723,9 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 	// now traverse from the root and check if the node is in the "joints" list
 	if (!TraverseJoints(Modifier, INDEX_NONE, RootNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
+	{
 		return false;
+	}
 
 	return true;
 }
@@ -1759,6 +1761,10 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	while (CollidingIndex != INDEX_NONE)
 	{
 		AddError("TraverseJoints()", FString::Printf(TEXT("Bone %s already exists."), *BoneName.ToString()));
+		if (SkeletonConfig.bSkipAlreadyExistentBoneNames)
+		{
+			return true;
+		}
 		return false;
 	}
 
@@ -1798,10 +1804,14 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	{
 		FglTFRuntimeNode ChildNode;
 		if (!LoadNode(ChildIndex, ChildNode))
+		{
 			return false;
+		}
 
 		if (!TraverseJoints(Modifier, NewParentIndex, ChildNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
+		{
 			return false;
+		}
 	}
 
 	return true;
