@@ -1639,12 +1639,19 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 	// fill the root bone
 	FglTFRuntimeNode RootNode;
-	int64 RootBoneIndex;
+	int64 RootBoneIndex = INDEX_NONE;
 	bool bHasSpecificRoot = false;
 
 	if (SkeletonConfig.RootNodeIndex > INDEX_NONE)
 	{
 		RootBoneIndex = SkeletonConfig.RootNodeIndex;
+	}
+	else if (!SkeletonConfig.ForceRootNode.IsEmpty())
+	{
+		if (LoadNodeByName(SkeletonConfig.ForceRootNode, RootNode))
+		{
+			RootBoneIndex = RootNode.Index;
+		}
 	}
 	else if (JsonSkinObject->TryGetNumberField("skeleton", RootBoneIndex))
 	{
@@ -1657,7 +1664,10 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	}
 
 	if (RootBoneIndex == INDEX_NONE)
+	{
+		AddError("FillReferenceSkeleton()", "Unable to find root node.");
 		return false;
+	}
 
 	if (!LoadNode(RootBoneIndex, RootNode))
 	{
