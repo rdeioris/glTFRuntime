@@ -454,6 +454,15 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	UBodySetup* BodySetup = StaticMesh->BodySetup;
 #endif
 
+	// set default LODs screen sizes
+	float DeltaScreenSize = (1.0f / RenderData->LODResources.Num()) / 2.0f;
+	float ScreenSize = 1;
+	for (int32 LODIndex = 0; LODIndex < RenderData->LODResources.Num(); LODIndex++)
+	{
+		RenderData->ScreenSize[LODIndex].Default = ScreenSize;
+		ScreenSize -= DeltaScreenSize;
+	}
+
 	// Override LODs ScreenSize
 	for (const TPair<int32, float>& Pair : StaticMeshConfig.LODScreenSize)
 	{
