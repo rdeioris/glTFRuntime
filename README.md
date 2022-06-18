@@ -11,3 +11,5 @@ Check the Features Showcase: https://www.youtube.com/watch?v=6058JA8wX8I
 Buy it from the Marketplace to support the development: https://www.unrealengine.com/marketplace/en-US/product/gltfruntime or become a patron: https://www.patreon.com/rdeioris
 
 View the official docs at https://github.com/rdeioris/glTFRuntime-docs/blob/master/README.md
+
+And please read this before packaging your project! https://github.com/rdeioris/gltfruntime-docs#notes-when-packaging-a-game 
