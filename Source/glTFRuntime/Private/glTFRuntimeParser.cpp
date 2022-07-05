@@ -1001,6 +1001,26 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			SamplerInterpolation = "LINEAR";
 		}
 
+		// convert to linear interpolation (unfortunately Unreal does not support Cubic for skeletal animations)
+		if (SamplerInterpolation == "CUBICSPLINE")
+		{
+			TArray<FVector4> CubicValues;
+			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			{
+				// TODO try to rebuild interpolation values
+				
+				//float Time = Timeline[TimeIndex];
+				// gather A, V and B
+				//FVector4 InTangent = Values[TimeIndex * 3];
+				FVector4 Value = Values[TimeIndex * 3 + 1];
+				//FVector4 OutTangent = Values[TimeIndex * 3 + 2];
+
+				CubicValues.Add(Value);
+			}
+
+			Values = CubicValues;
+		}
+
 		// get animation valid duration
 		for (float Time : Timeline)
 		{
@@ -1056,7 +1076,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 				}
 			}
 		}
-		
+
 		if (Node.Name.IsEmpty())
 		{
 			int64 NodeIndex;
