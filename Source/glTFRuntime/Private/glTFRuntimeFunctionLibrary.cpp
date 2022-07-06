@@ -14,6 +14,9 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const 
 		return nullptr;
 	}
 
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
 	// Annoying copy, but we do not want to remove the const
 	FglTFRuntimeConfig OverrideConfig = LoaderConfig;
 
@@ -34,9 +37,17 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FS
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
+	{
 		return nullptr;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
 	if (!Asset->LoadFromString(JsonData, LoaderConfig))
+	{
 		return nullptr;
+	}
 
 	return Asset;
 }
@@ -74,6 +85,9 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 	{
 		return nullptr;
 	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
 
 	if (!Asset->LoadFromData(Data.GetData(), Data.Num(), LoaderConfig))
 	{

@@ -184,6 +184,12 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FString> GetMaterialsVariants() const;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* RuntimeContextObject;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString RuntimeContextString;
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

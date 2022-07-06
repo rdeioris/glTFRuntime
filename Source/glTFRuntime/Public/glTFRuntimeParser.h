@@ -140,6 +140,12 @@ struct FglTFRuntimeConfig
 
 	bool bSearchContentDir;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* RuntimeContextObject;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString RuntimeContextString;
+
 	FglTFRuntimeConfig()
 	{
 		TransformBaseType = EglTFRuntimeTransformBaseType::Default;
@@ -150,6 +156,7 @@ struct FglTFRuntimeConfig
 		bAllowExternalFiles = false;
 		bOverrideBaseDirectoryFromContentDir = false;
 		ArchiveAutoEntryPointExtensions = ".glb .gltf .json .js";
+		RuntimeContextObject = nullptr;
 	}
 
 	FMatrix GetMatrix() const
