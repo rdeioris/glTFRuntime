@@ -2188,13 +2188,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				FVector4 SecondQuatV = Curve.Values[SecondIndex];
 				FQuat FirstQuat = { FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W };
 				FQuat SecondQuat = { SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W };
-				FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
-				FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
-				FirstQuat = FirstMatrix.ToQuat();
-				SecondQuat = SecondMatrix.ToQuat();
 
 				// cubic spline ?
-				if (Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
 				{
 					float TD = Curve.Timeline[SecondIndex] - Curve.Timeline[FirstIndex];
 					float T = (FrameBase - Curve.Timeline[FirstIndex]) / TD;
@@ -2217,12 +2213,23 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 					AnimQuat = { CubicValue.X, CubicValue.Y, CubicValue.Z, CubicValue.W };
 
-					FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(AnimQuat.GetNormalized()) * SceneBasis;
+					FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(AnimQuat.GetNormalized()) * SceneBasis;
 
-					AnimQuat = FirstMatrix.ToQuat();
+					AnimQuat = RotationMatrix.ToQuat();
+				}
+				else if (FirstIndex == SecondIndex)
+				{
+					FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+
+					AnimQuat = RotationMatrix.ToQuat();
 				}
 				else
 				{
+
+					FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+					FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
+					FirstQuat = FirstMatrix.ToQuat();
+					SecondQuat = SecondMatrix.ToQuat();
 					AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
 				}
 
@@ -2232,8 +2239,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.RotKeys.Add(AnimQuat);
 #endif
 				FrameBase += FrameDelta;
+				}
 			}
-		}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
@@ -2325,8 +2332,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-	};
+		};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
-}
+	}
