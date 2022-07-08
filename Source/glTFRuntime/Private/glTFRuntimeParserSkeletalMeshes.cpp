@@ -2147,6 +2147,26 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	return AnimSequence;
 }
 
+FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const float T1, const FVector4 Value0, const FVector4 OutTangent, const FVector4 Value1, const FVector4 InTangent)
+{
+	float TD = T1 - T0;
+	float T = (TC - T0) / TD;
+	float TT = T * T;
+	float TTT = TT * T;
+
+	float S2 = -2 * TTT + 3 * TT;
+	float S3 = TTT - TT;
+	float S0 = 1 - S2;
+	float S1 = S3 - TT + T;
+
+	FVector4 CubicValue = S0 * Value0;
+	CubicValue += S1 * OutTangent * TD;
+	CubicValue += S2 * Value1;
+	CubicValue += S3 * InTangent * TD;
+
+	return CubicValue;
+}
+
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
 
@@ -2192,24 +2212,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				// cubic spline ?
 				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
 				{
-					float TD = Curve.Timeline[SecondIndex] - Curve.Timeline[FirstIndex];
-					float T = (FrameBase - Curve.Timeline[FirstIndex]) / TD;
-					float TT = T * T;
-					float TTT = TT * T;
-
-					float S2 = -2 * TTT + 3 * TT;
-					float S3 = TTT - TT;
-					float S0 = 1 - S2;
-					float S1 = S3 - TT + T;
-
-					FVector4 Value0 = FirstQuatV;
-					FVector4 Value1 = SecondQuatV;
-					FVector4 OutTangent = Curve.OutTangents[FirstIndex];
-					FVector4 InTangent = Curve.InTangents[SecondIndex];
-					FVector4 CubicValue = S0 * Value0;
-					CubicValue += S1 * OutTangent * TD;
-					CubicValue += S2 * Value1;
-					CubicValue += S3 * InTangent * TD;
+					FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], FirstQuatV, Curve.OutTangents[FirstIndex], SecondQuatV, Curve.InTangents[SecondIndex]);
 
 					AnimQuat = { CubicValue.X, CubicValue.Y, CubicValue.Z, CubicValue.W };
 
@@ -2239,8 +2242,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.RotKeys.Add(AnimQuat);
 #endif
 				FrameBase += FrameDelta;
-				}
 			}
+		}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
@@ -2259,12 +2262,24 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				FVector AnimLocation;
 				int32 FirstIndex;
 				int32 SecondIndex;
 				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
 				FVector4 First = Curve.Values[FirstIndex];
 				FVector4 Second = Curve.Values[SecondIndex];
-				FVector AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+
+				// cubic spline ?
+				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+				{
+					FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], First, Curve.OutTangents[FirstIndex], Second, Curve.InTangents[SecondIndex]);
+
+					AnimLocation = SceneBasis.TransformPosition(CubicValue) * SceneScale;
+				}
+				else
+				{
+					AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+				}
 #if ENGINE_MAJOR_VERSION > 4
 				Track.PosKeys.Add(FVector3f(AnimLocation));
 #else
@@ -2332,8 +2347,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-		};
+			};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
-	}
+		}
