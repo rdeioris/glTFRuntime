@@ -26,10 +26,15 @@ protected:
 	UPROPERTY(EditAnywhere)
 	class UStaticMeshComponent* RenderingPlaneComponent;
 
+	UPROPERTY(EditAnywhere)
+	class UGroomComponent* GroomPlaneComponent;
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	bool BakeMaterialToPng(UMaterialInterface* Material, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness);
+
+	bool BakeGroomToPng(class UGroomAsset* Groom, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness, const float OrthographicScale = 1);
 
 };

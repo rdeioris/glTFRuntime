@@ -5,6 +5,7 @@
 #include "glTFRuntimeMaterialBaker.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "GroomComponent.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
 
@@ -56,6 +57,10 @@ AglTFRuntimeMaterialBaker::AglTFRuntimeMaterialBaker()
 	RenderingPlaneComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
 	RenderingPlaneComponent->SetRelativeRotation(FRotator(0, 90, 90));
 	RenderingPlaneComponent->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane")));
+
+	GroomPlaneComponent = CreateDefaultSubobject<UGroomComponent>("Groom");
+	GroomPlaneComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	GroomPlaneComponent->SetRelativeRotation(FRotator(0, 90, 90));
 }
 
 // Called when the game starts or when spawned
@@ -136,6 +141,134 @@ bool AglTFRuntimeMaterialBaker::BakeMaterialToPng(UMaterialInterface* Material, 
 					}
 				}
 				if (Alpha <= Material->GetOpacityMaskClipValue())
+				{
+					Pixels[PixelIndex].A = 0;
+				}
+			}
+		}
+	}
+
+	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
+	ImageWrapper->SetRaw(Pixels.GetData(), Pixels.Num() * sizeof(FColor), TextureSize, TextureSize, ERGBFormat::BGRA, 8);
+	BaseColor = ImageWrapper->GetCompressed();
+
+	/* NormalMap */
+	RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_R8G8B8A8, true);
+	SceneCaptureComponent->PostProcessSettings.RemoveBlendable(ExtractBaseColor);
+	SceneCaptureComponent->PostProcessSettings.AddBlendable(ExtractNormalMap, 1);
+	SceneCaptureComponent->CaptureScene();
+
+	RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
+	RenderTargetResource->ReadPixels(Pixels);
+
+	ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
+	ImageWrapper->SetRaw(Pixels.GetData(), Pixels.Num() * sizeof(FColor), TextureSize, TextureSize, ERGBFormat::BGRA, 8);
+
+	NormalMap = ImageWrapper->GetCompressed();
+
+	/* Metallic Roughness */
+	RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_R8G8B8A8, true);
+	SceneCaptureComponent->PostProcessSettings.RemoveBlendable(ExtractNormalMap);
+	SceneCaptureComponent->PostProcessSettings.AddBlendable(ExtractMetallicRoughness, 1);
+	SceneCaptureComponent->CaptureScene();
+
+	RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
+	RenderTargetResource->ReadPixels(Pixels);
+
+	ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
+	ImageWrapper->SetRaw(Pixels.GetData(), Pixels.Num() * sizeof(FColor), TextureSize, TextureSize, ERGBFormat::BGRA, 8);
+
+	MetallicRoughness = ImageWrapper->GetCompressed();
+
+	return true;
+}
+
+bool AglTFRuntimeMaterialBaker::BakeGroomToPng(UGroomAsset* Groom, TArray<uint8>& BaseColor, TArray<uint8>& NormalMap, TArray<uint8>& MetallicRoughness, const float OrthographicScale)
+{
+	const uint32 TextureSize = 2048;
+
+	UMaterial* ExtractBaseColor = LoadObject<UMaterial>(nullptr, TEXT("/glTFRuntime/PPM_glTFRuntimeExtractBaseColor"));
+	UMaterial* ExtractNormalMap = LoadObject<UMaterial>(nullptr, TEXT("/glTFRuntime/PPM_glTFRuntimeExtractNormalMap"));
+	UMaterial* ExtractMetallicRoughness = LoadObject<UMaterial>(nullptr, TEXT("/glTFRuntime/PPM_glTFRuntimeExtractMetallicRoughness"));
+
+	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
+
+	Groom->HairGroupsCards[0].ImportedMesh = RenderingPlaneComponent->GetStaticMesh();
+
+	Groom->BuildCardsGeometry();
+	Groom->BuildMeshesGeometry();
+
+	GroomPlaneComponent->SetGroomAsset(Groom);
+	SceneCaptureComponent->ProjectionType = ECameraProjectionMode::Orthographic;
+	
+	SceneCaptureComponent->OrthoWidth = 100 * OrthographicScale;
+	SceneCaptureComponent->ShowOnlyComponent(GroomPlaneComponent);
+
+	UTextureRenderTarget2D* RenderTarget = NewObject<UTextureRenderTarget2D>();
+	SceneCaptureComponent->TextureTarget = RenderTarget;
+
+	FRenderTarget* RenderTargetResource = nullptr;
+	TArray<FColor> Pixels;
+	TArray<FLinearColor> AlphaValues;
+
+	UMaterialInterface* GroomMaterial = nullptr;
+	for (int32 Index = 0; Index < Groom->HairGroupsMaterials.Num(); Index++)
+	{
+		if (Groom->HairGroupsMaterials[Index].SlotName == Groom->HairGroupsCards[0].MaterialSlotName)
+		{
+			GroomMaterial = Groom->HairGroupsMaterials[Index].Material;
+			break;
+		}
+	}
+
+	if (!GroomMaterial)
+	{
+		return false;
+	}
+
+	/* Alpha (if required) */
+	if (GroomMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent || GroomMaterial->GetBlendMode() == EBlendMode::BLEND_Masked)
+	{
+		SceneCaptureComponent->ShowFlags.Translucency = true;
+		SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneColorHDR;
+		RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_FloatRGBA, false);
+		SceneCaptureComponent->CaptureScene();
+		RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
+		RenderTargetResource->ReadLinearColorPixels(AlphaValues);
+	}
+
+	SceneCaptureComponent->ShowFlags.Translucency = true;
+	SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+
+	/* BaseColor */
+	RenderTarget->InitCustomFormat(TextureSize, TextureSize, EPixelFormat::PF_R8G8B8A8, false);
+	if (GroomMaterial->GetBlendMode() != EBlendMode::BLEND_Translucent)
+	{
+		SceneCaptureComponent->PostProcessSettings.AddBlendable(ExtractBaseColor, 1);
+	}
+	SceneCaptureComponent->CaptureScene();
+
+	RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
+	RenderTargetResource->ReadPixels(Pixels);
+
+	if (GroomMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent || GroomMaterial->GetBlendMode() == EBlendMode::BLEND_Masked)
+	{
+		int32 AlphaPixelsNum = 0;
+		for (int32 PixelIndex = 0; PixelIndex < Pixels.Num(); PixelIndex++)
+		{
+			const float Alpha = 1 - AlphaValues[PixelIndex].A;
+
+			Pixels[PixelIndex].A = Alpha * 255.0f;
+			if (GroomMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
+			{
+				if (GroomMaterial->GetShadingModels().IsUnlit())
+				{
+					if (Pixels[PixelIndex].R == 0 && Pixels[PixelIndex].G == 0 && Pixels[PixelIndex].B == 0)
+					{
+						Pixels[PixelIndex].A = 0;
+					}
+				}
+				if (Alpha < GroomMaterial->GetOpacityMaskClipValue())
 				{
 					Pixels[PixelIndex].A = 0;
 				}

@@ -44,7 +44,8 @@ public class glTFRuntime : ModuleRules
                 "ApplicationCore",
                 "HTTP",
                 "PhysicsCore",
-                "Projects"
+                "Projects",
+                "HairStrandsCore"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

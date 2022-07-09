@@ -5,6 +5,7 @@
 #include "Animation/MorphTarget.h"
 #include "Engine/Canvas.h"
 #include "glTFRuntimeMaterialBaker.h"
+#include "GroomAsset.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "Kismet/KismetRenderingLibrary.h"
@@ -49,7 +50,7 @@ FglTFRuntimeWriter::~FglTFRuntimeWriter()
 {
 }
 
-bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent)
+bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent, class UGroomAsset* Groom, const float OrthographicScale)
 {
 	if (LOD < 0)
 	{
@@ -232,25 +233,54 @@ bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, c
 			StaticMeshMaterial = StaticMeshComponent ? StaticMeshComponent->GetMaterial(MaterialIndex) : StaticMesh->GetStaticMaterials()[MaterialIndex].MaterialInterface;
 		}
 
+		if (Groom)
+		{
+			StaticMeshMaterial = Groom->HairGroupsMaterials[0].Material;
+		}
+
 		AglTFRuntimeMaterialBaker* MaterialBaker = World->SpawnActor<AglTFRuntimeMaterialBaker>();
 
 		TArray<uint8> PNGBaseColor;
 		TArray<uint8> PNGNormalMap;
 		TArray<uint8> PNGMetallicRoughness;
 
-		FString AlphaMode = "OPAQUE";
+		bool bMaterialBaked = false;
+		if (Groom)
+		{
+			bMaterialBaked = MaterialBaker->BakeGroomToPng(Groom, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness, OrthographicScale);
+			StaticMeshMaterial = nullptr;
+			for (int32 Index = 0; Index < Groom->HairGroupsMaterials.Num(); Index++)
+			{
+				if (Groom->HairGroupsMaterials[Index].SlotName == Groom->HairGroupsCards[0].MaterialSlotName)
+				{
+					StaticMeshMaterial = Groom->HairGroupsMaterials[Index].Material;
+					break;
+				}
+			}
 
-		if (StaticMeshMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
-		{
-			AlphaMode = "BLEND";
+			if (!StaticMeshMaterial)
+			{
+				return false;
+			}
 		}
-		else if (StaticMeshMaterial->GetBlendMode() == EBlendMode::BLEND_Masked)
+		else
 		{
-			AlphaMode = "MASK";
+			bMaterialBaked = MaterialBaker->BakeMaterialToPng(StaticMeshMaterial, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness);
 		}
 
-		if (MaterialBaker->BakeMaterialToPng(StaticMeshMaterial, PNGBaseColor, PNGNormalMap, PNGMetallicRoughness))
+		if (bMaterialBaked)
 		{
+
+			FString AlphaMode = "OPAQUE";
+
+			if (StaticMeshMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
+			{
+				AlphaMode = "BLEND";
+			}
+			else if (StaticMeshMaterial->GetBlendMode() == EBlendMode::BLEND_Masked)
+			{
+				AlphaMode = "MASK";
+			}
 
 			int64 ImageBufferViewBaseColorOffset = BinaryData.Num();
 			BinaryData.Append(PNGBaseColor.GetData(), PNGBaseColor.Num());
@@ -316,7 +346,7 @@ bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, c
 
 		}
 
-		MaterialBaker->Destroy();
+		//MaterialBaker->Destroy();
 
 		JsonPrimitives.Add(MakeShared<FJsonValueObject>(JsonPrimitive));
 	}

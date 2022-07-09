@@ -129,7 +129,7 @@ public:
 	~FglTFRuntimeWriter();
 
 	bool AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent);
-	bool AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent);
+	bool AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent, class UGroomAsset* Groom, const float OrthographicScale);
 
 	bool WriteToFile(const FString& Filename);
 
