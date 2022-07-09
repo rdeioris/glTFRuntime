@@ -73,6 +73,12 @@ struct FglTFRuntimeWriterConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FTransform ParentNodeTransform;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString ForceRootBone;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 MaxBonesInfluences;
+
 	FglTFRuntimeWriterConfig()
 	{
 		bExportSkin = true;
@@ -84,6 +90,7 @@ struct FglTFRuntimeWriterConfig
 		bExportTangents = true;
 		bExportUVs = true;
 		ParentNodeTransform = FTransform::Identity;
+		MaxBonesInfluences = 12;
 	}
 };
 
@@ -121,7 +128,8 @@ public:
 	FglTFRuntimeWriter(const FglTFRuntimeWriterConfig& InConfig);
 	~FglTFRuntimeWriter();
 
-	bool AddMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent);
+	bool AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent);
+	bool AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent);
 
 	bool WriteToFile(const FString& Filename);
 

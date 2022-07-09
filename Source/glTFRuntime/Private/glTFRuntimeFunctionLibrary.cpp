@@ -86,13 +86,27 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 bool UglTFRuntimeFunctionLibrary::glTFSaveSkeletalMeshToFile(UObject* WorldContextObject, USkeletalMesh* SkeletalMesh, const int32 LOD, const FString& Filename, const TArray<UAnimSequence*>& Animations, const FglTFRuntimeWriterConfig& WriterConfig)
 {
 	TSharedRef<FglTFRuntimeWriter> Writer = MakeShared<FglTFRuntimeWriter>(WriterConfig);
-	Writer->AddMesh(WorldContextObject->GetWorld(), SkeletalMesh, LOD, Animations, nullptr);
+	Writer->AddSkeletalMesh(WorldContextObject->GetWorld(), SkeletalMesh, LOD, Animations, nullptr);
 	return Writer->WriteToFile(Filename);
 }
 
 bool UglTFRuntimeFunctionLibrary::glTFSaveSkeletalMeshComponentToFile(UObject* WorldContextObject, USkeletalMeshComponent* SkeletalMeshComponent, const int32 LOD, const FString& Filename, const TArray<UAnimSequence*>& Animations, const FglTFRuntimeWriterConfig& WriterConfig)
 {
 	TSharedRef<FglTFRuntimeWriter> Writer = MakeShared<FglTFRuntimeWriter>(WriterConfig);
-	Writer->AddMesh(WorldContextObject->GetWorld(), SkeletalMeshComponent->SkeletalMesh, LOD, Animations, SkeletalMeshComponent);
+	Writer->AddSkeletalMesh(WorldContextObject->GetWorld(), SkeletalMeshComponent->SkeletalMesh, LOD, Animations, SkeletalMeshComponent);
+	return Writer->WriteToFile(Filename);
+}
+
+bool UglTFRuntimeFunctionLibrary::glTFSaveStaticMeshToFile(UObject* WorldContextObject, UStaticMesh* StaticMesh, const int32 LOD, const FString& Filename, const FglTFRuntimeWriterConfig& WriterConfig)
+{
+	TSharedRef<FglTFRuntimeWriter> Writer = MakeShared<FglTFRuntimeWriter>(WriterConfig);
+	Writer->AddStaticMesh(WorldContextObject->GetWorld(), StaticMesh, LOD, nullptr);
+	return Writer->WriteToFile(Filename);
+}
+
+bool UglTFRuntimeFunctionLibrary::glTFSaveStaticMeshComponentToFile(UObject* WorldContextObject, UStaticMeshComponent* StaticMeshComponent, const int32 LOD, const FString& Filename, const FglTFRuntimeWriterConfig& WriterConfig)
+{
+	TSharedRef<FglTFRuntimeWriter> Writer = MakeShared<FglTFRuntimeWriter>(WriterConfig);
+	Writer->AddStaticMesh(WorldContextObject->GetWorld(), StaticMeshComponent->GetStaticMesh(), LOD, StaticMeshComponent);
 	return Writer->WriteToFile(Filename);
 }
