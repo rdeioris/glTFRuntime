@@ -46,4 +46,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "glTF Save StaticMesh with Groom in File", AutoCreateRefTerm = "Animations, WriterConfig, AdditionalStaticMeshes"), Category = "glTFRuntime")
 	static bool glTFSaveStaticMeshWithGroomToFile(UObject* WorldContextObject, UStaticMesh* StaticMesh, const int32 LOD, class UGroomAsset* Groom, const FString& Filename, const FglTFRuntimeWriterConfig& WriterConfig, const float OrthographicScale = 1);
+
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "glTF Save Actor in File", AutoCreateRefTerm = "WriterConfig"), Category = "glTFRuntime")
+	static bool glTFSaveActorToFile(UObject* WorldContextObject, AActor* Actor, const int32 LOD, const FString& Filename, const FglTFRuntimeWriterConfig& WriterConfig);
 };

@@ -128,14 +128,23 @@ public:
 	FglTFRuntimeWriter(const FglTFRuntimeWriterConfig& InConfig);
 	~FglTFRuntimeWriter();
 
-	bool AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent);
-	bool AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent, class UGroomAsset* Groom, const float OrthographicScale);
+	int32 AddSkeletalMesh(const int32 ParentIndex, UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent);
+	int32 AddStaticMesh(const int32 ParentIndex, UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent, class UGroomAsset* Groom, const float OrthographicScale);
 
 	bool WriteToFile(const FString& Filename);
+
+	int32 AddNode(const int32 ParentIndex, const FString& Name, const FTransform Transform, const int32 MeshIndex, const int32 SkinIndex);
+
+	int32 GetParentNodeIndex(const int32 NodeIndex) const;
+
+	bool AddActor(UWorld* World, AActor* Actor, const int32 LOD);
+
+	bool AddRecursiveComponent(const int32 ParentNodeIndex, UWorld* World, USceneComponent* SceneComponent, const int32 LOD);
 
 protected:
 	TSharedPtr<FJsonObject> JsonRoot;
 	TArray<TSharedPtr<FJsonValue>> JsonMeshes;
+	TArray<TSharedPtr<FJsonValue>> JsonSkins;
 	TArray<TSharedPtr<FJsonValue>> JsonAnimations;
 	TArray<TSharedPtr<FJsonValue>> JsonMaterials;
 	TArray<TSharedPtr<FJsonValue>> JsonImages;
@@ -147,4 +156,5 @@ protected:
 	TArray<uint8> BinaryData;
 
 	FglTFRuntimeWriterConfig Config;
+	int32 TextureIndex = 0;
 };

@@ -6,6 +6,7 @@
 #include "Engine/Canvas.h"
 #include "glTFRuntimeMaterialBaker.h"
 #include "GroomAsset.h"
+#include "GroomComponent.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "Kismet/KismetRenderingLibrary.h"
@@ -50,11 +51,11 @@ FglTFRuntimeWriter::~FglTFRuntimeWriter()
 {
 }
 
-bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent, class UGroomAsset* Groom, const float OrthographicScale)
+int32 FglTFRuntimeWriter::AddStaticMesh(const int32 ParentIndex, UWorld* World, UStaticMesh* StaticMesh, const int32 LOD, UStaticMeshComponent* StaticMeshComponent, class UGroomAsset* Groom, const float OrthographicScale)
 {
 	if (LOD < 0)
 	{
-		return false;
+		return INDEX_NONE;
 	}
 
 	if (!StaticMesh && StaticMeshComponent)
@@ -64,10 +65,8 @@ bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, c
 
 	if (!StaticMesh)
 	{
-		return false;
+		return INDEX_NONE;
 	}
-
-	uint32 MeshIndex = JsonMeshes.Num();
 
 	FStaticMeshRenderData* RenderData = StaticMesh->GetRenderData();
 	if (!RenderData)
@@ -80,7 +79,7 @@ bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, c
 
 	if (LOD >= NumLODs)
 	{
-		return false;
+		return INDEX_NONE;
 	}
 
 	FMatrix SceneBasisMatrix = FBasisVectorMatrix(FVector(1, 0, 0), FVector(0, 0, 1), FVector(0, 1, 0), FVector::ZeroVector).Inverse();
@@ -191,7 +190,6 @@ bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, c
 	FglTFRuntimeAccessor TexCoordAccessor("VEC2", 5126, TexCoords.Num(), TexCoordOffset, TexCoords.Num() * sizeof(FVector2D), false);
 	int32 TexCoordAccessorIndex = Accessors.Add(TexCoordAccessor);
 
-	int32 TextureIndex = 0;
 	for (int32 SectionIndex = 0; SectionIndex < LODRenderData.Sections.Num(); SectionIndex++)
 	{
 		FStaticMeshSection& Section = LODRenderData.Sections[SectionIndex];
@@ -260,7 +258,7 @@ bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, c
 
 			if (!StaticMeshMaterial)
 			{
-				return false;
+				return INDEX_NONE;
 			}
 		}
 		else
@@ -353,16 +351,61 @@ bool FglTFRuntimeWriter::AddStaticMesh(UWorld* World, UStaticMesh* StaticMesh, c
 
 	JsonMesh->SetArrayField("primitives", JsonPrimitives);
 
-	JsonMeshes.Add(MakeShared<FJsonValueObject>(JsonMesh));
+	int32 MeshIndex = JsonMeshes.Add(MakeShared<FJsonValueObject>(JsonMesh));
+
+	return AddNode(ParentIndex, StaticMeshComponent ? StaticMeshComponent->GetPathName() : StaticMesh->GetPathName(), StaticMeshComponent ? StaticMeshComponent->GetComponentTransform() : FTransform::Identity, MeshIndex, INDEX_NONE);
+}
+
+bool FglTFRuntimeWriter::AddRecursiveComponent(const int32 ParentNodeIndex, UWorld* World, USceneComponent* SceneComponent, const int32 LOD)
+{
+	int32 NewParentIndex = INDEX_NONE;
+	if (UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(SceneComponent))
+	{
+		NewParentIndex = AddStaticMesh(ParentNodeIndex, World, nullptr, LOD, StaticMeshComponent, nullptr, 1);
+	}
+	else if (UGroomComponent* GroomComponent = Cast<UGroomComponent>(SceneComponent))
+	{
+		if (GroomComponent->GroomAsset && GroomComponent->GroomAsset->HairGroupsCards.Num() > 0)
+		{
+			NewParentIndex = AddStaticMesh(ParentNodeIndex, World, GroomComponent->GroomAsset->HairGroupsCards[0].ImportedMesh, 0, nullptr, GroomComponent->GroomAsset, 10);
+		}
+
+		if (NewParentIndex == INDEX_NONE)
+		{
+			NewParentIndex = AddNode(ParentNodeIndex, SceneComponent->GetPathName(), SceneComponent->GetComponentTransform(), INDEX_NONE, INDEX_NONE);
+		}
+	}
+	else if (USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(SceneComponent))
+	{
+		NewParentIndex = AddSkeletalMesh(ParentNodeIndex, World, nullptr, LOD, {}, SkeletalMeshComponent);
+	}
+	else
+	{
+		NewParentIndex = AddNode(ParentNodeIndex, SceneComponent->GetPathName(), SceneComponent->GetComponentTransform(), INDEX_NONE, INDEX_NONE);
+	}
+
+	for (USceneComponent* Child : SceneComponent->GetAttachChildren())
+	{
+		if (!AddRecursiveComponent(NewParentIndex, World, Child, LOD))
+		{
+			return false;
+		}
+	}
 
 	return true;
 }
 
-bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent)
+bool FglTFRuntimeWriter::AddActor(UWorld* World, AActor* Actor, const int32 LOD)
+{
+	USceneComponent* RootComponent = Actor->GetRootComponent();
+	return AddRecursiveComponent(INDEX_NONE, World, RootComponent, LOD);
+}
+
+int32 FglTFRuntimeWriter::AddSkeletalMesh(const int32 ParentIndex, UWorld* World, USkeletalMesh* SkeletalMesh, const int32 LOD, const TArray<UAnimSequence*>& Animations, USkeletalMeshComponent* SkeletalMeshComponent)
 {
 	if (LOD < 0)
 	{
-		return false;
+		return INDEX_NONE;
 	}
 
 	if (!SkeletalMesh && SkeletalMeshComponent)
@@ -372,8 +415,10 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 
 	if (!SkeletalMesh)
 	{
-		return false;
+		return INDEX_NONE;
 	}
+
+	int32 SkinIndex = INDEX_NONE;
 
 	const FReferenceSkeleton& SkeletonRef = SkeletalMesh->GetRefSkeleton();
 
@@ -405,7 +450,7 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 		RootBoneIndex = SkeletonRef.FindBoneIndex(*Config.ForceRootBone);
 		if (RootBoneIndex == INDEX_NONE)
 		{
-			return false;
+			return INDEX_NONE;
 		}
 		OverrideNoneIndex = SkeletonRef.GetParentIndex(RootBoneIndex);
 		BoneReferenceTransform = BoneTransforms[RootBoneIndex];
@@ -419,29 +464,21 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 		BoneTransforms[RootBoneIndex] = FTransform::Identity;
 	}
 
+	TMap<int32, int32> BoneNodeMap;
+	TMap<int32, int32> JointsBoneMap;
+
 	if (Config.bExportSkin)
 	{
 		TArray<TSharedPtr<FJsonValue>> JsonJoints;
 		TArray<float> MatricesData;
 
-
 		for (int32 BoneIndex = RootBoneIndex; BoneIndex < NumBones; BoneIndex++)
 		{
-			TSharedRef<FJsonObject> JsonNode = MakeShared<FJsonObject>();
-			JsonNode->SetStringField("name", SkeletonRef.GetBoneName(BoneIndex).ToString());
-			TArray<TSharedPtr<FJsonValue>> JsonNodeChildren;
-			TArray<int32> BoneChildren;
-			for (int32 ChildBoneIndex = RootBoneIndex; ChildBoneIndex < NumBones; ChildBoneIndex++)
-			{
-				if (SkeletonRef.GetParentIndex(ChildBoneIndex) == BoneIndex)
-				{
-					JsonNodeChildren.Add(MakeShared<FJsonValueNumber>(ChildBoneIndex - RootBoneIndex));
-				}
-			}
 
-			if (JsonNodeChildren.Num() > 0)
+			int32 BoneParentIndex = SkeletonRef.GetParentIndex(BoneIndex);
+			if (BoneParentIndex != INDEX_NONE)
 			{
-				JsonNode->SetArrayField("children", JsonNodeChildren);
+				BoneParentIndex = BoneNodeMap[BoneParentIndex];
 			}
 
 			FMatrix Matrix = Basis.Inverse() * BoneTransforms[BoneIndex].ToMatrixWithScale() * Basis;
@@ -479,34 +516,14 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 				NodeTransform = Config.OverrideBonesByName[SkeletonRef.GetBoneName(BoneIndex)];
 			}
 
-			FVector NodeTranslation = NodeTransform.GetLocation();
-			FQuat NodeRotation = NodeTransform.GetRotation();
-			FVector NodeScale = NodeTransform.GetScale3D();
+			int32 JointNodeIndex = AddNode(BoneParentIndex, SkeletonRef.GetBoneName(BoneIndex).ToString(), NodeTransform, INDEX_NONE, INDEX_NONE);
 
-			JsonNodeTranslation.Add(MakeShared<FJsonValueNumber>(NodeTranslation.X));
-			JsonNodeTranslation.Add(MakeShared<FJsonValueNumber>(NodeTranslation.Y));
-			JsonNodeTranslation.Add(MakeShared<FJsonValueNumber>(NodeTranslation.Z));
+			JointsBoneMap.Add(JointNodeIndex, JsonJoints.Add(MakeShared<FJsonValueNumber>(JointNodeIndex)));
 
-			JsonNodeRotation.Add(MakeShared<FJsonValueNumber>(NodeRotation.X));
-			JsonNodeRotation.Add(MakeShared<FJsonValueNumber>(NodeRotation.Y));
-			JsonNodeRotation.Add(MakeShared<FJsonValueNumber>(NodeRotation.Z));
-			JsonNodeRotation.Add(MakeShared<FJsonValueNumber>(NodeRotation.W));
-
-			JsonNodeScale.Add(MakeShared<FJsonValueNumber>(NodeScale.X));
-			JsonNodeScale.Add(MakeShared<FJsonValueNumber>(NodeScale.Y));
-			JsonNodeScale.Add(MakeShared<FJsonValueNumber>(NodeScale.Z));
-
-			JsonNode->SetArrayField("translation", JsonNodeTranslation);
-			JsonNode->SetArrayField("rotation", JsonNodeRotation);
-			JsonNode->SetArrayField("scale", JsonNodeScale);
-
-			int32 JointNode = JsonNodes.Add(MakeShared<FJsonValueObject>(JsonNode));
-			check(JointNode == BoneIndex - RootBoneIndex);
-			JsonJoints.Add(MakeShared<FJsonValueNumber>(JointNode));
+			BoneNodeMap.Add(BoneIndex, JointNodeIndex);
 		}
 
 
-		TArray<TSharedPtr<FJsonValue>> JsonSkins;
 		TSharedRef<FJsonObject> JsonSkin = MakeShared<FJsonObject>();
 		JsonSkin->SetStringField("name", SkeletalMesh->GetSkeleton()->GetName());
 
@@ -521,12 +538,9 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 
 		JsonSkin->SetNumberField("inverseBindMatrices", SkeletonMatricesAccessorIndex);
 
-		int32 SkinIndex = JsonSkins.Add(MakeShared<FJsonValueObject>(JsonSkin));
+		SkinIndex = JsonSkins.Add(MakeShared<FJsonValueObject>(JsonSkin));
 
-		JsonRoot->SetArrayField("skins", JsonSkins);
 	}
-
-	uint32 MeshIndex = JsonMeshes.Num();
 
 	FSkeletalMeshRenderData* RenderData = SkeletalMesh->GetResourceForRendering();
 	if (!RenderData)
@@ -539,7 +553,7 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 
 	if (LOD >= NumLODs)
 	{
-		return false;
+		return INDEX_NONE;
 	}
 
 	FMatrix SceneBasisMatrix = FBasisVectorMatrix(FVector(1, 0, 0), FVector(0, 0, 1), FVector(0, 1, 0), FVector::ZeroVector).Inverse();
@@ -563,7 +577,7 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 		if (PivotBoneIndex < 0)
 		{
 			UE_LOG(LogTemp, Error, TEXT("Unable to find Pivot Bone %s"), *Config.PivotToBone);
-			return false;
+			return INDEX_NONE;
 		}
 		FMatrix FullMatrix = Basis.Inverse() * BuildBoneFullMatrix(SkeletonRef, BoneTransforms, PivotBoneIndex, OverrideNoneIndex) * Basis;
 		FullMatrix.ScaleTranslation(FVector::OneVector / 100);
@@ -675,7 +689,7 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 					{
 						const int32 BoneIndex = SkinWeightInfo.InfluenceBones[(JointsGroup * 4) + InfluenceIndex];
 						const uint8 Weight = SkinWeightInfo.InfluenceWeights[(JointsGroup * 4) + InfluenceIndex];
-						InfluencesData[InfluenceIndex] = Section.BoneMap[BoneIndex];
+						InfluencesData[InfluenceIndex] = JointsBoneMap[BoneNodeMap[Section.BoneMap[BoneIndex]]];
 						WeightsData[InfluenceIndex] = Weight;
 						if (Weight == 0)
 						{
@@ -726,12 +740,14 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 				TArray<FVector> Values;
 				Values.AddZeroed(Positions.Num());
 				MorphTargetsMinMaxValues.Add(MorphTarget->GetName(), TPair<FVector, FVector>(FVector::ZeroVector, FVector::ZeroVector));
+
 				for (const FMorphTargetDelta& Delta : MorphTargetLodModel.Vertices)
 				{
 					//uint32 PositionIndex = Indices[Delta.SourceIdx];
 					Values[Delta.SourceIdx] = SceneBasisMatrix.TransformPosition(Delta.PositionDelta) * SceneScale;
 
 					const FVector Position = Values[Delta.SourceIdx];
+
 					TPair<FVector, FVector>& Pair = MorphTargetsMinMaxValues[MorphTarget->GetName()];
 					if (Position.X < Pair.Key.X)
 					{
@@ -758,9 +774,11 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 						Pair.Value.Z = Position.Z;
 					}
 				}
+
 				MorphTargetsValues.Add(TPair<FString, TArray<FVector>>(MorphTarget->GetName(), Values));
 
 				MorphTargetNameMap.Add(MorphTarget->GetName(), JsonMorphTargetsNames.Add(MakeShared<FJsonValueString>(MorphTarget->GetName())));
+
 			}
 		}
 	}
@@ -853,7 +871,6 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 		}
 	}
 
-	int32 TextureIndex = 0;
 	for (int32 SectionIndex = 0; SectionIndex < LODRenderData.RenderSections.Num(); SectionIndex++)
 	{
 		FSkelMeshRenderSection& Section = LODRenderData.RenderSections[SectionIndex];
@@ -1020,8 +1037,9 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 		JsonMesh->SetObjectField("extras", JsonExtras);
 	}
 
-	JsonMeshes.Add(MakeShared<FJsonValueObject>(JsonMesh));
+	int32 MeshIndex = JsonMeshes.Add(MakeShared<FJsonValueObject>(JsonMesh));
 
+#if 0
 	if (Config.bExportSkin)
 	{
 		const FReferenceSkeleton& AnimSkeletonRef = SkeletalMesh->GetSkeleton()->GetReferenceSkeleton();
@@ -1233,10 +1251,99 @@ bool FglTFRuntimeWriter::AddSkeletalMesh(UWorld* World, USkeletalMesh* SkeletalM
 			JsonAnimation->SetArrayField("samplers", JsonAnimationSamplers);
 
 			JsonAnimations.Add(MakeShared<FJsonValueObject>(JsonAnimation));
+}
+}
+#endif
+
+	return AddNode(ParentIndex, SkeletalMeshComponent ? SkeletalMeshComponent->GetPathName() : SkeletalMesh->GetPathName(), SkeletalMeshComponent ? SkeletalMeshComponent->GetComponentTransform() : FTransform::Identity, MeshIndex, SkinIndex);
+}
+
+int32 FglTFRuntimeWriter::AddNode(const int32 ParentIndex, const FString& Name, const FTransform Transform, const int32 MeshIndex, const int32 SkinIndex)
+{
+	TSharedRef<FJsonObject> JsonNode = MakeShared<FJsonObject>();
+
+	JsonNode->SetStringField("name", Name);
+
+	TArray<TSharedPtr<FJsonValue>> JsonNodeTranslation;
+	TArray<TSharedPtr<FJsonValue>> JsonNodeRotation;
+	TArray<TSharedPtr<FJsonValue>> JsonNodeScale;
+
+	FVector NodeTranslation = Transform.GetLocation();
+	FQuat NodeRotation = Transform.GetRotation();
+	FVector NodeScale = Transform.GetScale3D();
+
+	JsonNodeTranslation.Add(MakeShared<FJsonValueNumber>(NodeTranslation.X));
+	JsonNodeTranslation.Add(MakeShared<FJsonValueNumber>(NodeTranslation.Y));
+	JsonNodeTranslation.Add(MakeShared<FJsonValueNumber>(NodeTranslation.Z));
+
+	JsonNodeRotation.Add(MakeShared<FJsonValueNumber>(NodeRotation.X));
+	JsonNodeRotation.Add(MakeShared<FJsonValueNumber>(NodeRotation.Y));
+	JsonNodeRotation.Add(MakeShared<FJsonValueNumber>(NodeRotation.Z));
+	JsonNodeRotation.Add(MakeShared<FJsonValueNumber>(NodeRotation.W));
+
+	JsonNodeScale.Add(MakeShared<FJsonValueNumber>(NodeScale.X));
+	JsonNodeScale.Add(MakeShared<FJsonValueNumber>(NodeScale.Y));
+	JsonNodeScale.Add(MakeShared<FJsonValueNumber>(NodeScale.Z));
+
+	JsonNode->SetArrayField("translation", JsonNodeTranslation);
+	JsonNode->SetArrayField("rotation", JsonNodeRotation);
+	JsonNode->SetArrayField("scale", JsonNodeScale);
+
+	if (MeshIndex != INDEX_NONE)
+	{
+		JsonNode->SetNumberField("mesh", MeshIndex);
+	}
+
+	if (SkinIndex != INDEX_NONE)
+	{
+		JsonNode->SetNumberField("skin", SkinIndex);
+	}
+
+	int32 JointNode = JsonNodes.Add(MakeShared<FJsonValueObject>(JsonNode));
+
+
+	if (ParentIndex != INDEX_NONE)
+	{
+		const TSharedPtr<FJsonObject> ParentObject = JsonNodes[ParentIndex]->AsObject();
+		const TArray<TSharedPtr<FJsonValue>>* CurrentChildren = nullptr;
+		if (ParentObject->TryGetArrayField("children", CurrentChildren))
+		{
+			TArray<TSharedPtr<FJsonValue>> NewChildren = *CurrentChildren;
+			NewChildren.Add(MakeShared<FJsonValueNumber>(JointNode));
+			ParentObject->SetArrayField("children", NewChildren);
+		}
+		else
+		{
+			ParentObject->SetArrayField("children", { MakeShared<FJsonValueNumber>(JointNode) });
 		}
 	}
 
-	return true;
+	return JointNode;
+}
+
+int32 FglTFRuntimeWriter::GetParentNodeIndex(const int32 NodeIndex) const
+{
+	for (int32 Index = 0; Index < JsonNodes.Num(); Index++)
+	{
+		if (Index == NodeIndex)
+		{
+			continue;
+		}
+
+		const TArray<TSharedPtr<FJsonValue>>* Children = nullptr;
+		if (JsonNodes[Index]->AsObject()->TryGetArrayField("children", Children))
+		{
+			for (const TSharedPtr<FJsonValue> JsonValue : *Children)
+			{
+				if (JsonValue->AsNumber() == NodeIndex)
+				{
+					return Index;
+				}
+			}
+		}
+	}
+
+	return INDEX_NONE;
 }
 
 bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
@@ -1308,71 +1415,17 @@ bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
 		JsonTextures.Add(MakeShared<FJsonValueObject>(JsonTexture));
 	}
 
-	TSharedRef<FJsonObject> JsonNode = MakeShared<FJsonObject>();
-	JsonNode->SetStringField("name", "Mesh");
-	JsonNode->SetNumberField("mesh", 0);
-	if (Config.bExportSkin)
-	{
-		JsonNode->SetNumberField("skin", 0);
-	}
-
-	int32 JsonNodeIndex = JsonNodes.Add(MakeShared<FJsonValueObject>(JsonNode));
-
-	int32 JsonParentNodeIndex = INDEX_NONE;
-
-	if (Config.bAddParentNode)
-	{
-		TSharedRef<FJsonObject> JsonParentNode = MakeShared<FJsonObject>();
-
-		TArray<TSharedPtr<FJsonValue>> JsonParentNodeTranslation;
-		TArray<TSharedPtr<FJsonValue>> JsonParentNodeRotation;
-		TArray<TSharedPtr<FJsonValue>> JsonParentNodeScale;
-
-		FMatrix Basis = FBasisVectorMatrix(FVector(1, 0, 0), FVector(0, 0, 1), FVector(0, 1, 0), FVector::ZeroVector);
-		FMatrix Matrix = Basis.Inverse() * Config.ParentNodeTransform.ToMatrixWithScale() * Basis;
-		Matrix.ScaleTranslation(FVector::OneVector / 100);
-
-		FTransform ParentNodeTransform = FTransform(Matrix);
-
-		FVector ParentNodeTranslation = ParentNodeTransform.GetLocation();
-		FQuat ParentNodeRotation = ParentNodeTransform.GetRotation();
-		FVector ParentNodeScale = ParentNodeTransform.GetScale3D();
-
-		JsonParentNodeTranslation.Add(MakeShared<FJsonValueNumber>(ParentNodeTranslation.X));
-		JsonParentNodeTranslation.Add(MakeShared<FJsonValueNumber>(ParentNodeTranslation.Y));
-		JsonParentNodeTranslation.Add(MakeShared<FJsonValueNumber>(ParentNodeTranslation.Z));
-
-		JsonParentNodeRotation.Add(MakeShared<FJsonValueNumber>(ParentNodeRotation.X));
-		JsonParentNodeRotation.Add(MakeShared<FJsonValueNumber>(ParentNodeRotation.Y));
-		JsonParentNodeRotation.Add(MakeShared<FJsonValueNumber>(ParentNodeRotation.Z));
-		JsonParentNodeRotation.Add(MakeShared<FJsonValueNumber>(ParentNodeRotation.W));
-
-		JsonParentNodeScale.Add(MakeShared<FJsonValueNumber>(ParentNodeScale.X));
-		JsonParentNodeScale.Add(MakeShared<FJsonValueNumber>(ParentNodeScale.Y));
-		JsonParentNodeScale.Add(MakeShared<FJsonValueNumber>(ParentNodeScale.Z));
-
-		JsonParentNode->SetStringField("name", "Parent");
-
-		JsonParentNode->SetArrayField("translation", JsonParentNodeTranslation);
-		JsonParentNode->SetArrayField("rotation", JsonParentNodeRotation);
-		JsonParentNode->SetArrayField("scale", JsonParentNodeScale);
-
-		TArray<TSharedPtr<FJsonValue>> JsonParentNodeChildren;
-		JsonParentNodeChildren.Add(MakeShared<FJsonValueNumber>(JsonNodeIndex));
-
-		JsonParentNode->SetArrayField("children", JsonParentNodeChildren);
-
-		JsonParentNodeIndex = JsonNodes.Add(MakeShared<FJsonValueObject>(JsonParentNode));
-	}
-
+	// add root nodes
 	TSharedRef<FJsonObject> JsonScene = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> JsonSceneNodes;
-	if (Config.bExportSkin)
+	for (int32 NodeIndex = 0; NodeIndex < JsonNodes.Num(); NodeIndex++)
 	{
-		JsonSceneNodes.Add(MakeShared<FJsonValueNumber>(0));
+		if (GetParentNodeIndex(NodeIndex) == INDEX_NONE)
+		{
+			JsonSceneNodes.Add(MakeShared<FJsonValueNumber>(NodeIndex));
+		}
 	}
 
-	JsonSceneNodes.Add(MakeShared<FJsonValueNumber>(JsonParentNodeIndex != INDEX_NONE ? JsonParentNodeIndex : JsonNodeIndex));
 	JsonScene->SetArrayField("nodes", JsonSceneNodes);
 
 	JsonScenes.Add(MakeShared<FJsonValueObject>(JsonScene));
@@ -1383,6 +1436,7 @@ bool FglTFRuntimeWriter::WriteToFile(const FString& Filename)
 	JsonRoot->SetArrayField("bufferViews", JsonBufferViews);
 	JsonRoot->SetArrayField("buffers", JsonBuffers);
 	JsonRoot->SetArrayField("meshes", JsonMeshes);
+	JsonRoot->SetArrayField("skins", JsonSkins);
 	if (JsonAnimations.Num() > 0)
 	{
 		JsonRoot->SetArrayField("animations", JsonAnimations);
