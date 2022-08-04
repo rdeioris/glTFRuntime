@@ -959,7 +959,7 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter, const TArray<FglTFRuntimePathItem>& OverrideTrackNameFromExtension)
+bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter, const TArray<FglTFRuntimePathItem>& OverrideTrackNameFromExtension)
 {
 	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
 
@@ -971,7 +971,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 
 	Duration = 0.f;
 
-	TArray<TPair<TArray<float>, TArray<FVector4>>> Samplers;
+	TArray<FglTFRuntimeAnimationCurve> Samplers;
 
 	for (int32 SamplerIndex = 0; SamplerIndex < JsonSamplers->Num(); SamplerIndex++)
 	{
@@ -981,15 +981,15 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			return false;
 		}
 
-		TArray<float> Timeline;
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", Timeline, { 5126 }, false))
+		FglTFRuntimeAnimationCurve AnimationCurve;
+
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", AnimationCurve.Timeline, { 5126 }, false))
 		{
 			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"input\" from sampler %d"), SamplerIndex));
 			return false;
 		}
 
-		TArray<FVector4> Values;
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", Values, { 1, 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, true))
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", AnimationCurve.Values, { 1, 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, true))
 		{
 			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"output\" from sampler %d"), SamplerIndex));
 			return false;
@@ -1002,7 +1002,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 		}
 
 		// get animation valid duration
-		for (float Time : Timeline)
+		for (float Time : AnimationCurve.Timeline)
 		{
 			if (Time > Duration)
 			{
@@ -1010,7 +1010,26 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			}
 		}
 
-		Samplers.Add(TPair<TArray<float>, TArray<FVector4>>(Timeline, Values));
+		// extract tangents and value (unfortunately Unreal does not support Cubic Splines for skeletal animations)
+		if (SamplerInterpolation == "CUBICSPLINE")
+		{
+			TArray<FVector4> CubicValues;
+			for (int32 TimeIndex = 0; TimeIndex < AnimationCurve.Timeline.Num(); TimeIndex++)
+			{
+				// gather A, V and B
+				FVector4 InTangent = AnimationCurve.Values[TimeIndex * 3];
+				FVector4 Value = AnimationCurve.Values[TimeIndex * 3 + 1];
+				FVector4 OutTangent = AnimationCurve.Values[TimeIndex * 3 + 2];
+
+				AnimationCurve.InTangents.Add(InTangent);
+				AnimationCurve.OutTangents.Add(OutTangent);
+				CubicValues.Add(Value);
+			}
+
+			AnimationCurve.Values = CubicValues;
+		}
+
+		Samplers.Add(AnimationCurve);
 	}
 
 
@@ -1056,7 +1075,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 				}
 			}
 		}
-		
+
 		if (Node.Name.IsEmpty())
 		{
 			int64 NodeIndex;
@@ -1082,7 +1101,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			return false;
 		}
 
-		Callback(Node, Path, Samplers[Sampler].Key, Samplers[Sampler].Value);
+		Callback(Node, Path, Samplers[Sampler]);
 	}
 
 	return true;
@@ -1139,45 +1158,45 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 
 	bool bAnimationFound = false;
 
-	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
+	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
 	{
 		if (Path == "translation")
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
 			{
-				AnimationCurve->AddLocationValue(Timeline[TimeIndex], Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddLocationValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "rotation")
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
 			{
-				FVector4 RotationValue = Values[TimeIndex];
+				FVector4 RotationValue = Curve.Values[TimeIndex];
 				FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
 				FVector Euler = Quat.Euler();
-				AnimationCurve->AddRotationValue(Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddRotationValue(Curve.Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "scale")
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
 			{
-				AnimationCurve->AddScaleValue(Timeline[TimeIndex], Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddScaleValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		bAnimationFound = true;
@@ -1232,45 +1251,45 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 
 	bool bAnimationFound = false;
 
-	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
+	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
 	{
 		if (Path == "translation")
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
 			{
-				AnimationCurve->AddLocationValue(Timeline[TimeIndex], Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddLocationValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "rotation")
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
 			{
-				FVector4 RotationValue = Values[TimeIndex];
+				FVector4 RotationValue = Curve.Values[TimeIndex];
 				FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
 				FVector Euler = Quat.Euler();
-				AnimationCurve->AddRotationValue(Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddRotationValue(Curve.Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		else if (Path == "scale")
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Timeline.Num(); TimeIndex++)
+			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
 			{
-				AnimationCurve->AddScaleValue(Timeline[TimeIndex], Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
+				AnimationCurve->AddScaleValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
 			}
 		}
 		bAnimationFound = true;

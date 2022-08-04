@@ -1900,7 +1900,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 		}
-}
+	}
 #endif
 
 	bool bHasTracks = false;
@@ -1926,8 +1926,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
 #endif
+			}
 		}
-	}
 		else if (Pair.Value.PosKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1956,7 +1956,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
 #endif
-		}
+			}
 		}
 		else if (Pair.Value.RotKeys.Num() < NumFrames)
 		{
@@ -1985,7 +1985,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 #endif
-		}
+			}
 		}
 		else if (Pair.Value.ScaleKeys.Num() < NumFrames)
 		{
@@ -2043,8 +2043,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 					Pair.Value.ScaleKeys[FrameIndex] = FrameTransform.GetScale3D();
 #endif
+				}
 			}
-		}
 
 			if (SkeletalAnimationConfig.bRemoveRootMotion)
 			{
@@ -2147,10 +2147,30 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	return AnimSequence;
 }
 
+FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const float T1, const FVector4 Value0, const FVector4 OutTangent, const FVector4 Value1, const FVector4 InTangent)
+{
+	float TD = T1 - T0;
+	float T = (TC - T0) / TD;
+	float TT = T * T;
+	float TTT = TT * T;
+
+	float S2 = -2 * TTT + 3 * TT;
+	float S3 = TTT - TT;
+	float S0 = 1 - S2;
+	float S1 = S3 - TT + T;
+
+	FVector4 CubicValue = S0 * Value0;
+	CubicValue += S1 * OutTangent * TD;
+	CubicValue += S2 * Value1;
+	CubicValue += S3 * InTangent * TD;
+
+	return CubicValue;
+}
+
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
 
-	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
+	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
 	{
 
 		if (SkeletalAnimationConfig.RemoveTracks.Contains(Node.Name))
@@ -2164,9 +2184,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 		if (Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
 
@@ -2180,18 +2200,42 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				FQuat AnimQuat;
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 FirstQuatV = Values[FirstIndex];
-				FVector4 SecondQuatV = Values[SecondIndex];
+				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 FirstQuatV = Curve.Values[FirstIndex];
+				FVector4 SecondQuatV = Curve.Values[SecondIndex];
 				FQuat FirstQuat = { FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W };
 				FQuat SecondQuat = { SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W };
-				FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
-				FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
-				FirstQuat = FirstMatrix.ToQuat();
-				SecondQuat = SecondMatrix.ToQuat();
-				FQuat AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+
+				// cubic spline ?
+				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+				{
+					FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], FirstQuatV, Curve.OutTangents[FirstIndex], SecondQuatV, Curve.InTangents[SecondIndex]);
+
+					AnimQuat = { CubicValue.X, CubicValue.Y, CubicValue.Z, CubicValue.W };
+
+					FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(AnimQuat.GetNormalized()) * SceneBasis;
+
+					AnimQuat = RotationMatrix.ToQuat();
+				}
+				else if (FirstIndex == SecondIndex)
+				{
+					FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+
+					AnimQuat = RotationMatrix.ToQuat();
+				}
+				else
+				{
+
+					FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+					FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
+					FirstQuat = FirstMatrix.ToQuat();
+					SecondQuat = SecondMatrix.ToQuat();
+					AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+				}
+
 #if ENGINE_MAJOR_VERSION > 4
 				Track.RotKeys.Add(FQuat4f(AnimQuat));
 #else
@@ -2202,9 +2246,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 		}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
 
@@ -2218,12 +2262,24 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				FVector AnimLocation;
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 First = Values[FirstIndex];
-				FVector4 Second = Values[SecondIndex];
-				FVector AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 First = Curve.Values[FirstIndex];
+				FVector4 Second = Curve.Values[SecondIndex];
+
+				// cubic spline ?
+				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+				{
+					FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], First, Curve.OutTangents[FirstIndex], Second, Curve.InTangents[SecondIndex]);
+
+					AnimLocation = SceneBasis.TransformPosition(CubicValue) * SceneScale;
+				}
+				else
+				{
+					AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+				}
 #if ENGINE_MAJOR_VERSION > 4
 				Track.PosKeys.Add(FVector3f(AnimLocation));
 #else
@@ -2234,9 +2290,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 		}
 		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
 
@@ -2252,9 +2308,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			{
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 First = Values[FirstIndex];
-				FVector4 Second = Values[SecondIndex];
+				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 First = Curve.Values[FirstIndex];
+				FVector4 Second = Curve.Values[SecondIndex];
 #if ENGINE_MAJOR_VERSION > 4
 				Track.ScaleKeys.Add(FVector3f((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling()));
 #else
@@ -2272,9 +2328,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				return;
 			}
 
-			if (Timeline.Num() * MorphTargetNames.Num() != Values.Num())
+			if (Curve.Timeline.Num() * MorphTargetNames.Num() != Curve.Values.Num())
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for weights on node %d"), Timeline.Num(), Values.Num() / MorphTargetNames.Num(), Node.Index));
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for weights on node %d"), Curve.Timeline.Num(), Curve.Values.Num() / MorphTargetNames.Num(), Node.Index));
 				return;
 			}
 
@@ -2283,16 +2339,16 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				FName MorphTargetName = MorphTargetNames[MorphTargetIndex];
 				TArray<TPair<float, float>> Curves;
 
-				for (int32 TimelineIndex = 0; TimelineIndex < Timeline.Num(); TimelineIndex++)
+				for (int32 TimelineIndex = 0; TimelineIndex < Curve.Timeline.Num(); TimelineIndex++)
 				{
-					TPair<float, float> Curve = TPair<float, float>(Timeline[TimelineIndex], Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
-					Curves.Add(Curve);
+					TPair<float, float> NewCurve = TPair<float, float>(Curve.Timeline[TimelineIndex], Curve.Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
+					Curves.Add(NewCurve);
 				}
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-	};
+			};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
-}
+		}
