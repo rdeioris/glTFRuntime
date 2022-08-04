@@ -578,3 +578,9 @@ TArray<FString> UglTFRuntimeAsset::GetMaterialsVariants() const
 	GLTF_CHECK_PARSER(TArray<FString>());
 	return Parser->MaterialsVariants;
 }
+
+UAnimSequence* UglTFRuntimeAsset::CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	return Parser->CreateAnimationFromPose(SkeletalMesh, SkeletalAnimationConfig);
+}

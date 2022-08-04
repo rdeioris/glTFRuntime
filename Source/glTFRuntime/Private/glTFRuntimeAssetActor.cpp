@@ -203,6 +203,10 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(NewComponent);
 		FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig;
 		UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+		if (!SkeletalAnimation)
+		{
+			SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->SkeletalMesh, SkeletalAnimationConfig);
+		}
 		if (SkeletalAnimation)
 		{
 			SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;

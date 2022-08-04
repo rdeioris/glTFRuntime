@@ -1291,6 +1291,8 @@ public:
 
 	static FVector4 CubicSpline(const float TC, const float T0, const float T1, const FVector4 Value0, const FVector4 OutTangent, const FVector4 Value1, const FVector4 InTangent);
 
+	UAnimSequence* CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
 protected:
 	TSharedRef<FJsonObject> Root;
 
