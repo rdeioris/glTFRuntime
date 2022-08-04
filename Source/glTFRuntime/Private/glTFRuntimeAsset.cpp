@@ -243,14 +243,14 @@ TArray<UStaticMesh*> UglTFRuntimeAsset::LoadStaticMeshesFromPrimitives(const int
 	return Parser->LoadStaticMeshesFromPrimitives(MeshIndex, StaticMeshConfig);
 }
 
-UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshLODs(const TArray<int32> MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshLODs(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadStaticMeshLODs(MeshIndices, StaticMeshConfig);
 }
 
-USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshLODs(const TArray<int32> MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshLODs(const TArray<int32>& MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
@@ -516,7 +516,7 @@ void UglTFRuntimeAsset::LoadStaticMeshAsync(const int32 MeshIndex, FglTFRuntimeS
 	Parser->LoadStaticMeshAsync(MeshIndex, AsyncCallback, StaticMeshConfig);
 }
 
-void UglTFRuntimeAsset::LoadStaticMeshLODsAsync(const TArray<int32> MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+void UglTFRuntimeAsset::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
 
