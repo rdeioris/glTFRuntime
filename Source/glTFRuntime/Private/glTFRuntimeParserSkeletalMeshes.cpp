@@ -2262,7 +2262,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 		BoneTrack.InternalTrackData = Pair.Value;
 		BoneTracks.Add(BoneTrack);
 #else
-		AnimSequence->AddNewRawTrack(*Pair.Key, &Pair.Value);
+		AnimSequence->AddNewRawTrack(*Pair.Key, const_cast<FRawAnimSequenceTrack*>(&Pair.Value));
 #endif
 #else
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
