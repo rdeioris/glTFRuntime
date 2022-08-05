@@ -588,13 +588,15 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	}
 
 	TArray64<uint8> UncompressedBytes;
-	EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
+	constexpr EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
 	int32 Width = 0;
 	int32 Height = 0;
 	if (!LoadImage(ImageIndex, UncompressedBytes, Width, Height, MaterialsConfig.ImagesConfig))
 	{
 		return nullptr;
 	}
+
+	OnLoadedTexturePixels.Broadcast(AsShared(), JsonTextureObject.ToSharedRef(), Width, Height, reinterpret_cast<FColor*>(UncompressedBytes.GetData()));
 
 	if (Width > 0 && Height > 0 &&
 		(Width % GPixelFormats[PixelFormat].BlockSizeX) == 0 &&

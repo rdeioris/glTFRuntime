@@ -17,7 +17,7 @@
 #include "Serialization/ArrayReader.h"
 #include "glTFRuntimeParser.generated.h"
 
-DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
+GLTFRUNTIME_API DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeError, const FString, ErrorContext, const FString, ErrorMessage);
 
@@ -1161,6 +1161,11 @@ struct FglTFRuntimeAnimationCurve
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeStaticMeshAsync, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
 
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedPrimitive, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, FglTFRuntimePrimitive&);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedRefSkeleton, TSharedRef<FglTFRuntimeParser>, TSharedPtr<FJsonObject>, FReferenceSkeletonModifier&);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnCreatedPoseTracks, TSharedRef<FglTFRuntimeParser>, TMap<FString, FRawAnimSequenceTrack>&);
+DECLARE_MULTICAST_DELEGATE_FiveParams(FglTFRuntimeOnLoadedTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedPtr<FJsonObject>, const int32, const int32, FColor*);
+
 /**
  *
  */
@@ -1292,6 +1297,15 @@ public:
 	static FVector4 CubicSpline(const float TC, const float T0, const float T1, const FVector4 Value0, const FVector4 OutTangent, const FVector4 Value1, const FVector4 InTangent);
 
 	UAnimSequence* CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
+	TArray<TSharedRef<FJsonObject>> GetMeshes() const;
+	TArray<TSharedRef<FJsonObject>> GetMeshPrimitives(TSharedRef<FJsonObject> Mesh) const;
+	TSharedPtr<FJsonObject> GetJsonObjectExtras(TSharedRef<FJsonObject> JsonObject) const;
+
+	static FglTFRuntimeOnLoadedPrimitive OnLoadedPrimitive;
+	static FglTFRuntimeOnLoadedRefSkeleton OnLoadedRefSkeleton;
+	static FglTFRuntimeOnCreatedPoseTracks OnCreatedPoseTracks;
+	static FglTFRuntimeOnLoadedTexturePixels OnLoadedTexturePixels;
 
 protected:
 	TSharedRef<FJsonObject> Root;

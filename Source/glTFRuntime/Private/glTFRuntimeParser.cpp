@@ -11,6 +11,11 @@
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
+FglTFRuntimeOnLoadedPrimitive FglTFRuntimeParser::OnLoadedPrimitive;
+FglTFRuntimeOnLoadedRefSkeleton FglTFRuntimeParser::OnLoadedRefSkeleton;
+FglTFRuntimeOnCreatedPoseTracks FglTFRuntimeParser::OnCreatedPoseTracks;
+FglTFRuntimeOnLoadedTexturePixels FglTFRuntimeParser::OnLoadedTexturePixels;
+
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromFilename, FColor::Magenta);
@@ -1629,6 +1634,8 @@ bool FglTFRuntimeParser::FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<
 		BoneMap.Add(0, RootBoneName);
 	}
 
+	OnLoadedRefSkeleton.Broadcast(AsShared(), nullptr, Modifier);
+
 	return true;
 }
 
@@ -1755,6 +1762,8 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	{
 		return false;
 	}
+
+	OnLoadedRefSkeleton.Broadcast(AsShared(), JsonSkinObject, Modifier);
 
 	return true;
 }
@@ -2285,6 +2294,8 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			return false;
 		}
 	}
+
+	OnLoadedPrimitive.Broadcast(AsShared(), JsonPrimitiveObject, Primitive);
 
 	return true;
 }
@@ -3230,4 +3241,54 @@ FVector FglTFRuntimeParser::ComputeTangentY(const FVector Normal, const FVector 
 FVector FglTFRuntimeParser::ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W)
 {
 	return (Normal ^ TangetX) * W;
+}
+
+TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetMeshes() const
+{
+	TArray<TSharedRef<FJsonObject>> Meshes;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (Root->TryGetArrayField("meshes", JsonArray))
+	{
+		for (TSharedPtr<FJsonValue> JsonValue : *JsonArray)
+		{
+			const TSharedPtr<FJsonObject>* JsonObject;
+			if (JsonValue->TryGetObject(JsonObject))
+			{
+				Meshes.Add(JsonObject->ToSharedRef());
+			}
+		}
+	}
+
+	return Meshes;
+}
+
+TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetMeshPrimitives(TSharedRef<FJsonObject> Mesh) const
+{
+	TArray<TSharedRef<FJsonObject>> Primitives;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (Mesh->TryGetArrayField("primitives", JsonArray))
+	{
+		for (TSharedPtr<FJsonValue> JsonValue : *JsonArray)
+		{
+			const TSharedPtr<FJsonObject>* JsonObject;
+			if (JsonValue->TryGetObject(JsonObject))
+			{
+				Primitives.Add(JsonObject->ToSharedRef());
+			}
+		}
+	}
+
+	return Primitives;
+}
+
+TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectExtras(TSharedRef<FJsonObject> JsonObject) const
+{
+	const TSharedPtr<FJsonObject>* ExtrasObject = nullptr;
+	if (JsonObject->TryGetObjectField("extras", ExtrasObject))
+	{
+		return *ExtrasObject;
+	}
+	return nullptr;
 }
