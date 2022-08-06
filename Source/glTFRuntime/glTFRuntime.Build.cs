@@ -11,13 +11,13 @@ public class glTFRuntime : ModuleRules
 
         PublicIncludePaths.AddRange(
             new string[] {
-			}
+            }
             );
 
 
         PrivateIncludePaths.AddRange(
             new string[] {
-			}
+            }
             );
 
 
@@ -42,7 +42,7 @@ public class glTFRuntime : ModuleRules
                 "HTTP",
                 "PhysicsCore",
                 "Projects"
-			}
+            }
             );
 
         if (Target.Type == TargetType.Editor)
@@ -56,7 +56,7 @@ public class glTFRuntime : ModuleRules
         DynamicallyLoadedModuleNames.AddRange(
             new string[]
             {
-			}
+            }
             );
     }
 }

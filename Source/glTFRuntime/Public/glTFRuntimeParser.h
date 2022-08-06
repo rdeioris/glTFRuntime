@@ -864,6 +864,12 @@ struct FglTFRuntimePrimitive
 	TMap<int32, FName> OverrideBoneMap;
 	TMap<int32, int32> BonesCache;
 	FString MaterialName;
+	int64 AdditionalBufferView;
+
+	FglTFRuntimePrimitive()
+	{
+		AdditionalBufferView = INDEX_NONE;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -1161,6 +1167,7 @@ struct FglTFRuntimeAnimationCurve
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeStaticMeshAsync, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
 
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnPreLoadedPrimitive, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, FglTFRuntimePrimitive&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedPrimitive, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, FglTFRuntimePrimitive&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedRefSkeleton, TSharedRef<FglTFRuntimeParser>, TSharedPtr<FJsonObject>, FReferenceSkeletonModifier&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnCreatedPoseTracks, TSharedRef<FglTFRuntimeParser>, TMap<FString, FRawAnimSequenceTrack>&);
@@ -1225,7 +1232,7 @@ public:
 
 	bool GetBuffer(int32 BufferIndex, FglTFRuntimeBlob& Blob);
 	bool GetBufferView(int32 BufferViewIndex, FglTFRuntimeBlob& Blob, int64& Stride);
-	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob);
+	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob, const FglTFRuntimeBlob* AdditionalBufferView);
 
 	bool GetAllNodes(TArray<FglTFRuntimeNode>& Nodes);
 
@@ -1301,11 +1308,66 @@ public:
 	TArray<TSharedRef<FJsonObject>> GetMeshes() const;
 	TArray<TSharedRef<FJsonObject>> GetMeshPrimitives(TSharedRef<FJsonObject> Mesh) const;
 	TSharedPtr<FJsonObject> GetJsonObjectExtras(TSharedRef<FJsonObject> JsonObject) const;
+	TSharedPtr<FJsonObject> GetJsonObjectFromObject(TSharedRef<FJsonObject> JsonObject, const FString& Name) const;
+	TSharedPtr<FJsonObject> GetJsonObjectExtension(TSharedRef<FJsonObject> JsonObject, const FString& Name) const;
+	int64 GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject, const FString& Name) const;
 
+	static FglTFRuntimeOnLoadedPrimitive OnPreLoadedPrimitive;
 	static FglTFRuntimeOnLoadedPrimitive OnLoadedPrimitive;
 	static FglTFRuntimeOnLoadedRefSkeleton OnLoadedRefSkeleton;
 	static FglTFRuntimeOnCreatedPoseTracks OnCreatedPoseTracks;
 	static FglTFRuntimeOnLoadedTexturePixels OnLoadedTexturePixels;
+
+	const FglTFRuntimeBlob* GetAdditionalBufferView(const int64 Index, const FString& Name) const;
+	
+	void AddAdditionalBufferView(const int64 Index, const FString& Name, const FglTFRuntimeBlob& Blob);
+
+	template<typename T>
+	void AddAdditionalBufferViewData(const int64 Index, const FString& Name, const T* Data, const int64 Num)
+	{
+		TArray64<uint8> NewArray;
+		NewArray.Append(reinterpret_cast<const uint8*>(Data), Num);
+
+		int32 NewIndex = AdditionalBufferViewsData.Add(MoveTemp(NewArray));
+
+		FglTFRuntimeBlob Blob;
+		Blob.Data = AdditionalBufferViewsData[NewIndex].GetData();
+		Blob.Num = Num;
+
+		AddAdditionalBufferView(Index, Name, Blob);
+	}
+
+	template<typename T>
+	void AddAdditionalBufferViewData(const int64 Index, const FString& Name, const T& Array)
+	{
+		AddAdditionalBufferViewData(Index, Name, Array.GetData(), Array.Num() * Array.GetTypeSize());
+	}
+
+
+	template<typename Callback, typename... Args>
+	void ForEachJsonField(TSharedRef<FJsonObject> JsonObject, Callback InCallback, Args... InArgs)
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : JsonObject->Values)
+		{
+			if (Pair.Value.IsValid())
+			{
+				InCallback(Pair.Key, Pair.Value.ToSharedRef(), InArgs...);
+			}
+		}
+	}
+
+	template<typename Callback, typename... Args>
+	void ForEachJsonFieldAsIndex(TSharedRef<FJsonObject> JsonObject, Callback InCallback, Args... InArgs)
+	{
+		ForEachJsonField(JsonObject, [InCallback, &InArgs...](const FString& Key, TSharedRef<FJsonValue> Value)
+			{
+				int64 Index = INDEX_NONE;
+				if (Value->TryGetNumber(Index))
+				{
+					InCallback(Key, Index, InArgs...);
+				}
+			});
+	}
 
 protected:
 	TSharedRef<FJsonObject> Root;
@@ -1396,7 +1458,7 @@ protected:
 	FString BaseDirectory;
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, bool bNormalized, Callback Filter)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, bool bNormalized, Callback Filter, const int64 AdditionalBufferView)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -1407,7 +1469,7 @@ protected:
 		FglTFRuntimeBlob Blob;
 		int64 ComponentType = 0, Stride = 0, Elements = 0, ElementSize = 0, Count = 0;
 		bool bOverrideNormalized = false;
-		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob))
+		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob, GetAdditionalBufferView(AdditionalBufferView, Name)))
 		{
 			return false;
 		}
@@ -1491,7 +1553,7 @@ protected:
 	}
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, bool bNormalized, Callback Filter)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, bool bNormalized, Callback Filter, const int64 AdditionalBufferView)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -1502,7 +1564,7 @@ protected:
 		FglTFRuntimeBlob Blob;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		bool bOverrideNormalized = false;
-		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob))
+		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob, GetAdditionalBufferView(AdditionalBufferView, Name)))
 		{
 			return false;
 		}
@@ -1571,15 +1633,15 @@ protected:
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const bool bNormalized)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const bool bNormalized, const int64 AdditionalBufferView)
 	{
-		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; });
+		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; }, AdditionalBufferView);
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const bool bNormalized)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const bool bNormalized, const int64 AdditionalBufferView)
 	{
-		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; });
+		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; }, AdditionalBufferView);
 	}
 
 	template<int32 Num, typename T>
@@ -1604,7 +1666,7 @@ protected:
 	template<typename T>
 	T GetSafeValue(TArray<T>& Values, const int32 Index, const T DefaultValue, bool& bMissing)
 	{
-		if (Index >= Values.Num())
+		if (Index >= Values.Num() || Index < 0)
 		{
 			bMissing = true;
 			return DefaultValue;
@@ -1617,4 +1679,7 @@ protected:
 
 	TArray64<uint8> ZeroBuffer;
 	TMap<int32, TArray64<uint8>> SparseAccessorsCache;
+
+	TMap<int64, TMap<FString, FglTFRuntimeBlob>> AdditionalBufferViewsCache;
+	TArray<TArray64<uint8>> AdditionalBufferViewsData;
 };
