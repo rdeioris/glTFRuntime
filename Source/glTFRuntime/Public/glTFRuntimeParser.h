@@ -767,6 +767,46 @@ struct FglTFRuntimePathItem
 	}
 };
 
+DECLARE_DYNAMIC_DELEGATE_RetVal_ThreeParams(FString, FglTFRuntimeAnimationCurveRemapper, const FString&, CurveName, const FString&, Path, UObject*, Context);
+DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FVector, FglTFRuntimeAnimationFrameTranslationRemapper, const FString&, CurveName, const int32, FrameNumber, FVector, Translation, UObject*, Context);
+DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FRotator, FglTFRuntimeAnimationFrameRotationRemapper, const FString&, CurveName, const int32, FrameNumber, FRotator, Rotation, UObject*, Context);
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletalAnimationCurveRemapperHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeAnimationCurveRemapper Remapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletalAnimationFrameTranslationRemapperHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeAnimationFrameTranslationRemapper Remapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletalAnimationFrameRotationRemapperHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeAnimationFrameRotationRemapper Remapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalAnimationConfig
 {
@@ -802,6 +842,18 @@ struct FglTFRuntimeSkeletalAnimationConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FString> RemoveTracks;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeSkeletalAnimationCurveRemapperHook CurveRemapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	USkeleton* RetargetTo;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (GetByRef), Category = "glTFRuntime")
+	FglTFRuntimeSkeletalAnimationFrameTranslationRemapperHook FrameTranslationRemapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (GetByRef), Category = "glTFRuntime")
+	FglTFRuntimeSkeletalAnimationFrameRotationRemapperHook FrameRotationRemapper;
+
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
 		RootNodeIndex = INDEX_NONE;
@@ -812,6 +864,7 @@ struct FglTFRuntimeSkeletalAnimationConfig
 		bRemoveRotations = false;
 		bRemoveScales = false;
 		bRemoveMorphTargets = false;
+		RetargetTo = nullptr;
 	}
 };
 

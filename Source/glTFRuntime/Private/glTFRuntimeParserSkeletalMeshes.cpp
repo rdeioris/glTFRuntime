@@ -2315,8 +2315,14 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
 	{
+		FString TrackName = Node.Name;
 
-		if (SkeletalAnimationConfig.RemoveTracks.Contains(Node.Name))
+		if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
+		{
+			TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(TrackName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
+		}
+
+		if (SkeletalAnimationConfig.RemoveTracks.Contains(TrackName))
 		{
 			return;
 		}
@@ -2333,12 +2339,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				return;
 			}
 
-			if (!Tracks.Contains(Node.Name))
+			if (!Tracks.Contains(TrackName))
 			{
-				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+				Tracks.Add(TrackName, FRawAnimSequenceTrack());
 			}
 
-			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
 			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
@@ -2379,6 +2385,22 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
 				}
 
+				if (SkeletalAnimationConfig.RetargetTo)
+				{
+					const int32 RetargetBoneIndex = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().FindBoneIndex(*TrackName);
+					if (RetargetBoneIndex > INDEX_NONE)
+					{
+						FTransform RetargetBoneTransform = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().GetRefBonePose()[RetargetBoneIndex];
+						AnimQuat = Node.Transform.InverseTransformRotation(AnimQuat);
+						AnimQuat = RetargetBoneTransform.TransformRotation(AnimQuat);
+					}
+				}
+
+				if (SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound())
+				{
+					AnimQuat = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.Execute(TrackName, Frame, AnimQuat.Rotator(), SkeletalAnimationConfig.FrameRotationRemapper.Context).Quaternion();
+				}
+
 #if ENGINE_MAJOR_VERSION > 4
 				Track.RotKeys.Add(FQuat4f(AnimQuat));
 #else
@@ -2395,12 +2417,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				return;
 			}
 
-			if (!Tracks.Contains(Node.Name))
+			if (!Tracks.Contains(TrackName))
 			{
-				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+				Tracks.Add(TrackName, FRawAnimSequenceTrack());
 			}
 
-			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
 			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
@@ -2423,6 +2445,23 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				{
 					AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
 				}
+
+				if (SkeletalAnimationConfig.RetargetTo)
+				{
+					const int32 RetargetBoneIndex = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().FindBoneIndex(*TrackName);
+					if (RetargetBoneIndex > INDEX_NONE)
+					{
+						FTransform RetargetBoneTransform = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().GetRefBonePose()[RetargetBoneIndex];
+						AnimLocation = Node.Transform.InverseTransformPosition(AnimLocation);
+						AnimLocation = RetargetBoneTransform.TransformPosition(AnimLocation);
+					}
+				}
+
+				if (SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.IsBound())
+				{
+					AnimLocation = SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.Execute(TrackName, Frame, AnimLocation, SkeletalAnimationConfig.FrameTranslationRemapper.Context);
+				}
+
 #if ENGINE_MAJOR_VERSION > 4
 				Track.PosKeys.Add(FVector3f(AnimLocation));
 #else
@@ -2439,12 +2478,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				return;
 			}
 
-			if (!Tracks.Contains(Node.Name))
+			if (!Tracks.Contains(TrackName))
 			{
-				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+				Tracks.Add(TrackName, FRawAnimSequenceTrack());
 			}
 
-			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
 			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
