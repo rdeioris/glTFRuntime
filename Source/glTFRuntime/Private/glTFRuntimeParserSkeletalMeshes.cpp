@@ -2253,12 +2253,13 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 
 	for (const TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
 	{
+		const int32 BoneIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(*Pair.Key);
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
 		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
 		FBoneAnimationTrack BoneTrack;
 		BoneTrack.Name = *Pair.Key;
-		BoneTrack.BoneTreeIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(*Pair.Key);
+		BoneTrack.BoneTreeIndex = BoneIndex;
 		BoneTrack.InternalTrackData = Pair.Value;
 		BoneTracks.Add(BoneTrack);
 #else
