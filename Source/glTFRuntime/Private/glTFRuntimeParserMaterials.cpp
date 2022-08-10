@@ -333,13 +333,15 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	if (!BaseMaterial)
 	{
-		return nullptr;
+		AddError("BuildMaterial()", "Unable to find glTFRuntime Material, ensure it has been packaged, falling back to default material");
+		return UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
 	}
 
 	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
 	if (!Material)
 	{
-		return nullptr;
+		AddError("BuildMaterial()", "Unable to create material instance, falling back to default material");
+		return UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
 	}
 
 	// make it public to allow exports
@@ -784,6 +786,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 	UMaterialInterface* Material = LoadMaterial_Internal(Index, MaterialName, JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors);
 	if (!Material)
 	{
+		AddError("LoadMaterial()", "Unable to load material");
 		return nullptr;
 	}
 
