@@ -243,6 +243,13 @@ TArray<UStaticMesh*> UglTFRuntimeAsset::LoadStaticMeshesFromPrimitives(const int
 	return Parser->LoadStaticMeshesFromPrimitives(MeshIndex, StaticMeshConfig);
 }
 
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshRecursive(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadStaticMeshRecursive(NodeName, ExcludeNodes, StaticMeshConfig);
+}
+
 UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshLODs(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
@@ -303,6 +310,13 @@ void UglTFRuntimeAsset::LoadSkeletalMeshRecursiveAsync(const FString& NodeName, 
 	GLTF_CHECK_PARSER_VOID();
 
 	Parser->LoadSkeletalMeshRecursiveAsync(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, AsyncCallback, SkeletalMeshConfig);
+}
+
+void UglTFRuntimeAsset::LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	GLTF_CHECK_PARSER_VOID();
+
+	Parser->LoadStaticMeshRecursiveAsync(NodeName, ExcludeNodes, AsyncCallback, StaticMeshConfig);
 }
 
 USkeleton* UglTFRuntimeAsset::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
@@ -583,4 +597,17 @@ UAnimSequence* UglTFRuntimeAsset::CreateAnimationFromPose(USkeletalMesh* Skeleta
 {
 	GLTF_CHECK_PARSER(nullptr);
 	return Parser->CreateAnimationFromPose(SkeletalMesh, SkeletalAnimationConfig);
+}
+
+bool UglTFRuntimeAsset::LoadMeshAsRuntimeLOD(const int32 MeshIndex, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->LoadMeshAsRuntimeLOD(MeshIndex, RuntimeLOD, MaterialsConfig);
+}
+
+UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	return Parser->LoadStaticMeshFromRuntimeLODs(RuntimeLODs, StaticMeshConfig);
 }

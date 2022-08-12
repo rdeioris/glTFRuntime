@@ -926,7 +926,7 @@ struct FglTFRuntimePrimitive
 };
 
 USTRUCT(BlueprintType)
-struct FglTFRuntimeLOD
+struct FglTFRuntimeSkeletalMeshLOD
 {
 	GENERATED_BODY()
 
@@ -940,7 +940,7 @@ struct FglTFRuntimeLOD
 	FSkeletalMeshImportData ImportData;
 #endif
 
-	FglTFRuntimeLOD()
+	FglTFRuntimeSkeletalMeshLOD()
 	{
 		bHasNormals = false;
 		bHasTangents = false;
@@ -956,7 +956,7 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 
 	USkeletalMesh* SkeletalMesh;
 
-	TArray<FglTFRuntimeLOD> LODs;
+	TArray<FglTFRuntimeSkeletalMeshLOD> LODs;
 
 	int32 SkinIndex;
 
@@ -1009,9 +1009,24 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FglTFRuntimeMeshLOD
+{
+	GENERATED_BODY()
+
+	TArray<FglTFRuntimePrimitive> Primitives;
+	TArray<FTransform> AdditionalTransforms;
+
+	FglTFRuntimeMeshLOD()
+	{
+	}
+};
+
 struct FglTFRuntimeStaticMeshContext : public FGCObject
 {
 	TSharedRef<class FglTFRuntimeParser> Parser;
+
+	TArray<const FglTFRuntimeMeshLOD*> LODs;
 
 	const FglTFRuntimeStaticMeshConfig StaticMeshConfig;
 
@@ -1244,10 +1259,16 @@ public:
 	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromData(Data.GetData(), Data.Num(), LoaderConfig); }
 	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromData(Data.GetData(), Data.Num(), LoaderConfig); }
 
+	bool LoadMeshAsRuntimeLOD(const int32 MeshIndex, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+
+	UStaticMesh* LoadStaticMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	TArray<UStaticMesh*> LoadStaticMeshesFromPrimitives(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+
+	UStaticMesh* LoadStaticMeshRecursive(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	void LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UStaticMesh* LoadStaticMeshLODs(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
@@ -1438,9 +1459,13 @@ protected:
 	TArray<FglTFRuntimeNode> AllNodesCache;
 	bool bAllNodesCached;
 
+	TMap<TSharedRef<FJsonObject>, FglTFRuntimeMeshLOD> LODsCache;
+
 	TArray64<uint8> BinaryBuffer;
 
-	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext, TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>>& PrimitivesCache);
+	bool LoadMeshIntoMeshLOD(TSharedRef<FJsonObject> JsonMeshObject, FglTFRuntimeMeshLOD*& LOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+
+	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext);
 	UMaterialInterface* LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors);
 	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
 
@@ -1717,7 +1742,7 @@ protected:
 	TSharedPtr<FglTFRuntimeZipFile> ZipFile;
 
 	template<typename T>
-	T GetSafeValue(TArray<T>& Values, const int32 Index, const T DefaultValue, bool& bMissing)
+	T GetSafeValue(const TArray<T>& Values, const int32 Index, const T DefaultValue, bool& bMissing)
 	{
 		if (Index >= Values.Num() || Index < 0)
 		{

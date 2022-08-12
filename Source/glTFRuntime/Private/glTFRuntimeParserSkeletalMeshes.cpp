@@ -261,7 +261,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	FSkeletalMeshModel* ImportedResource = SkeletalMeshContext->SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
 
-	for (FglTFRuntimeLOD& LOD : SkeletalMeshContext->LODs)
+	for (FglTFRuntimeSkeletalMeshLOD& LOD : SkeletalMeshContext->LODs)
 	{
 
 		TArray<SkeletalMeshImportData::FVertex> Wedges;
@@ -580,7 +580,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 	SkeletalMeshContext->SkeletalMesh->AllocateResourceForRendering();
 
-	for (FglTFRuntimeLOD& LOD : SkeletalMeshContext->LODs)
+	for (FglTFRuntimeSkeletalMeshLOD& LOD : SkeletalMeshContext->LODs)
 	{
 		FSkeletalMeshLODRenderData* LodRenderData = new FSkeletalMeshLODRenderData();
 		int32 LODIndex = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData.Add(LodRenderData);
@@ -1340,7 +1340,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 		AddError("LoadSkeletalMesh()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
 		return nullptr;
 	}
-	TArray<FglTFRuntimeLOD> LODs;
+	TArray<FglTFRuntimeSkeletalMeshLOD> LODs;
 	const int32 LODIndex = LODs.AddDefaulted(1);
 	if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), LODs[LODIndex].Primitives, SkeletalMeshConfig.MaterialsConfig))
 	{
@@ -1388,7 +1388,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 				return;
 			}
 
-			TArray<FglTFRuntimeLOD> LODs;
+			TArray<FglTFRuntimeSkeletalMeshLOD> LODs;
 			const int32 LODIndex = LODs.AddDefaulted(1);
 			if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), LODs[LODIndex].Primitives, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig))
 			{
@@ -1403,7 +1403,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32>&MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
-	TArray<FglTFRuntimeLOD> LODs;
+	TArray<FglTFRuntimeSkeletalMeshLOD> LODs;
 
 	for (const int32 MeshIndex : MeshIndices)
 	{
@@ -1414,7 +1414,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32>&Mesh
 			return nullptr;
 		}
 
-		FglTFRuntimeLOD LOD;
+		FglTFRuntimeSkeletalMeshLOD LOD;
 		if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), LOD.Primitives, SkeletalMeshConfig.MaterialsConfig))
 		{
 			return nullptr;
@@ -1554,7 +1554,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & Nod
 		}
 	}
 
-	FglTFRuntimeLOD LOD0;
+	FglTFRuntimeSkeletalMeshLOD LOD0;
 	LOD0.Primitives = MoveTemp(Primitives);
 
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
@@ -1694,7 +1694,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 				}
 			}
 
-			FglTFRuntimeLOD LOD0;
+			FglTFRuntimeSkeletalMeshLOD LOD0;
 			LOD0.Primitives = MoveTemp(Primitives);
 
 			SkeletalMeshContext->SkinIndex = NewSkinIndex;
