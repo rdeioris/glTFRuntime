@@ -1617,7 +1617,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		return nullptr;
 	}
 
-	int32 NumFrames = FMath::Max(Duration * 30, 1);
+	int32 NumFrames = FMath::Max<int32>(Duration * 30, 1);
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
@@ -2099,7 +2099,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			return;
 		}
 
-		int32 NumFrames = FMath::Max(Duration * 30, 1);
+		int32 NumFrames = FMath::Max<int32>(Duration * 30, 1);
 
 		float FrameDelta = 1.f / 30;
 
