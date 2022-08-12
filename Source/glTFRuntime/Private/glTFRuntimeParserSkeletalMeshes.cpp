@@ -1460,8 +1460,8 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, ExcludeNodes, NodeName, SkinIndex, AsyncCallback]()
 		{
 			FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
-
-			FglTFRuntimeMeshLOD CombinedLOD;
+			// ensure to cache it as the finalizer requires LOD access
+			FglTFRuntimeMeshLOD& CombinedLOD = SkeletalMeshContext->CachedRuntimeMeshLODs.AddDefaulted_GetRef();
 			int32 NewSkinIndex = SkinIndex;
 			if (!LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, NewSkinIndex, ExcludeNodes, CombinedLOD, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig))
 			{
@@ -2438,6 +2438,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 	{
 		SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLOD));
 	}
+
 	if (!CreateSkeletalMeshFromLODs(SkeletalMeshContext))
 	{
 		AddError("LoadSkeletalMesh()", "Unable to load SkeletalMesh.");

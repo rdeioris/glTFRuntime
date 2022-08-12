@@ -962,6 +962,9 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 
 	FBox BoundingBox;
 
+	// here we cache per-context LODs
+	TArray<FglTFRuntimeMeshLOD> CachedRuntimeMeshLODs;
+
 	FglTFRuntimeSkeletalMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : Parser(InParser), SkeletalMeshConfig(InSkeletalMeshConfig)
 	{
 		EObjectFlags Flags = RF_Public;
