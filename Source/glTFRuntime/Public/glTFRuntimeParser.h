@@ -925,12 +925,10 @@ struct FglTFRuntimePrimitive
 	}
 };
 
-USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalMeshLOD
 {
-	GENERATED_BODY()
-
-	TArray<FglTFRuntimePrimitive> Primitives;
+	// non-const here as the SkeletalMesh parser could modify internal bones mappings
+	FglTFRuntimeMeshLOD* RuntimeLOD;
 
 	bool bHasNormals;
 	bool bHasTangents;
@@ -940,7 +938,9 @@ struct FglTFRuntimeSkeletalMeshLOD
 	FSkeletalMeshImportData ImportData;
 #endif
 
-	FglTFRuntimeSkeletalMeshLOD()
+	FglTFRuntimeSkeletalMeshLOD() = delete;
+
+	FglTFRuntimeSkeletalMeshLOD(FglTFRuntimeMeshLOD* InRuntimeLOD) : RuntimeLOD(InRuntimeLOD)
 	{
 		bHasNormals = false;
 		bHasTangents = false;
