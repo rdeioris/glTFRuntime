@@ -2428,3 +2428,21 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & No
 
 	return true;
 }
+
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>&RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
+{
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
+	SkeletalMeshContext->SkinIndex = SkinIndex;
+
+	for (const FglTFRuntimeMeshLOD& RuntimeLOD : RuntimeLODs)
+	{
+		SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLOD));
+	}
+	if (!CreateSkeletalMeshFromLODs(SkeletalMeshContext))
+	{
+		AddError("LoadSkeletalMesh()", "Unable to load SkeletalMesh.");
+		return nullptr;
+	}
+
+	return FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
+}
