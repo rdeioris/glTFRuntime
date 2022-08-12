@@ -611,3 +611,10 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODs(const TArray<FglTF
 	GLTF_CHECK_PARSER(nullptr);
 	return Parser->LoadStaticMeshFromRuntimeLODs(RuntimeLODs, StaticMeshConfig);
 }
+
+bool UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, const int32 SkinIndex)
+{
+	GLTF_CHECK_PARSER(false);
+	int32 NewSkinIndex = SkinIndex;
+	return Parser->LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, NewSkinIndex, ExcludeNodes, RuntimeLOD, MaterialsConfig, SkeletonConfig);
+}

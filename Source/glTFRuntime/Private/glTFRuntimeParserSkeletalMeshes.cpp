@@ -1617,7 +1617,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		return nullptr;
 	}
 
-	int32 NumFrames = Duration * 30;
+	int32 NumFrames = FMath::Max(Duration * 30, 1);
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
@@ -1785,7 +1785,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 				if (!LoadNode(SkeletalAnimationConfig.RootNodeIndex, AnimRootNode))
 				{
 					return nullptr;
-		}
+				}
 
 				for (int32 FrameIndex = 0; FrameIndex < Pair.Value.RotKeys.Num(); FrameIndex++)
 				{
@@ -2099,7 +2099,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			return;
 		}
 
-		int32 NumFrames = Duration * 30;
+		int32 NumFrames = FMath::Max(Duration * 30, 1);
 
 		float FrameDelta = 1.f / 30;
 
@@ -2114,7 +2114,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			if (!Tracks.Contains(TrackName))
 			{
 				Tracks.Add(TrackName, FRawAnimSequenceTrack());
-		}
+			}
 
 			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
@@ -2179,7 +2179,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.RotKeys.Add(AnimQuat);
 #endif
 				FrameBase += FrameDelta;
-				}
+			}
 		}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 		{
@@ -2299,7 +2299,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					Curves.Add(NewCurve);
 				}
 				MorphTargetCurves.Add(MorphTargetName, Curves);
-		}
+			}
 		}
 	};
 
@@ -2360,14 +2360,14 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & No
 				SkinIndex = ChildNode.SkinIndex;
 				break;
 			}
-	}
+		}
 
 		if (SkinIndex <= INDEX_NONE)
 		{
 			AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", "Unable to find a valid Skin");
 			return false;
 		}
-}
+	}
 
 	// now search for all meshes (will be all merged in the same primitives list)
 	for (FglTFRuntimeNode& ChildNode : Nodes)
@@ -2383,7 +2383,7 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & No
 			{
 				AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", FString::Printf(TEXT("Unable to find Mesh with index %d"), ChildNode.MeshIndex));
 				return false;
-		}
+			}
 
 			// keep track of primitives
 			int32 PrimitiveFirstIndex = RuntimeLOD.Primitives.Num();
@@ -2423,7 +2423,7 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & No
 					Primitive.OverrideBoneMap = BoneMap;
 				}
 			}
-	}
+		}
 	}
 
 	return true;
