@@ -153,7 +153,7 @@ struct FglTFRuntimeConfig
 		BaseTransform = FTransform::Identity;
 		SceneScale = 100;
 		bSearchContentDir = false;
-		bAllowExternalFiles = false;
+		bAllowExternalFiles = true;
 		bOverrideBaseDirectoryFromContentDir = false;
 		ArchiveAutoEntryPointExtensions = ".glb .gltf .json .js";
 		RuntimeContextObject = nullptr;

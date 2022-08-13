@@ -1557,7 +1557,6 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
 	if (!Root->TryGetArrayField("animations", JsonAnimations))
 	{
-		AddError("LoadNodeSkeletalAnimation()", "No animations defined in the asset");
 		return nullptr;
 	}
 
@@ -2396,33 +2395,31 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & No
 
 			RuntimeLOD.Primitives.Append(LOD->Primitives);
 
-			// if the SkinIndex is different from the selected one,
-			// build an override bone map
-			if (ChildNode.SkinIndex > INDEX_NONE && ChildNode.SkinIndex != SkinIndex)
+			// Always build an override map, to have a cache of the bone/index mapping
+
+			TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
+			if (!JsonSkinObject)
 			{
-				TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
-				if (!JsonSkinObject)
-				{
-					AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", FString::Printf(TEXT("Unable to fill skin %d"), ChildNode.SkinIndex));
-					return false;
-				}
-
-				TMap<int32, FName> BoneMap;
-
-				FReferenceSkeleton FakeRefSkeleton;
-				if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), FakeRefSkeleton, BoneMap, SkeletonConfig))
-				{
-					AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", "Unable to fill RefSkeleton.");
-					return false;
-				}
-
-				// apply overrides
-				for (int32 PrimitiveIndex = PrimitiveFirstIndex; PrimitiveIndex < RuntimeLOD.Primitives.Num(); PrimitiveIndex++)
-				{
-					FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
-					Primitive.OverrideBoneMap = BoneMap;
-				}
+				AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", FString::Printf(TEXT("Unable to fill skin %d"), ChildNode.SkinIndex));
+				return false;
 			}
+
+			TMap<int32, FName> BoneMap;
+
+			FReferenceSkeleton FakeRefSkeleton;
+			if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), FakeRefSkeleton, BoneMap, SkeletonConfig))
+			{
+				AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", "Unable to fill RefSkeleton.");
+				return false;
+			}
+
+			// apply overrides
+			for (int32 PrimitiveIndex = PrimitiveFirstIndex; PrimitiveIndex < RuntimeLOD.Primitives.Num(); PrimitiveIndex++)
+			{
+				FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+				Primitive.OverrideBoneMap = BoneMap;
+			}
+
 		}
 	}
 
@@ -2431,12 +2428,70 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & No
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>&RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
+	if (RuntimeLODs.Num() < 1)
+	{
+		return nullptr;
+	}
+
+	if (RuntimeLODs[0].Primitives.Num() < 1)
+	{
+		return nullptr;
+	}
+
+	if (RuntimeLODs[0].Primitives[0].OverrideBoneMap.IsEmpty())
+	{
+		AddError("LoadSkeletalMeshFromRuntimeLODs()", "Empty Primitive OverrideBoneMap");
+		return nullptr;
+	}
+
+	const TMap<int32, FName>& BaseBoneMap = RuntimeLODs[0].Primitives[0].OverrideBoneMap;
+
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
 
-	for (const FglTFRuntimeMeshLOD& RuntimeLOD : RuntimeLODs)
+	SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLODs[0]));
+
+	auto ContainsBone = [BaseBoneMap](FName BoneName) -> bool
 	{
-		SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLOD));
+		for (const TPair<int32, FName>& Pair : BaseBoneMap)
+		{
+			if (Pair.Value == BoneName)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
+	for (int32 LODIndex = 1; LODIndex < RuntimeLODs.Num(); LODIndex++)
+	{
+		if (RuntimeLODs[LODIndex].Primitives.Num() < 1)
+		{
+			AddError("LoadSkeletalMeshFromRuntimeLODs()", "Invalid RuntimeLOD, no Primitives defined");
+			return nullptr;
+		}
+
+		for (const FglTFRuntimePrimitive& Primitive : RuntimeLODs[LODIndex].Primitives)
+		{
+			if (Primitive.OverrideBoneMap.IsEmpty())
+			{
+				AddError("LoadSkeletalMeshFromRuntimeLODs()", "Empty Primitive OverrideBoneMap");
+				return nullptr;
+			}
+
+			FglTFRuntimePrimitive& NonConstPrimitive = const_cast<FglTFRuntimePrimitive&>(Primitive);
+
+			for (TPair<int32, FName>& Pair : NonConstPrimitive.OverrideBoneMap)
+			{
+				if (!ContainsBone(Pair.Value))
+				{
+					AddError("LoadSkeletalMeshFromRuntimeLODs()", FString::Printf(TEXT("Unknown bone %s"), *Pair.Value.ToString()));
+					return nullptr;
+				}
+			}
+		}
+
+		SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLODs[LODIndex]));
 	}
 
 	if (!CreateSkeletalMeshFromLODs(SkeletalMeshContext))
