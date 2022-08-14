@@ -45,7 +45,8 @@ public class glTFRuntimeEditor : ModuleRules
                 "RenderCore",
                 "LevelEditor",
                 "glTFRuntime",
-                "DesktopPlatform"
+                "DesktopPlatform",
+		"EditorStyle"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

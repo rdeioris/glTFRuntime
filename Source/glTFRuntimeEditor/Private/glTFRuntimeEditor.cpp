@@ -53,7 +53,11 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 void FglTFRuntimeEditorModule::BuildglTFRuntimeMenu(FMenuBuilder& Builder)
 {
 	Builder.BeginSection("glTFRuntime", FText::FromString("glTFRuntime"));
+#if ENGINE_MAJOR_VERSION > 4
 	Builder.AddMenuEntry(LoadGLTFText, LoadGLTFText, FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.Default"), FExecuteAction::CreateRaw(this, &FglTFRuntimeEditorModule::SpawnglTFRuntimeActor));
+#else
+	Builder.AddMenuEntry(LoadGLTFText, LoadGLTFText, FSlateIcon(FEditorStyle::GetStyleSetName(), "ClassIcon.Default"), FExecuteAction::CreateRaw(this, &FglTFRuntimeEditorModule::SpawnglTFRuntimeActor));
+#endif
 	Builder.EndSection();
 }
 

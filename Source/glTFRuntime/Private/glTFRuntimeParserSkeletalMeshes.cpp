@@ -2461,7 +2461,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 		return nullptr;
 	}
 
-	if (RuntimeLODs[0].Primitives[0].OverrideBoneMap.IsEmpty())
+	if (RuntimeLODs[0].Primitives[0].OverrideBoneMap.Num() < 1)
 	{
 		AddError("LoadSkeletalMeshFromRuntimeLODs()", "Empty Primitive OverrideBoneMap");
 		return nullptr;
@@ -2496,7 +2496,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 
 		for (const FglTFRuntimePrimitive& Primitive : RuntimeLODs[LODIndex].Primitives)
 		{
-			if (Primitive.OverrideBoneMap.IsEmpty())
+			if (Primitive.OverrideBoneMap.Num() < 1)
 			{
 				AddError("LoadSkeletalMeshFromRuntimeLODs()", "Empty Primitive OverrideBoneMap");
 				return nullptr;
