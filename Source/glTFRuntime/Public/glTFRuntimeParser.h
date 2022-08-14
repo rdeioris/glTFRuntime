@@ -825,6 +825,9 @@ struct FglTFRuntimeSkeletalAnimationConfig
 	bool bRemoveRootMotion;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<ERootMotionRootLock::Type> RootMotionRootLock;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bRemoveTranslations;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -848,16 +851,23 @@ struct FglTFRuntimeSkeletalAnimationConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	USkeleton* RetargetTo;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (GetByRef), Category = "glTFRuntime")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, FTransform> TransformPose;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FglTFRuntimeSkeletalAnimationFrameTranslationRemapperHook FrameTranslationRemapper;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (GetByRef), Category = "glTFRuntime")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FglTFRuntimeSkeletalAnimationFrameRotationRemapperHook FrameRotationRemapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float FramesPerSecond;
 
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
 		RootNodeIndex = INDEX_NONE;
 		bRootMotion = false;
+		RootMotionRootLock = ERootMotionRootLock::RefPose;
 		bRemoveRootMotion = false;
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
 		bRemoveTranslations = false;
@@ -865,6 +875,7 @@ struct FglTFRuntimeSkeletalAnimationConfig
 		bRemoveScales = false;
 		bRemoveMorphTargets = false;
 		RetargetTo = nullptr;
+		FramesPerSecond = 30.0f;
 	}
 };
 

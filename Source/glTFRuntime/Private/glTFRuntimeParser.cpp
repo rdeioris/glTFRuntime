@@ -2799,8 +2799,14 @@ float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float
 	// first search for second (higher value)
 	for (int32 i = 0; i < FramesTimes.Num(); i++)
 	{
-		float TimeValue = FramesTimes[i];
-		if (TimeValue >= WantedTime)
+		float TimeValue = FramesTimes[i] - FramesTimes[0];
+		if (FMath::IsNearlyEqual(TimeValue, WantedTime))
+		{
+			FirstIndex = i;
+			SecondIndex = i;
+			return 0;
+		}
+		else if (TimeValue > WantedTime)
 		{
 			SecondIndex = i;
 			break;
@@ -2821,7 +2827,7 @@ float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float
 
 	FirstIndex = SecondIndex - 1;
 
-	return (WantedTime - FramesTimes[FirstIndex]) / FramesTimes[SecondIndex];
+	return ((WantedTime + FramesTimes[0]) - FramesTimes[FirstIndex]) / (FramesTimes[SecondIndex] - FramesTimes[FirstIndex]);
 }
 
 bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive)

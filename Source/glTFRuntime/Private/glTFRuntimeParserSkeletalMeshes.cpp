@@ -1610,13 +1610,14 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 	float Duration;
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
+
 	TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
 	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [](const FglTFRuntimeNode& Node) -> bool { return true; }))
 	{
 		return nullptr;
 	}
 
-	int32 NumFrames = FMath::Max<int32>(Duration * 30, 1);
+	int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
@@ -1633,7 +1634,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfKeys")));
 	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
 
-	FFrameRate FrameRate(30, 1);
+	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
 	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
@@ -1647,6 +1648,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	AnimSequence->SequenceLength = Duration;
 #endif
 	AnimSequence->bEnableRootMotion = SkeletalAnimationConfig.bRootMotion;
+	AnimSequence->RootMotionRootLock = SkeletalAnimationConfig.RootMotionRootLock;
 
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
 
@@ -1825,6 +1827,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			}
 		}
 
+
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
 		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
@@ -1925,7 +1928,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	}
 
 	constexpr int32 NumFrames = 1;
-	constexpr float Duration = NumFrames / 30.f;
+	const float Duration = NumFrames / SkeletalAnimationConfig.FramesPerSecond;
 
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
@@ -1943,7 +1946,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfKeys")));
 	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
 
-	FFrameRate FrameRate(30, 1);
+	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
 	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
@@ -2098,9 +2101,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			return;
 		}
 
-		int32 NumFrames = FMath::Max<int32>(Duration * 30, 1);
+		int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
 
-		float FrameDelta = 1.f / 30;
+		float FrameDelta = 1.f / SkeletalAnimationConfig.FramesPerSecond;
 
 		if (Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
 		{
@@ -2117,9 +2120,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
-			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				const float FrameBase = FrameDelta * Frame;
 				FQuat AnimQuat;
 				int32 FirstIndex;
 				int32 SecondIndex;
@@ -2167,6 +2170,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					}
 				}
 
+				if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
+				{
+					AnimQuat = SkeletalAnimationConfig.TransformPose[TrackName].TransformRotation(AnimQuat);
+				}
+
 				if (SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound())
 				{
 					AnimQuat = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.Execute(TrackName, Frame, AnimQuat.Rotator(), SkeletalAnimationConfig.FrameRotationRemapper.Context).Quaternion();
@@ -2177,7 +2185,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 				Track.RotKeys.Add(AnimQuat);
 #endif
-				FrameBase += FrameDelta;
 			}
 		}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
@@ -2195,9 +2202,10 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
-			float FrameBase = 0.f;
+
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				const float FrameBase = FrameDelta * Frame;
 				FVector AnimLocation;
 				int32 FirstIndex;
 				int32 SecondIndex;
@@ -2228,9 +2236,14 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					}
 				}
 
+				if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
+				{
+					AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
+				}
+
 				if (SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.IsBound())
 				{
-					AnimLocation = SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.Execute(TrackName, Frame, AnimLocation, SkeletalAnimationConfig.FrameTranslationRemapper.Context);
+					AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
 				}
 
 #if ENGINE_MAJOR_VERSION > 4
@@ -2238,7 +2251,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 				Track.PosKeys.Add(AnimLocation);
 #endif
-				FrameBase += FrameDelta;
 			}
 		}
 		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
@@ -2256,9 +2268,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
-			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				const float FrameBase = FrameDelta * Frame;
 				int32 FirstIndex;
 				int32 SecondIndex;
 				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
@@ -2269,7 +2281,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 				Track.ScaleKeys.Add((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling());
 #endif
-				FrameBase += FrameDelta;
 			}
 		}
 		else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
