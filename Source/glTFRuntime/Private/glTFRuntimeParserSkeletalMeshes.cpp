@@ -1960,6 +1960,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	AnimSequence->SequenceLength = Duration;
 #endif
 	AnimSequence->bEnableRootMotion = SkeletalAnimationConfig.bRootMotion;
+	AnimSequence->RootMotionRootLock = SkeletalAnimationConfig.RootMotionRootLock;
 
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
 	const TArray<FMeshBoneInfo>& MeshBoneInfos = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBoneInfo();
@@ -1998,12 +1999,23 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 		}
 
 		FRawAnimSequenceTrack Track;
-		// positions
+		// positions (check for root motion)
+		if (BoneIndex == 0 && !AnimSequence->bEnableRootMotion)
+		{
 #if ENGINE_MAJOR_VERSION > 4
-		Track.PosKeys.Add(FVector3f(Node.Transform.GetLocation()));
+			Track.PosKeys.Add(FVector3f(BonesPoses[0].GetLocation()));
 #else
-		Track.PosKeys.Add(Node.Transform.GetLocation());
+			Track.PosKeys.Add(BonesPoses[0].GetLocation());
 #endif
+		}
+		else
+		{
+#if ENGINE_MAJOR_VERSION > 4
+			Track.PosKeys.Add(FVector3f(Node.Transform.GetLocation()));
+#else
+			Track.PosKeys.Add(Node.Transform.GetLocation());
+#endif
+		}
 
 
 #if ENGINE_MAJOR_VERSION > 4
@@ -2193,7 +2205,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			{
 				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
-			}
+		}
 
 			if (!Tracks.Contains(TrackName))
 			{
@@ -2252,14 +2264,14 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.PosKeys.Add(AnimLocation);
 #endif
 			}
-		}
+	}
 		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
 				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
-			}
+		}
 
 			if (!Tracks.Contains(TrackName))
 			{
@@ -2282,7 +2294,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.ScaleKeys.Add((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling());
 #endif
 			}
-		}
+}
 		else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
 		{
 			TArray<FName> MorphTargetNames;
@@ -2311,7 +2323,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-	};
+};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);

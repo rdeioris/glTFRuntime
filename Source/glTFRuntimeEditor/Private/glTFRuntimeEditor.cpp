@@ -40,6 +40,8 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 				{
 					NewActor->SetFlags(EObjectFlags::RF_DuplicateTransient);
 					NewActor->Asset = Asset;
+					NewActor->bAllowSkeletalAnimations = false;
+					NewActor->bAllowNodeAnimations = false;
 					NewActor->FinishSpawning(Transform);
 					NewActor->DispatchBeginPlay();
 				}
