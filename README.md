@@ -12,4 +12,8 @@ Buy it from the Marketplace to support the development: https://www.unrealengine
 
 View the official docs at https://github.com/rdeioris/glTFRuntime-docs/blob/master/README.md
 
-And please read this before packaging your project! https://github.com/rdeioris/gltfruntime-docs#notes-when-packaging-a-game 
+If you need Draco support, just install: https://github.com/rdeioris/glTFRuntimeDraco
+
+For a big tutorial about runtime animation retargeting: https://github.com/rdeioris/glTFRuntime-docs/blob/master/Tutorials/RetargetingRPMAndMixamo.md
+
+And please read this before packaging your project! https://github.com/rdeioris/gltfruntime-docs#notes-when-packaging-a-game
