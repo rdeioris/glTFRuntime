@@ -338,7 +338,7 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 	}
 
 	UMaterialInterface* TranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeTranslucent_Inst"));
-	if (OpaqueMaterial)
+	if (TranslucentMaterial)
 	{
 		MetallicRoughnessMaterialsMap.Add(EglTFRuntimeMaterialType::Translucent, TranslucentMaterial);
 	}
@@ -356,7 +356,7 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 	}
 
 	UMaterialInterface* MaskedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeMasked_Inst"));
-	if (TwoSidedTranslucentMaterial)
+	if (MaskedMaterial)
 	{
 		MetallicRoughnessMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, MaskedMaterial);
 	}
@@ -390,6 +390,44 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 	if (SGTwoSidedTranslucentMaterial)
 	{
 		SpecularGlossinessMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, SGTwoSidedTranslucentMaterial);
+	}
+
+
+	// KHR_materials_unlit 
+	UMaterialInterface* UnlitOpaqueMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_Unlit_glTFRuntimeBase"));
+	if (UnlitOpaqueMaterial)
+	{
+		UnlitMaterialsMap.Add(EglTFRuntimeMaterialType::Opaque, UnlitOpaqueMaterial);
+	}
+
+	UMaterialInterface* UnlitTranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_Unlit_glTFRuntimeTranslucent_Inst"));
+	if (UnlitTranslucentMaterial)
+	{
+		UnlitMaterialsMap.Add(EglTFRuntimeMaterialType::Translucent, UnlitTranslucentMaterial);
+	}
+
+	UMaterialInterface* UnlitTwoSidedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_Unlit_glTFRuntimeTwoSided_Inst"));
+	if (UnlitTwoSidedMaterial)
+	{
+		UnlitMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSided, UnlitTwoSidedMaterial);
+	}
+
+	UMaterialInterface* UnlitTwoSidedTranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_Unlit_glTFRuntimeTwoSidedTranslucent_Inst"));
+	if (UnlitTwoSidedTranslucentMaterial)
+	{
+		UnlitMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, UnlitTwoSidedTranslucentMaterial);
+	}
+
+	UMaterialInterface* UnlitMaskedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_Unlit_glTFRuntimeMasked_Inst"));
+	if (UnlitMaskedMaterial)
+	{
+		UnlitMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, UnlitMaskedMaterial);
+	}
+
+	UMaterialInterface* UnlitTwoSidedMaskedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_Unlit_glTFRuntimeTwoSidedMasked_Inst"));
+	if (UnlitTwoSidedMaskedMaterial)
+	{
+		UnlitMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, UnlitTwoSidedMaskedMaterial);
 	}
 
 	JsonObject->TryGetStringArrayField("extensionsUsed", ExtensionsUsed);

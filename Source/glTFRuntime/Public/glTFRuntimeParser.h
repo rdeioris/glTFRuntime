@@ -1170,6 +1170,8 @@ struct FglTFRuntimeMaterial
 
 	bool bMasked;
 
+	bool bKHR_materials_unlit;
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -1198,6 +1200,7 @@ struct FglTFRuntimeMaterial
 		TransmissionFactor = 0;
 		TransmissionTextureCache = nullptr;
 		bMasked = false;
+		bKHR_materials_unlit = false;
 	}
 };
 
@@ -1546,6 +1549,7 @@ protected:
 
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MetallicRoughnessMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SpecularGlossinessMaterialsMap;
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UnlitMaterialsMap;
 
 	TArray<FString> Errors;
 

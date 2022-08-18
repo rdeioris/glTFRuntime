@@ -202,6 +202,13 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 			RuntimeMaterial.bKHR_materials_transmission = true;
 		}
+
+		// KHR_materials_unlit 
+		const TSharedPtr<FJsonObject>* JsonMaterialUnlit;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_unlit", JsonMaterialUnlit))
+		{
+			RuntimeMaterial.bKHR_materials_unlit = true;
+		}
 	}
 
 	if (IsInGameThread())
@@ -313,6 +320,14 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		if (SpecularGlossinessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 		{
 			BaseMaterial = SpecularGlossinessMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+
+	if (RuntimeMaterial.bKHR_materials_unlit)
+	{
+		if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = UnlitMaterialsMap[RuntimeMaterial.MaterialType];
 		}
 	}
 
