@@ -430,6 +430,23 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 		UnlitMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, UnlitTwoSidedMaskedMaterial);
 	}
 
+	// KHR_materials_transmission
+	UMaterialInterface* TrasmissionMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_Transmission_glTFRuntimeBase"));
+	if (TranslucentMaterial)
+	{
+		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::Opaque, TrasmissionMaterial);
+		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, TrasmissionMaterial);
+		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::Translucent, TrasmissionMaterial);
+	}
+
+	UMaterialInterface* TrasmissionTwoSidedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_Transmission_glTFRuntimeTwoSided_Inst"));
+	if (TrasmissionTwoSidedMaterial)
+	{
+		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSided, TrasmissionTwoSidedMaterial);
+		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, TrasmissionTwoSidedMaterial);
+		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, TrasmissionTwoSidedMaterial);
+	}
+
 	JsonObject->TryGetStringArrayField("extensionsUsed", ExtensionsUsed);
 	JsonObject->TryGetStringArrayField("extensionsRequired", ExtensionsRequired);
 
@@ -2829,6 +2846,8 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(TexturesCache);
 	Collector.AddReferencedObjects(MetallicRoughnessMaterialsMap);
 	Collector.AddReferencedObjects(SpecularGlossinessMaterialsMap);
+	Collector.AddReferencedObjects(UnlitMaterialsMap);
+	Collector.AddReferencedObjects(TransmissionMaterialsMap);
 }
 
 float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)

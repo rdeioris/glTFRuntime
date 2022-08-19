@@ -323,6 +323,14 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	}
 
+	if (RuntimeMaterial.bKHR_materials_transmission)
+	{
+		if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+
 	if (RuntimeMaterial.bKHR_materials_unlit)
 	{
 		if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))

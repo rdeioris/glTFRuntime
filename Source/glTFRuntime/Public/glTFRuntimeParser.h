@@ -1550,6 +1550,7 @@ protected:
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MetallicRoughnessMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SpecularGlossinessMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UnlitMaterialsMap;
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> TransmissionMaterialsMap;
 
 	TArray<FString> Errors;
 
