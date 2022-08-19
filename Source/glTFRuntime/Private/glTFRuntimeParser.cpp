@@ -1686,6 +1686,10 @@ bool FglTFRuntimeParser::FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<
 	else
 	{
 		FName RootBoneName = FName("root");
+		if (!SkeletalMeshConfig.SkeletonConfig.RootBoneName.IsEmpty())
+		{
+			RootBoneName = FName(SkeletalMeshConfig.SkeletonConfig.RootBoneName);
+		}
 		Modifier.Add(FMeshBoneInfo(RootBoneName, RootBoneName.ToString(), INDEX_NONE), FTransform::Identity);
 		BoneMap.Add(0, RootBoneName);
 	}
