@@ -1172,6 +1172,9 @@ struct FglTFRuntimeMaterial
 
 	bool bKHR_materials_unlit;
 
+	bool bHasIOR;
+	float IOR;
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -1201,6 +1204,8 @@ struct FglTFRuntimeMaterial
 		TransmissionTextureCache = nullptr;
 		bMasked = false;
 		bKHR_materials_unlit = false;
+		bHasIOR = false;
+		IOR = 1;
 	}
 };
 

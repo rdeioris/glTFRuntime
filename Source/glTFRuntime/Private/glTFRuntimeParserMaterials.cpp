@@ -209,6 +209,27 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 		{
 			RuntimeMaterial.bKHR_materials_unlit = true;
 		}
+
+		// KHR_materials_ior
+		const TSharedPtr<FJsonObject>* JsonMaterialIOR;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_ior", JsonMaterialIOR))
+		{
+			if (!(*JsonMaterialIOR)->TryGetNumberField("ior", RuntimeMaterial.IOR))
+			{
+				RuntimeMaterial.IOR = 1.5;
+			}
+			RuntimeMaterial.bHasIOR = true;
+		}
+
+		// KHR_materials_specular
+		const TSharedPtr<FJsonObject>* JsonMaterialSpecular;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_specular", JsonMaterialSpecular))
+		{
+			if (!(*JsonMaterialSpecular)->TryGetNumberField("specularFactor", RuntimeMaterial.BaseSpecularFactor))
+			{
+				RuntimeMaterial.BaseSpecularFactor = 1;
+			}
+		}
 	}
 
 	if (IsInGameThread())
@@ -475,6 +496,8 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
 	Material->SetScalarParameterValue("AlphaMask", RuntimeMaterial.bMasked ? 1.0f : 0.0f);
+
+	ApplyMaterialFloatFactor(RuntimeMaterial.bHasIOR, "ior", RuntimeMaterial.IOR);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ParamsMultiplier)
 	{
