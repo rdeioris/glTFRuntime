@@ -109,6 +109,12 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpRes
 		return;
 	}
 
+	// escaped?
+	if (Url.StartsWith("\"") && Url.EndsWith("\""))
+	{
+		Url = Url.RightChop(1).LeftChop(1);
+	}
+
 	if (Url.Contains("://"))
 	{
 		glTFLoadAssetFromUrl(Url, {}, Completed, LoaderConfig);
