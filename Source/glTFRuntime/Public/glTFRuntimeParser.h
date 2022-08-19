@@ -1147,7 +1147,7 @@ struct FglTFRuntimeMaterial
 	FglTFRuntimeTextureTransform SpecularGlossinessTransform;
 	FglTFRuntimeTextureSampler SpecularGlossinessSampler;
 
-	float BaseSpecularFactor;
+	double BaseSpecularFactor;
 
 	bool bHasDiffuseFactor;
 	FLinearColor DiffuseFactor;
@@ -1173,7 +1173,7 @@ struct FglTFRuntimeMaterial
 	bool bKHR_materials_unlit;
 
 	bool bHasIOR;
-	float IOR;
+	double IOR;
 
 	FglTFRuntimeMaterial()
 	{

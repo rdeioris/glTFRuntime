@@ -1,8 +1,9 @@
-// Copyright 2020, Roberto De Ioris.
+// Copyright 2022, Roberto De Ioris.
 
 
 #include "glTFRuntimeFunctionLibrary.h"
 #include "HttpModule.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 
@@ -95,4 +96,28 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 	}
 
 	return Asset;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+{
+
+	FString Url;
+	FPlatformApplicationMisc::ClipboardPaste(Url);
+
+	if (Url.IsEmpty())
+	{
+		return;
+	}
+
+	if (Url.Contains("://"))
+	{
+		glTFLoadAssetFromUrl(Url, {}, Completed, LoaderConfig);
+		return;
+	}
+
+	UglTFRuntimeAsset* Asset = glTFLoadAssetFromFilename(Url, false, LoaderConfig);
+	if (Asset)
+	{
+		Completed.ExecuteIfBound(Asset);
+	}
 }
