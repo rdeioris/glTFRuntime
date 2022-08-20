@@ -444,6 +444,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		}
 		LODResources.IndexBuffer.SetIndices(LODIndices, EIndexBufferStride::Force32Bit);
 
+#if WITH_EDITOR
 		if (StaticMeshConfig.bGenerateStaticMeshDescription)
 		{
 			FStaticMeshSourceModel& SourceModel = StaticMesh->AddSourceModel();
@@ -514,6 +515,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 			SourceModel.CommitMeshDescription(true);
 		}
+#endif
 	}
 
 	return StaticMesh;
