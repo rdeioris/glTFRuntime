@@ -447,21 +447,27 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		if (StaticMeshConfig.bGenerateStaticMeshDescription)
 		{
 			FStaticMeshSourceModel& SourceModel = StaticMesh->AddSourceModel();
+#if ENGINE_MAJOR_VERSION > 4
 			FMeshDescription* MeshDescription = SourceModel.CreateMeshDescription();
 			FStaticMeshAttributes StaticMeshAttributes(*MeshDescription);
-#if ENGINE_MAJOR_VERSION > 4
 			TVertexAttributesRef<FVector3f> MeshDescriptionPositions = MeshDescription->GetVertexPositions();
 			TVertexInstanceAttributesRef<FVector3f> VertexInstanceNormals = StaticMeshAttributes.GetVertexInstanceNormals();
 			TVertexInstanceAttributesRef<FVector3f> VertexInstanceTangents = StaticMeshAttributes.GetVertexInstanceTangents();
 			TVertexInstanceAttributesRef<FVector2f> VertexInstanceUVs = StaticMeshAttributes.GetVertexInstanceUVs();
 			TVertexInstanceAttributesRef<FVector4f> VertexInstanceColors = StaticMeshAttributes.GetVertexInstanceColors();
 #else
-			TVertexAttributesRef<FVector> MeshDescriptionPositions = MeshDescription->GetVertexPositions();
+			FMeshDescription* MeshDescription = StaticMesh->CreateMeshDescription(LODIndex);
+			FStaticMeshAttributes StaticMeshAttributes(*MeshDescription);
+			TVertexAttributesRef<FVector> MeshDescriptionPositions = StaticMeshAttributes.GetVertexPositions();
+			TVertexInstanceAttributesRef<FVector> VertexInstanceNormals = StaticMeshAttributes.GetVertexInstanceNormals();
+			TVertexInstanceAttributesRef<FVector> VertexInstanceTangents = StaticMeshAttributes.GetVertexInstanceTangents();
+			TVertexInstanceAttributesRef<FVector2D> VertexInstanceUVs = StaticMeshAttributes.GetVertexInstanceUVs();
+			TVertexInstanceAttributesRef<FVector4> VertexInstanceColors = StaticMeshAttributes.GetVertexInstanceColors();
 #endif
 			for (int32 PositionIndex = 0; PositionIndex < StaticMeshBuildVertices.Num(); PositionIndex++)
 			{
-				MeshDescription->CreateVertexWithID(PositionIndex);
-				MeshDescriptionPositions[PositionIndex] = StaticMeshBuildVertices[PositionIndex].Position;
+				MeshDescription->CreateVertexWithID(FVertexID(PositionIndex));
+				MeshDescriptionPositions[FVertexID(PositionIndex)] = StaticMeshBuildVertices[PositionIndex].Position;
 			}
 
 			TArray<TPair<uint32, FPolygonGroupID>> PolygonGroups;
@@ -474,9 +480,9 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			int32 CurrentPolygonGroupIndex = 0;
 			for (uint32 VertexIndex = 0; VertexIndex < static_cast<uint32>(LODIndices.Num()); VertexIndex += 3)
 			{
-				const FVertexInstanceID VertexInstanceID0 = MeshDescription->CreateVertexInstance(LODIndices[VertexIndex]);;
-				const FVertexInstanceID VertexInstanceID1 = MeshDescription->CreateVertexInstance(LODIndices[VertexIndex + 1]);
-				const FVertexInstanceID VertexInstanceID2 = MeshDescription->CreateVertexInstance(LODIndices[VertexIndex + 2]);
+				const FVertexInstanceID VertexInstanceID0 = MeshDescription->CreateVertexInstance(FVertexID(LODIndices[VertexIndex]));;
+				const FVertexInstanceID VertexInstanceID1 = MeshDescription->CreateVertexInstance(FVertexID(LODIndices[VertexIndex + 1]));
+				const FVertexInstanceID VertexInstanceID2 = MeshDescription->CreateVertexInstance(FVertexID(LODIndices[VertexIndex + 2]));
 
 				VertexInstanceNormals[VertexInstanceID0] = StaticMeshBuildVertices[LODIndices[VertexIndex]].TangentZ;
 				VertexInstanceTangents[VertexInstanceID0] = StaticMeshBuildVertices[LODIndices[VertexIndex]].TangentX;
@@ -512,7 +518,12 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				MeshDescription->CreateTriangle(PolygonGroupID, { VertexInstanceID0, VertexInstanceID1, VertexInstanceID2 });
 			}
 
+#if ENGINE_MAJOR_VERSION > 4
 			SourceModel.CommitMeshDescription(true);
+#else
+			SourceModel.MeshDescriptionBulkData->SaveMeshDescription(*MeshDescription);
+#endif
+			
 		}
 	}
 
@@ -638,7 +649,7 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	}
 
 	return StaticMesh;
-	}
+}
 
 bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
