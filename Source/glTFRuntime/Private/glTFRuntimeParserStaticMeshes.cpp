@@ -448,17 +448,16 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		if (StaticMeshConfig.bGenerateStaticMeshDescription)
 		{
 			FStaticMeshSourceModel& SourceModel = StaticMesh->AddSourceModel();
-#if ENGINE_MAJOR_VERSION > 4
-			FMeshDescription* MeshDescription = SourceModel.CreateMeshDescription();
+			FMeshDescription* MeshDescription = StaticMesh->CreateMeshDescription(CurrentLODIndex);
 			FStaticMeshAttributes StaticMeshAttributes(*MeshDescription);
+#if ENGINE_MAJOR_VERSION > 4
+
 			TVertexAttributesRef<FVector3f> MeshDescriptionPositions = MeshDescription->GetVertexPositions();
 			TVertexInstanceAttributesRef<FVector3f> VertexInstanceNormals = StaticMeshAttributes.GetVertexInstanceNormals();
 			TVertexInstanceAttributesRef<FVector3f> VertexInstanceTangents = StaticMeshAttributes.GetVertexInstanceTangents();
 			TVertexInstanceAttributesRef<FVector2f> VertexInstanceUVs = StaticMeshAttributes.GetVertexInstanceUVs();
 			TVertexInstanceAttributesRef<FVector4f> VertexInstanceColors = StaticMeshAttributes.GetVertexInstanceColors();
 #else
-			FMeshDescription* MeshDescription = StaticMesh->CreateMeshDescription(CurrentLODIndex);
-			FStaticMeshAttributes StaticMeshAttributes(*MeshDescription);
 			TVertexAttributesRef<FVector> MeshDescriptionPositions = StaticMeshAttributes.GetVertexPositions();
 			TVertexInstanceAttributesRef<FVector> VertexInstanceNormals = StaticMeshAttributes.GetVertexInstanceNormals();
 			TVertexInstanceAttributesRef<FVector> VertexInstanceTangents = StaticMeshAttributes.GetVertexInstanceTangents();
@@ -520,11 +519,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				MeshDescription->CreateTriangle(PolygonGroupID, { VertexInstanceID0, VertexInstanceID1, VertexInstanceID2 });
 			}
 
-#if ENGINE_MAJOR_VERSION > 4
-			SourceModel.CommitMeshDescription(true);
-#else
 			StaticMesh->CommitMeshDescription(CurrentLODIndex);
-#endif
 			
 		}
 #endif
