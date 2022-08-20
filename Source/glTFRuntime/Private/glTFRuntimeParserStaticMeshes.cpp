@@ -1,7 +1,9 @@
-// Copyright 2020-2021, Roberto De Ioris.
+// Copyright 2020-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
 #include "Async/Async.h"
+#include "MeshDescription.h"
+#include "StaticMeshAttributes.h"
 #include "StaticMeshOperations.h"
 #include "Engine/StaticMeshSocket.h"
 #if WITH_EDITOR
@@ -441,6 +443,77 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			LODResources.IndexBuffer = FRawStaticIndexBuffer(true);
 		}
 		LODResources.IndexBuffer.SetIndices(LODIndices, EIndexBufferStride::Force32Bit);
+
+		if (StaticMeshConfig.bGenerateStaticMeshDescription)
+		{
+			FStaticMeshSourceModel& SourceModel = StaticMesh->AddSourceModel();
+			FMeshDescription* MeshDescription = SourceModel.CreateMeshDescription();
+			FStaticMeshAttributes StaticMeshAttributes(*MeshDescription);
+#if ENGINE_MAJOR_VERSION > 4
+			TVertexAttributesRef<FVector3f> MeshDescriptionPositions = MeshDescription->GetVertexPositions();
+			TVertexInstanceAttributesRef<FVector3f> VertexInstanceNormals = StaticMeshAttributes.GetVertexInstanceNormals();
+			TVertexInstanceAttributesRef<FVector3f> VertexInstanceTangents = StaticMeshAttributes.GetVertexInstanceTangents();
+			TVertexInstanceAttributesRef<FVector2f> VertexInstanceUVs = StaticMeshAttributes.GetVertexInstanceUVs();
+			TVertexInstanceAttributesRef<FVector4f> VertexInstanceColors = StaticMeshAttributes.GetVertexInstanceColors();
+#else
+			TVertexAttributesRef<FVector> MeshDescriptionPositions = MeshDescription->GetVertexPositions();
+#endif
+			for (int32 PositionIndex = 0; PositionIndex < StaticMeshBuildVertices.Num(); PositionIndex++)
+			{
+				MeshDescription->CreateVertexWithID(PositionIndex);
+				MeshDescriptionPositions[PositionIndex] = StaticMeshBuildVertices[PositionIndex].Position;
+			}
+
+			TArray<TPair<uint32, FPolygonGroupID>> PolygonGroups;
+			for (const FStaticMeshSection& Section : LODResources.Sections)
+			{
+				const FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
+				PolygonGroups.Add(TPair<uint32, FPolygonGroupID>(Section.FirstIndex, PolygonGroupID));
+			}
+
+			int32 CurrentPolygonGroupIndex = 0;
+			for (uint32 VertexIndex = 0; VertexIndex < static_cast<uint32>(LODIndices.Num()); VertexIndex += 3)
+			{
+				const FVertexInstanceID VertexInstanceID0 = MeshDescription->CreateVertexInstance(LODIndices[VertexIndex]);;
+				const FVertexInstanceID VertexInstanceID1 = MeshDescription->CreateVertexInstance(LODIndices[VertexIndex + 1]);
+				const FVertexInstanceID VertexInstanceID2 = MeshDescription->CreateVertexInstance(LODIndices[VertexIndex + 2]);
+
+				VertexInstanceNormals[VertexInstanceID0] = StaticMeshBuildVertices[LODIndices[VertexIndex]].TangentZ;
+				VertexInstanceTangents[VertexInstanceID0] = StaticMeshBuildVertices[LODIndices[VertexIndex]].TangentX;
+				VertexInstanceNormals[VertexInstanceID1] = StaticMeshBuildVertices[LODIndices[VertexIndex + 1]].TangentZ;
+				VertexInstanceTangents[VertexInstanceID1] = StaticMeshBuildVertices[LODIndices[VertexIndex + 1]].TangentX;
+				VertexInstanceNormals[VertexInstanceID2] = StaticMeshBuildVertices[LODIndices[VertexIndex + 2]].TangentZ;
+				VertexInstanceTangents[VertexInstanceID2] = StaticMeshBuildVertices[LODIndices[VertexIndex + 2]].TangentX;
+
+				for (int32 UVIndex = 0; UVIndex < NumUVs; UVIndex++)
+				{
+					VertexInstanceUVs.Set(VertexInstanceID0, UVIndex, StaticMeshBuildVertices[LODIndices[VertexIndex]].UVs[UVIndex]);
+					VertexInstanceUVs.Set(VertexInstanceID1, UVIndex, StaticMeshBuildVertices[LODIndices[VertexIndex + 1]].UVs[UVIndex]);
+					VertexInstanceUVs.Set(VertexInstanceID2, UVIndex, StaticMeshBuildVertices[LODIndices[VertexIndex + 2]].UVs[UVIndex]);
+				}
+
+				if (bHasVertexColors)
+				{
+					VertexInstanceColors[VertexInstanceID0] = FLinearColor(StaticMeshBuildVertices[LODIndices[VertexIndex]].Color);
+					VertexInstanceColors[VertexInstanceID1] = FLinearColor(StaticMeshBuildVertices[LODIndices[VertexIndex + 1]].Color);
+					VertexInstanceColors[VertexInstanceID2] = FLinearColor(StaticMeshBuildVertices[LODIndices[VertexIndex + 2]].Color);
+				}
+
+				// safe approach given that the section array is built in order
+				if (CurrentPolygonGroupIndex + 1 < PolygonGroups.Num())
+				{
+					if (VertexIndex >= PolygonGroups[CurrentPolygonGroupIndex + 1].Key)
+					{
+						CurrentPolygonGroupIndex++;
+					}
+				}
+				const FPolygonGroupID PolygonGroupID = PolygonGroups[CurrentPolygonGroupIndex].Value;
+
+				MeshDescription->CreateTriangle(PolygonGroupID, { VertexInstanceID0, VertexInstanceID1, VertexInstanceID2 });
+			}
+
+			SourceModel.CommitMeshDescription(true);
+		}
 	}
 
 	return StaticMesh;
@@ -565,7 +638,7 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	}
 
 	return StaticMesh;
-}
+	}
 
 bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {

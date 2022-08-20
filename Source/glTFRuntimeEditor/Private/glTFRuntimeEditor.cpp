@@ -44,8 +44,11 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 					NewActor->Asset = Asset;
 					NewActor->bAllowSkeletalAnimations = false;
 					NewActor->bAllowNodeAnimations = false;
+					NewActor->StaticMeshConfig.bGenerateStaticMeshDescription = true;
 					NewActor->FinishSpawning(Transform);
 					NewActor->DispatchBeginPlay();
+					GEditor->SelectNone(true, true, true);
+					GEditor->SelectActor(NewActor, true, true, false, true);
 				}
 			}
 		}
@@ -61,7 +64,10 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActorFromClipboard()
 	FglTFRuntimeHttpResponse HttpResponse;
 	HttpResponse.BindUFunction(glTFRuntimeEditorDelegates.Get(), GET_FUNCTION_NAME_CHECKED(UglTFRuntimeEditorDelegates, SpawnFromClipboard));
 
-	UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(HttpResponse, LoaderConfig);
+	if (!UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(HttpResponse, LoaderConfig))
+	{
+		UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to load asset from clipboard"));
+	}
 }
 
 void FglTFRuntimeEditorModule::BuildglTFRuntimeMenu(FMenuBuilder& Builder)

@@ -16,7 +16,11 @@ void UglTFRuntimeEditorDelegates::SpawnFromClipboard(UglTFRuntimeAsset* Asset)
 		NewActor->Asset = Asset;
 		NewActor->bAllowSkeletalAnimations = false;
 		NewActor->bAllowNodeAnimations = false;
+		NewActor->StaticMeshConfig.bGenerateStaticMeshDescription = true;
 		NewActor->FinishSpawning(Transform);
 		NewActor->DispatchBeginPlay();
+
+		GEditor->SelectNone(true, true, true);
+		GEditor->SelectActor(NewActor, true, true, false, true);
 	}
 }

@@ -98,7 +98,7 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 	return Asset;
 }
 
-void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 {
 
 	FString Url;
@@ -106,7 +106,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpRes
 
 	if (Url.IsEmpty())
 	{
-		return;
+		return false;
 	}
 
 	// escaped?
@@ -118,12 +118,15 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpRes
 	if (Url.Contains("://"))
 	{
 		glTFLoadAssetFromUrl(Url, {}, Completed, LoaderConfig);
-		return;
+		return true;
 	}
 
 	UglTFRuntimeAsset* Asset = glTFLoadAssetFromFilename(Url, false, LoaderConfig);
 	if (Asset)
 	{
 		Completed.ExecuteIfBound(Asset);
+		return true;
 	}
+
+	return false;
 }

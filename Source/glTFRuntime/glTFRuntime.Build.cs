@@ -41,7 +41,9 @@ public class glTFRuntime : ModuleRules
                 "ApplicationCore",
                 "HTTP",
                 "PhysicsCore",
-                "Projects"
+                "Projects",
+                "MeshDescription",
+                "StaticMeshDescription"
             }
             );
 

@@ -15,6 +15,7 @@ FglTFRuntimeOnPreLoadedPrimitive FglTFRuntimeParser::OnPreLoadedPrimitive;
 FglTFRuntimeOnLoadedPrimitive FglTFRuntimeParser::OnLoadedPrimitive;
 FglTFRuntimeOnLoadedRefSkeleton FglTFRuntimeParser::OnLoadedRefSkeleton;
 FglTFRuntimeOnCreatedPoseTracks FglTFRuntimeParser::OnCreatedPoseTracks;
+FglTFRuntimeOnTexturePixels FglTFRuntimeParser::OnTexturePixels;
 FglTFRuntimeOnLoadedTexturePixels FglTFRuntimeParser::OnLoadedTexturePixels;
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)

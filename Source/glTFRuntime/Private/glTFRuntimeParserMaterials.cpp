@@ -1,7 +1,6 @@
-// Copyright 2022, Roberto De Ioris.
+// Copyright 2020-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
-#include "glTFRuntimeImageLoader.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
@@ -533,24 +532,11 @@ bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& Unco
 		return false;
 	}
 
-	for (TSubclassOf<UglTFRuntimeImageLoader> ImageLoaderClass : ImagesConfig.AdditionalImageLoaders)
+	OnTexturePixels.Broadcast(AsShared(), JsonImageObject.ToSharedRef(), Bytes, Width, Height, UncompressedBytes);
+
+	if (UncompressedBytes.Num() > 0)
 	{
-		// maybe overengineering but avoids custom loaders making mess
-		UncompressedBytes.Empty();
-		Width = 0;
-		Height = 0;
-		UglTFRuntimeImageLoader* ImageLoader = NewObject<UglTFRuntimeImageLoader>(GetTransientPackage(), ImageLoaderClass);
-		if (ImageLoader)
-		{
-			if (ImageLoader->LoadImage(AsShared(), ImageIndex, JsonImageObject.ToSharedRef(), Bytes, UncompressedBytes, Width, Height))
-			{
-				return true;
-			}
-		}
-		else
-		{
-			AddError("LoadImage()", FString::Printf(TEXT("Unable to instantiate glTFRuntimeImageLoader %s"), *ImageLoaderClass->GetName()));
-		}
+		return true;
 	}
 
 	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
