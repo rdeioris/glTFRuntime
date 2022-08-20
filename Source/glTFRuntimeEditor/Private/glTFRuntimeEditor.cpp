@@ -40,7 +40,6 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 				AglTFRuntimeAssetActor* NewActor = LevelEditorModule.GetFirstLevelEditor()->GetWorld()->SpawnActorDeferred<AglTFRuntimeAssetActor>(AglTFRuntimeAssetActor::StaticClass(), Transform);
 				if (NewActor)
 				{
-					NewActor->SetFlags(EObjectFlags::RF_DuplicateTransient);
 					NewActor->Asset = Asset;
 					NewActor->bAllowSkeletalAnimations = false;
 					NewActor->bAllowNodeAnimations = false;
