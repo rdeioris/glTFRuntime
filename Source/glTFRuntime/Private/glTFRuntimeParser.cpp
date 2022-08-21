@@ -1578,6 +1578,11 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 		CopySkeletonRotationsFrom(RefSkeleton, SkeletonConfig.CopyRotationsFrom->GetReferenceSkeleton());
 	}
 
+	if (SkeletonConfig.BonesDeltaTransformMap.Num() > 0)
+	{
+		AddSkeletonDeltaTranforms(RefSkeleton, SkeletonConfig.BonesDeltaTransformMap);
+	}
+
 	Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
 
 	if (CanWriteToCache(SkeletonConfig.CacheMode))
@@ -1853,6 +1858,47 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 			return false;
 		}
 		BoneName = FName(BoneNameMapValue);
+	}
+	else if (SkeletonConfig.bAssignUnmappedBonesToParent)
+	{
+		int32 ParentNodeIndex = Node.ParentIndex;
+		while (ParentNodeIndex != INDEX_NONE)
+		{
+			FglTFRuntimeNode ParentNode;
+			if (!LoadNode(ParentNodeIndex, ParentNode))
+			{
+				return false;
+			}
+
+			if (SkeletonConfig.BonesNameMap.Contains(ParentNode.Name))
+			{
+				if (Joints.Contains(Node.Index))
+				{
+					BoneMap.Add(Joints.IndexOfByKey(Node.Index), *SkeletonConfig.BonesNameMap[ParentNode.Name]);
+				}
+
+				// continue with the other children...
+				for (int32 ChildIndex : Node.ChildrenIndices)
+				{
+					FglTFRuntimeNode ChildNode;
+					if (!LoadNode(ChildIndex, ChildNode))
+					{
+						return false;
+					}
+
+					if (!TraverseJoints(Modifier, Parent, ChildNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
+					{
+						return false;
+					}
+				}
+
+				return true;
+			}
+
+			ParentNodeIndex = ParentNode.ParentIndex;
+		}
+
+		return false;
 	}
 
 	// Check if a bone with the same name exists
@@ -3429,4 +3475,81 @@ void FglTFRuntimeParser::AddAdditionalBufferView(const int64 Index, const FStrin
 		AdditionalBufferViewsCache[Index][Name] = Blob;
 	}
 
+}
+
+bool FglTFRuntimeParser::GetNumberFromExtras(const FString& Key, float &Value) const
+{
+	TSharedPtr<FJsonObject> JsonExtras = GetJsonObjectExtras(Root);
+	if (!JsonExtras)
+	{
+		return false;
+	}
+
+	return JsonExtras->TryGetNumberField(Key, Value);
+}
+
+bool FglTFRuntimeParser::GetStringFromExtras(const FString& Key, FString& Value) const
+{
+	TSharedPtr<FJsonObject> JsonExtras = GetJsonObjectExtras(Root);
+	if (!JsonExtras)
+	{
+		return false;
+	}
+
+	return JsonExtras->TryGetStringField(Key, Value);
+}
+
+bool FglTFRuntimeParser::GetBooleanFromExtras(const FString& Key, bool& Value) const
+{
+	TSharedPtr<FJsonObject> JsonExtras = GetJsonObjectExtras(Root);
+	if (!JsonExtras)
+	{
+		return false;
+	}
+
+	return JsonExtras->TryGetBoolField(Key, Value);
+}
+
+bool FglTFRuntimeParser::GetStringMapFromExtras(const FString& Key, TMap<FString, FString>& StringMap) const
+{
+	TSharedPtr<FJsonObject> JsonExtras = GetJsonObjectExtras(Root);
+	if (!JsonExtras)
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* JsonExtraObject = nullptr;
+	if (!JsonExtras->TryGetObjectField(Key, JsonExtraObject))
+	{
+		return false;
+	}
+
+	for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*JsonExtraObject)->Values)
+	{
+		if (!Pair.Value.IsValid())
+		{
+			continue;
+		}
+
+		FString Value;
+		if (!Pair.Value->TryGetString(Value))
+		{
+			continue;
+		}
+
+		StringMap.Add(Pair.Key, Value);
+	}
+
+	return true;
+}
+
+bool FglTFRuntimeParser::GetStringArrayFromExtras(const FString& Key, TArray<FString>& StringArray) const
+{
+	TSharedPtr<FJsonObject> JsonExtras = GetJsonObjectExtras(Root);
+	if (!JsonExtras)
+	{
+		return false;
+	}
+
+	return JsonExtras->TryGetStringArrayField(Key, StringArray);
 }

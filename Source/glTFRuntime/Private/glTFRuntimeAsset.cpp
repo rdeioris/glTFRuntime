@@ -624,3 +624,33 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshFromRuntimeLODs(const TArray<F
 	GLTF_CHECK_PARSER(nullptr);
 	return Parser->LoadSkeletalMeshFromRuntimeLODs(RuntimeLODs, SkinIndex, SkeletalMeshConfig);
 }
+
+bool UglTFRuntimeAsset::GetStringMapFromExtras(const FString& Key, TMap<FString, FString>& StringMap) const
+{
+	GLTF_CHECK_PARSER(false);
+	return Parser->GetStringMapFromExtras(Key, StringMap);
+}
+
+bool UglTFRuntimeAsset::GetStringArrayFromExtras(const FString& Key, TArray<FString>& StringArray) const
+{
+	GLTF_CHECK_PARSER(false);
+	return Parser->GetStringArrayFromExtras(Key, StringArray);
+}
+
+bool UglTFRuntimeAsset::GetNumberFromExtras(const FString& Key, float& Value) const
+{
+	GLTF_CHECK_PARSER(false);
+	return Parser->GetNumberFromExtras(Key, Value);
+}
+
+bool UglTFRuntimeAsset::GetStringFromExtras(const FString& Key, FString& Value) const
+{
+	GLTF_CHECK_PARSER(false);
+	return Parser->GetStringFromExtras(Key, Value);
+}
+
+bool UglTFRuntimeAsset::GetBooleanFromExtras(const FString& Key, bool& Value) const
+{
+	GLTF_CHECK_PARSER(false);
+	return Parser->GetBooleanFromExtras(Key, Value);
+}

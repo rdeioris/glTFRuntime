@@ -566,6 +566,9 @@ struct FglTFRuntimeSkeletonConfig
 	TMap<FString, FString> BonesNameMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAssignUnmappedBonesToParent;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, FTransform> BonesTransformMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -601,6 +604,7 @@ struct FglTFRuntimeSkeletonConfig
 		bClearRotations = false;
 		CopyRotationsFrom = nullptr;
 		bSkipAlreadyExistentBoneNames = false;
+		bAssignUnmappedBonesToParent = false;
 	}
 };
 
@@ -1388,6 +1392,12 @@ public:
 	bool GetJSONBooleanFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
 	int32 GetJSONArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+
+	bool GetStringMapFromExtras(const FString& Key, TMap<FString, FString>& StringMap) const;
+	bool GetStringArrayFromExtras(const FString& Key, TArray<FString>& StringArray) const;
+	bool GetNumberFromExtras(const FString& Key, float& Value) const;
+	bool GetStringFromExtras(const FString& Key, FString& Value) const;
+	bool GetBooleanFromExtras(const FString& Key, bool& Value) const;
 
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
 

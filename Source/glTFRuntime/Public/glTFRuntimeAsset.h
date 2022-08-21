@@ -211,6 +211,21 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
 	UAnimSequence* CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetStringMapFromExtras(const FString& Key, TMap<FString, FString>& StringMap) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetStringArrayFromExtras(const FString& Key, TArray<FString>& StringArray) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetNumberFromExtras(const FString& Key, float& Value) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetStringFromExtras(const FString& Key, FString& Value) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetBooleanFromExtras(const FString& Key, bool& Value) const;
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

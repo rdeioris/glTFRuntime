@@ -115,13 +115,16 @@ void FglTFRuntimeParser::AddSkeletonDeltaTranforms(FReferenceSkeleton& RefSkelet
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
 	const TArray<FTransform>& BonesTransforms = Modifier.GetReferenceSkeleton().GetRefBonePose();
 
-	for (int32 BoneIndex = 0; BoneIndex < RefSkeleton.GetNum(); BoneIndex++)
+	for (const TPair<FString, FTransform>& Pair : Transforms)
 	{
-		FName BoneName = RefSkeleton.GetBoneName(BoneIndex);
-		if (Transforms.Contains(BoneName.ToString()))
+		const int32 BoneIndex = RefSkeleton.FindBoneIndex(*Pair.Key);
+		if (BoneIndex <= INDEX_NONE)
 		{
-			Modifier.UpdateRefPoseTransform(BoneIndex, BonesTransforms[BoneIndex] * Transforms[BoneName.ToString()]);
+			continue;
 		}
+		FTransform Transform = BonesTransforms[BoneIndex];
+		Transform.Accumulate(Pair.Value);
+		Modifier.UpdateRefPoseTransform(BoneIndex, Transform);
 	}
 }
 
@@ -920,12 +923,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		for (int32 Index = 0; Index < NumIndices; Index++)
 		{
 			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
-		}
-#endif
 	}
+#endif
+}
 
 	return SkeletalMeshContext->SkeletalMesh;
-}
+	}
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
@@ -1117,7 +1120,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	if (bHasMorphTargets)
 	{
 		SkeletalMeshContext->SkeletalMesh->InitMorphTargets();
-	}
+}
 #endif
 
 	SkeletalMeshContext->SkeletalMesh->CalculateInvRefMatrices();
@@ -1323,7 +1326,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #endif
 
 	return SkeletalMeshContext->SkeletalMesh;
-}
+	}
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
@@ -1672,7 +1675,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 		}
-	}
+}
 #endif
 
 	bool bHasTracks = false;
@@ -1985,7 +1988,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 #endif
 
 		}
-	}
+}
 #endif
 
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
