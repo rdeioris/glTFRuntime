@@ -3485,7 +3485,15 @@ bool FglTFRuntimeParser::GetNumberFromExtras(const FString& Key, float &Value) c
 		return false;
 	}
 
-	return JsonExtras->TryGetNumberField(Key, Value);
+	double DoubleValue = 0;
+
+	if (JsonExtras->TryGetNumberField(Key, DoubleValue))
+	{
+		Value = DoubleValue;
+		return true;
+	}
+
+	return false;
 }
 
 bool FglTFRuntimeParser::GetStringFromExtras(const FString& Key, FString& Value) const
