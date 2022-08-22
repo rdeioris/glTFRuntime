@@ -1836,6 +1836,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
+	TArray<FString> AppendBones;
 	// add fake root bone ?
 	if (Parent == INDEX_NONE && SkeletonConfig.bAddRootBone)
 	{
@@ -1857,6 +1858,18 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 			AddError("TraverseJoints()", FString::Printf(TEXT("Invalid Bone Name Map for %s"), *BoneName.ToString()));
 			return false;
 		}
+
+		if (BoneNameMapValue.Contains(","))
+		{
+			TArray<FString> Parts;
+			if (BoneNameMapValue.ParseIntoArray(Parts, TEXT(",")) > 0)
+			{
+				BoneNameMapValue = Parts[0];
+				Parts.RemoveAt(0);
+				AppendBones = Parts;
+			}
+		}
+
 		BoneName = FName(BoneNameMapValue);
 	}
 	else if (SkeletonConfig.bAssignUnmappedBonesToParent)
@@ -1943,6 +1956,18 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	if (Joints.Contains(Node.Index))
 	{
 		BoneMap.Add(Joints.IndexOfByKey(Node.Index), BoneName);
+	}
+
+	for (const FString& AdditionalBone : AppendBones)
+	{
+		CollidingIndex = Modifier.FindBoneIndex(*AdditionalBone);
+		if (CollidingIndex > INDEX_NONE)
+		{
+			AddError("TraverseJoints()", FString::Printf(TEXT("Bone %s already exists."), *AdditionalBone));
+			return false;
+		}
+		Modifier.Add(FMeshBoneInfo(*AdditionalBone, AdditionalBone, NewParentIndex), FTransform::Identity);
+		NewParentIndex = Modifier.FindBoneIndex(*AdditionalBone);
 	}
 
 	for (int32 ChildIndex : Node.ChildrenIndices)
