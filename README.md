@@ -14,6 +14,8 @@ View the official docs at https://github.com/rdeioris/glTFRuntime-docs/blob/mast
 
 If you need Draco support, just install: https://github.com/rdeioris/glTFRuntimeDraco
 
+For a tutorial about assigning already existing animations to a GLTF SkeletalMesh: https://github.com/rdeioris/glTFRuntime-docs/blob/master/Tutorials/SkeletonRemapping.md
+
 For a big tutorial about runtime animation retargeting: https://github.com/rdeioris/glTFRuntime-docs/blob/master/Tutorials/RetargetingRPMAndMixamo.md
 
 And please read this before packaging your project! https://github.com/rdeioris/gltfruntime-docs#notes-when-packaging-a-game
