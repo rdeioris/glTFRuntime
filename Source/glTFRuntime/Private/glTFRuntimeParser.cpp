@@ -17,6 +17,7 @@ FglTFRuntimeOnLoadedRefSkeleton FglTFRuntimeParser::OnLoadedRefSkeleton;
 FglTFRuntimeOnCreatedPoseTracks FglTFRuntimeParser::OnCreatedPoseTracks;
 FglTFRuntimeOnTexturePixels FglTFRuntimeParser::OnTexturePixels;
 FglTFRuntimeOnLoadedTexturePixels FglTFRuntimeParser::OnLoadedTexturePixels;
+FglTFRuntimeOnFinalizedStaticMesh FglTFRuntimeParser::OnFinalizedStaticMesh;
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {

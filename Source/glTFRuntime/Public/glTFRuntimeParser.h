@@ -1268,6 +1268,7 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedRefSkeleton, TSharedR
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnCreatedPoseTracks, TSharedRef<FglTFRuntimeParser>, TMap<FString, FRawAnimSequenceTrack>&);
 DECLARE_MULTICAST_DELEGATE_SixParams(FglTFRuntimeOnTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, TArray64<uint8>&, int32&, int32&, TArray64<uint8>&);
 DECLARE_MULTICAST_DELEGATE_FiveParams(FglTFRuntimeOnLoadedTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, const int32, const int32, FColor*);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnFinalizedStaticMesh, TSharedRef<FglTFRuntimeParser>, UStaticMesh*, const FglTFRuntimeStaticMeshConfig&);
 
 /**
  *
@@ -1428,6 +1429,7 @@ public:
 	static FglTFRuntimeOnCreatedPoseTracks OnCreatedPoseTracks;
 	static FglTFRuntimeOnTexturePixels OnTexturePixels;
 	static FglTFRuntimeOnLoadedTexturePixels OnLoadedTexturePixels;
+	static FglTFRuntimeOnFinalizedStaticMesh OnFinalizedStaticMesh;
 
 	const FglTFRuntimeBlob* GetAdditionalBufferView(const int64 Index, const FString& Name) const;
 	

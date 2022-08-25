@@ -641,6 +641,8 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 		StaticMesh->AddSocket(Socket);
 	}
 
+	OnFinalizedStaticMesh.Broadcast(AsShared(), StaticMesh, StaticMeshConfig);
+
 	if (OnStaticMeshCreated.IsBound())
 	{
 		OnStaticMeshCreated.Broadcast(StaticMesh);
