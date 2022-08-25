@@ -9,31 +9,47 @@ TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromRelativePath(TShared
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonObject> CurrentObject = JsonObject;
+	TSharedPtr<FJsonValue> CurrentItem = MakeShared<FJsonValueObject>(JsonObject);
 
-	for (int32 PathIndex = 0; PathIndex < Path.Num() - 1; PathIndex++)
+	for (int32 PathIndex = 0; PathIndex < Path.Num(); PathIndex++)
 	{
 		const FString& Part = Path[PathIndex].Path;
 
-		TSharedPtr<FJsonValue> CurrentValue = CurrentObject->TryGetField(Part);
-		if (!CurrentValue)
+		UE_LOG(LogTemp, Error, TEXT("PathIndex = %d Part = %s"), PathIndex, *Part);
+
+		TSharedPtr<FJsonValue> Value = nullptr;
+
+		if (!Part.IsEmpty())
+		{
+			const TSharedPtr<FJsonObject>* IsObject = nullptr;
+			if (!CurrentItem->TryGetObject(IsObject))
+			{
+				return nullptr;
+			}
+
+			Value = (*IsObject)->TryGetField(Part);
+
+			UE_LOG(LogTemp, Error, TEXT("Value: %p"), Value.Get());
+		}
+		// pure array?
+		else if (Path[PathIndex].Index > INDEX_NONE)
+		{
+			Value = CurrentItem;
+		}
+
+		if (!Value)
 		{
 			return nullptr;
 		}
 
 		if (Path[PathIndex].Index <= INDEX_NONE)
 		{
-			const TSharedPtr<FJsonObject>* IsObject = nullptr;
-			if (!CurrentValue->TryGetObject(IsObject))
-			{
-				return nullptr;
-			}
-			CurrentObject = *IsObject;
+			CurrentItem = Value;
 		}
 		else
 		{
 			const TArray<TSharedPtr<FJsonValue>>* IsArray = nullptr;
-			if (!CurrentValue->TryGetArray(IsArray))
+			if (!Value->TryGetArray(IsArray))
 			{
 				return nullptr;
 			}
@@ -43,40 +59,13 @@ TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromRelativePath(TShared
 				return nullptr;
 			}
 
-			const TSharedPtr<FJsonObject>* IsObject = nullptr;
-			if (!(*IsArray)[Path[PathIndex].Index]->TryGetObject(IsObject))
-			{
-				return nullptr;
-			}
 
-			CurrentObject = *IsObject;
+			CurrentItem = (*IsArray)[Path[PathIndex].Index];
 		}
 
 	}
 
-	TSharedPtr<FJsonValue> FinalValue = CurrentObject->TryGetField(Path.Last().Path);
-	if (!FinalValue)
-	{
-		return nullptr;
-	}
-
-	if (Path.Last().Index <= INDEX_NONE)
-	{
-		return FinalValue;
-	}
-
-	const TArray<TSharedPtr<FJsonValue>>* IsArray = nullptr;
-	if (!FinalValue->TryGetArray(IsArray))
-	{
-		return nullptr;
-	}
-
-	if (!IsArray->IsValidIndex(Path.Last().Index))
-	{
-		return nullptr;
-	}
-
-	return (*IsArray)[Path.Last().Index];
+	return CurrentItem;
 }
 
 TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromPath(const TArray<FglTFRuntimePathItem>& Path) const
