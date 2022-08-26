@@ -452,6 +452,9 @@ struct FglTFRuntimeStaticMeshConfig
 	bool bBuildSimpleCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bBuildComplexCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FBox> BoxCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -496,11 +499,31 @@ struct FglTFRuntimeStaticMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bGenerateStaticMeshDescription;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, FString> CustomConfigMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<UDataAsset*> CustomConfigObjects;
+
+	template<typename T>
+	T* GetCustomConfig() const
+	{
+		for (UDataAsset* Config : CustomConfigObjects)
+		{
+			if (Config->IsA<T>())
+			{
+				return Cast<T>(Config);
+			}
+		}
+		return nullptr;
+	}
+
 	FglTFRuntimeStaticMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
 		bReverseWinding = false;
 		bBuildSimpleCollision = false;
+		bBuildComplexCollision = false;
 		Outer = nullptr;
 		CollisionComplexity = ECollisionTraceFlag::CTF_UseDefault;
 		bAllowCPUAccess = false;

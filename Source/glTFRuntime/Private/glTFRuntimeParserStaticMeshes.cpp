@@ -520,7 +520,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			}
 
 			StaticMesh->CommitMeshDescription(CurrentLODIndex);
-			
+
 		}
 #endif
 	}
@@ -582,12 +582,12 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 #endif
 	}
 
-	if (!StaticMesh->bAllowCPUAccess)
-	{
-		BodySetup->bNeverNeedsCookedCollisionData = true;
-	}
+	BodySetup->bHasCookedCollisionData = false;
+
+	BodySetup->bNeverNeedsCookedCollisionData = !StaticMeshConfig.bBuildComplexCollision;
 
 	BodySetup->bMeshCollideAll = false;
+	BodySetup->bHasCookedCollisionData = false;
 	BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
 
 	BodySetup->InvalidatePhysicsData();
@@ -621,7 +621,20 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 		BodySetup->AggGeom.SphereElems.Add(SphereElem);
 	}
 
-	BodySetup->CreatePhysicsMeshes();
+	if (StaticMeshConfig.bBuildComplexCollision || StaticMeshConfig.CollisionComplexity == ECollisionTraceFlag::CTF_UseComplexAsSimple)
+	{
+		if (!StaticMesh->bAllowCPUAccess || !StaticMeshConfig.Outer || !StaticMesh->GetWorld() || !StaticMesh->GetWorld()->IsGameWorld())
+		{
+			AddError("FinalizeStaticMesh", "Unable to generate Complex collision without CpuAccess and a valid StaticMesh Outer (consider setting it to the related StaticMeshComponent)");
+		}
+		BodySetup->CreatePhysicsMeshes();
+	}
+
+	// recreate physics state (if possible)
+	if (UActorComponent* ActorComponent = Cast<UActorComponent>(StaticMesh->GetOuter()))
+	{
+		ActorComponent->RecreatePhysicsState();
+	}
 
 	for (const TPair<FString, FTransform>& Pair : StaticMeshConfig.Sockets)
 	{
