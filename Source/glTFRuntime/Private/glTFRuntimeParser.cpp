@@ -604,7 +604,7 @@ bool FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, cons
 		return false;
 	}
 
-	for (TSharedPtr<FJsonValue> JsonItem : (*JsonArray))
+	for (const TSharedPtr<FJsonValue>& JsonItem : (*JsonArray))
 	{
 		JsonItems.Add(JsonItem.ToSharedRef());
 	}
@@ -658,7 +658,7 @@ TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetJsonObjectArrayFromExtens
 			const TArray<TSharedPtr<FJsonValue>>* Items;
 			if ((*JsonExtensionObject)->TryGetArrayField(FieldName, Items))
 			{
-				for (TSharedPtr<FJsonValue> Item : (*Items))
+				for (const TSharedPtr<FJsonValue>& Item : (*Items))
 				{
 					const TSharedPtr<FJsonObject>* Object = nullptr;
 					if (Item->TryGetObject(Object))
@@ -671,6 +671,28 @@ TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetJsonObjectArrayFromExtens
 	}
 
 	return Objects;
+}
+
+TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetJsonObjectArrayOfObjects(TSharedRef<FJsonObject> JsonObject, const FString& FieldName)
+{
+	TArray<TSharedRef<FJsonObject>> Items;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	if (!JsonObject->TryGetArrayField(FieldName, JsonArray))
+	{
+		return Items;
+	}
+
+	for (const TSharedPtr<FJsonValue>& JsonItem : *JsonArray)
+	{
+		const TSharedPtr<FJsonObject>* JsonItemObject = nullptr;
+		if (JsonItem->TryGetObject(JsonItemObject))
+		{
+			Items.Add(JsonItemObject->ToSharedRef());
+		}
+	}
+
+	return Items;
 }
 
 FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue)
@@ -946,8 +968,6 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	Node.SkinIndex = GetJsonObjectIndex(JsonNodeObject, "skin", INDEX_NONE);
 
 	Node.CameraIndex = GetJsonObjectIndex(JsonNodeObject, "camera", INDEX_NONE);
-
-	Node.EmitterIndices = GetJsonExtensionObjectIndices(JsonNodeObject, "MSFT_audio_emitter", "emitters");
 
 	FMatrix Matrix = FMatrix::Identity;
 
@@ -3503,7 +3523,7 @@ void FglTFRuntimeParser::AddAdditionalBufferView(const int64 Index, const FStrin
 
 }
 
-bool FglTFRuntimeParser::GetNumberFromExtras(const FString& Key, float &Value) const
+bool FglTFRuntimeParser::GetNumberFromExtras(const FString& Key, float& Value) const
 {
 	TSharedPtr<FJsonObject> JsonExtras = GetJsonObjectExtras(Root);
 	if (!JsonExtras)
@@ -3593,8 +3613,13 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeExtensionObject(const int32 N
 	TSharedPtr<FJsonObject> JsonNodeObject = GetJsonObjectFromRootIndex("nodes", NodeIndex);
 	if (!JsonNodeObject)
 	{
-		return false;
+		return nullptr;
 	}
 
 	return GetJsonObjectExtension(JsonNodeObject.ToSharedRef(), ExtensionName);
+}
+
+TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeObject(const int32 NodeIndex)
+{
+	return GetJsonObjectFromRootIndex("nodes", NodeIndex);
 }

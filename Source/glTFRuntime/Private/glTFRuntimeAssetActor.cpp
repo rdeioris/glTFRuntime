@@ -179,19 +179,24 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		}
 	}
 
-	// check for audio emitters
-	for (const int32 EmitterIndex : Node.EmitterIndices)
+
+	TArray<int32> EmitterIndices;
+	if (Asset->GetNodeExtensionIndices(Node.Index, "MSFT_audio_emitter", "emitters", EmitterIndices))
 	{
-		FglTFRuntimeAudioEmitter AudioEmitter;
-		if (Asset->LoadAudioEmitter(EmitterIndex, AudioEmitter))
+		// check for audio emitters
+		for (const int32 EmitterIndex : EmitterIndices)
 		{
-			UAudioComponent* AudioComponent = NewObject<UAudioComponent>(this, *AudioEmitter.Name);
-			AudioComponent->SetupAttachment(NewComponent);
-			AudioComponent->RegisterComponent();
-			AudioComponent->SetRelativeTransform(Node.Transform);
-			AddInstanceComponent(AudioComponent);
-			Asset->LoadEmitterIntoAudioComponent(AudioEmitter, AudioComponent);
-			AudioComponent->Play();
+			FglTFRuntimeAudioEmitter AudioEmitter;
+			if (Asset->LoadAudioEmitter(EmitterIndex, AudioEmitter))
+			{
+				UAudioComponent* AudioComponent = NewObject<UAudioComponent>(this, *AudioEmitter.Name);
+				AudioComponent->SetupAttachment(NewComponent);
+				AudioComponent->RegisterComponent();
+				AudioComponent->SetRelativeTransform(Node.Transform);
+				AddInstanceComponent(AudioComponent);
+				Asset->LoadEmitterIntoAudioComponent(AudioEmitter, AudioComponent);
+				AudioComponent->Play();
+			}
 		}
 	}
 

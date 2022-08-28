@@ -128,6 +128,9 @@ public:
 	bool GetNodeGPUInstancingTransforms(const int32 NodeIndex, TArray<FTransform>& Transforms);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetNodeExtensionIndices(const int32 NodeIndex, const FString& ExtensionName, const FString& FieldName, TArray<int32>& Indices);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
