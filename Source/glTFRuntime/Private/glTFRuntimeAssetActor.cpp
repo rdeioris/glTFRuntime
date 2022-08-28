@@ -114,7 +114,10 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			if (Asset->GetNodeGPUInstancingTransforms(Node.Index, GPUInstancingTransforms))
 			{
 				UInstancedStaticMeshComponent* InstancedStaticMeshComponent = NewObject<UInstancedStaticMeshComponent>(this, GetSafeNodeName<UInstancedStaticMeshComponent>(Node));
-				InstancedStaticMeshComponent->AddInstances(GPUInstancingTransforms, false, false);
+				for (const FTransform& GPUInstanceTransform : GPUInstancingTransforms)
+				{
+					InstancedStaticMeshComponent->AddInstance(GPUInstanceTransform);
+				}
 				StaticMeshComponent = InstancedStaticMeshComponent;
 			}
 			else
