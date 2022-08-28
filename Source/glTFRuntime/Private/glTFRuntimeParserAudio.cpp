@@ -35,7 +35,7 @@ bool FglTFRuntimeParser::LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntime
 	Emitter.Name = GetJsonObjectString(JsonEmitterObject.ToSharedRef(), "name", "");
 	Emitter.Volume = GetJsonObjectNumber(JsonEmitterObject.ToSharedRef(), "volume", 1);
 
-	for (const TSharedRef<FJsonObject> JsonClipObject : GetJsonObjectArrayOfObjects(JsonEmitterObject.ToSharedRef(), "clips"))
+	for (const TSharedRef<FJsonObject>& JsonClipObject : GetJsonObjectArrayOfObjects(JsonEmitterObject.ToSharedRef(), "clips"))
 	{
 		const int32 ClipIndex = GetJsonObjectNumber(JsonClipObject, "clip", INDEX_NONE);
 		if (ClipIndex > INDEX_NONE)
