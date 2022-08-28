@@ -2,6 +2,7 @@
 
 
 #include "glTFRuntimeAssetActor.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
@@ -108,7 +109,18 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	{
 		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
 		{
-			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
+			UStaticMeshComponent* StaticMeshComponent = nullptr;
+			TArray<FTransform> GPUInstancingTransforms;
+			if (Asset->GetNodeGPUInstancingTransforms(Node.Index, GPUInstancingTransforms))
+			{
+				UInstancedStaticMeshComponent* InstancedStaticMeshComponent = NewObject<UInstancedStaticMeshComponent>(this, GetSafeNodeName<UInstancedStaticMeshComponent>(Node));
+				InstancedStaticMeshComponent->AddInstances(GPUInstancingTransforms, false, false);
+				StaticMeshComponent = InstancedStaticMeshComponent;
+			}
+			else
+			{
+				StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
+			}
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			StaticMeshComponent->RegisterComponent();
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);

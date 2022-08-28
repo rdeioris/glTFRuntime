@@ -1505,6 +1505,8 @@ public:
 			});
 	}
 
+	TSharedPtr<FJsonObject> GetNodeExtensionObject(const int32 NodeIndex, const FString& ExtensionName);
+
 protected:
 	TSharedRef<FJsonObject> Root;
 
@@ -1598,6 +1600,14 @@ protected:
 	TArray<FString> Errors;
 
 	FString BaseDirectory;
+
+public:
+	FTransform RebaseTransform(const FTransform& Transform) const
+	{
+		FMatrix M = Transform.ToMatrixWithScale();
+		M.ScaleTranslation(FVector(SceneScale, SceneScale, SceneScale));
+		return FTransform(SceneBasis.Inverse() * M * SceneBasis);
+	}
 
 	template<typename T, typename Callback>
 	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, bool bNormalized, Callback Filter, const int64 AdditionalBufferView)
@@ -1742,7 +1752,6 @@ protected:
 			{
 				int8* Ptr = (int8*)&(Blob.Data[Index]);
 				Value = bNormalized ? FMath::Max(((float)(*Ptr)) / 127.f, -1.f) : *Ptr;
-
 			}
 			// UNSIGNED_BYTE
 			else if (ComponentType == 5121)
@@ -1786,20 +1795,28 @@ protected:
 		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; }, AdditionalBufferView);
 	}
 
+
+
 	template<int32 Num, typename T>
 	bool GetJsonVector(const TArray<TSharedPtr<FJsonValue>>* JsonValues, T& Value)
 	{
 		if (JsonValues->Num() != Num)
+		{
 			return false;
+		}
 
 		for (int32 i = 0; i < Num; i++)
 		{
 			if (!(*JsonValues)[i]->TryGetNumber(Value[i]))
+			{
 				return false;
+			}
 		}
 
 		return true;
 	}
+
+protected:
 
 	bool MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive);
 

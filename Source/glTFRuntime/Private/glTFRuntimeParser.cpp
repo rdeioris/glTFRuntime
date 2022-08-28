@@ -479,7 +479,7 @@ bool FglTFRuntimeParser::LoadNodes()
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonNodes;
 
-	// no meshes ?
+	// no nodes ?
 	if (!Root->TryGetArrayField("nodes", JsonNodes))
 	{
 		return false;
@@ -3586,4 +3586,15 @@ bool FglTFRuntimeParser::GetStringArrayFromExtras(const FString& Key, TArray<FSt
 	}
 
 	return JsonExtras->TryGetStringArrayField(Key, StringArray);
+}
+
+TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeExtensionObject(const int32 NodeIndex, const FString& ExtensionName)
+{
+	TSharedPtr<FJsonObject> JsonNodeObject = GetJsonObjectFromRootIndex("nodes", NodeIndex);
+	if (!JsonNodeObject)
+	{
+		return false;
+	}
+
+	return GetJsonObjectExtension(JsonNodeObject.ToSharedRef(), ExtensionName);
 }

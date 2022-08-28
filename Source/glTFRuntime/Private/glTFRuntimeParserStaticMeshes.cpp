@@ -185,10 +185,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 #if ENGINE_MAJOR_VERSION > 4
 				StaticMeshVertex.Position = FVector3f(GetSafeValue(Primitive.Positions, VertexIndex, FVector::ZeroVector, bMissingIgnore));
-				BoundingBox += FVector(StaticMeshVertex.Position);
 #else
 				StaticMeshVertex.Position = GetSafeValue(Primitive.Positions, VertexIndex, FVector::ZeroVector, bMissingIgnore);
-				BoundingBox += StaticMeshVertex.Position;
 #endif
 
 				FVector4 TangentX = GetSafeValue(Primitive.Tangents, VertexIndex, FVector4(0, 0, 0, 1), bMissingTangents);
@@ -230,18 +228,22 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				{
 #if ENGINE_MAJOR_VERSION > 4
 					StaticMeshVertex.Position = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformPosition(FVector3d(StaticMeshVertex.Position)));
-					BoundingBox += FVector(StaticMeshVertex.Position);
 					StaticMeshVertex.TangentX = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(FVector3d(StaticMeshVertex.TangentX)));
 					StaticMeshVertex.TangentY = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(FVector3d(StaticMeshVertex.TangentY)));
 					StaticMeshVertex.TangentZ = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(FVector3d(StaticMeshVertex.TangentZ)));
 #else
 					StaticMeshVertex.Position = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformPosition(StaticMeshVertex.Position);
-					BoundingBox += StaticMeshVertex.Position;
 					StaticMeshVertex.TangentX = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(StaticMeshVertex.TangentX);
 					StaticMeshVertex.TangentY = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(StaticMeshVertex.TangentY);
 					StaticMeshVertex.TangentZ = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(StaticMeshVertex.TangentZ);
 #endif
 				}
+
+#if ENGINE_MAJOR_VERSION > 4
+				BoundingBox += FVector(StaticMeshVertex.Position);
+#else
+				BoundingBox += StaticMeshVertex.Position;
+#endif
 			}
 			// End of Geometry generation
 

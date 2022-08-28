@@ -125,6 +125,9 @@ public:
 	bool NodeIsBone(const int32 NodeIndex);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetNodeGPUInstancingTransforms(const int32 NodeIndex, TArray<FTransform>& Transforms);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")

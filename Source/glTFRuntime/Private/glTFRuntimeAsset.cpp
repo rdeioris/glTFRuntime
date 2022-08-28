@@ -654,3 +654,80 @@ bool UglTFRuntimeAsset::GetBooleanFromExtras(const FString& Key, bool& Value) co
 	GLTF_CHECK_PARSER(false);
 	return Parser->GetBooleanFromExtras(Key, Value);
 }
+
+bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TArray<FTransform>& Transforms)
+{
+	GLTF_CHECK_PARSER(false);
+
+	TSharedPtr<FJsonObject> InstancingExtension = Parser->GetNodeExtensionObject(NodeIndex, "EXT_mesh_gpu_instancing");
+	if (!InstancingExtension)
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> InstancingExtensionAttributes = Parser->GetJsonObjectFromObject(InstancingExtension.ToSharedRef(), "attributes");
+	if (!InstancingExtensionAttributes)
+	{
+		return false;
+	}
+
+	TArray<FVector> Translations;
+	TArray<FVector4> Rotations;
+	TArray<FVector> Scales;
+
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "TRANSLATION", Translations, { 3 }, { 5126 }, false, [](FVector V) { return V; }, INDEX_NONE))
+	{
+		Transforms.AddUninitialized(Translations.Num());
+		for (int32 Index = 0; Index < Translations.Num(); Index++)
+		{
+			Transforms[Index].SetTranslation(Translations[Index]);
+		}
+	}
+
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "ROTATION", Rotations, { 4 }, { 5126, 5120, 5122 }, true, [](FVector4 Q) { return Q; }, INDEX_NONE))
+	{
+		if (Transforms.Num() == 0)
+		{
+			Transforms.AddUninitialized(Rotations.Num());
+		}
+		else if (Transforms.Num() != Rotations.Num())
+		{
+			return false;
+		}
+
+		for (int32 Index = 0; Index < Rotations.Num(); Index++)
+		{
+			Transforms[Index].SetRotation(FQuat(Rotations[Index].X, Rotations[Index].Y, Rotations[Index].Z, Rotations[Index].W));
+		}
+	}
+
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "SCALE", Scales, { 3 }, { 5126 }, false, [](FVector V) { return V; }, INDEX_NONE))
+	{
+		if (Transforms.Num() == 0)
+		{
+			Transforms.AddUninitialized(Scales.Num());
+		}
+		else if (Transforms.Num() != Scales.Num())
+		{
+			return false;
+		}
+
+		for (int32 Index = 0; Index < Scales.Num(); Index++)
+		{
+			Transforms[Index].SetScale3D(Scales[Index]);
+		}
+	}
+
+	// the extension is present but no attribute is defined (still valid)
+	if (Transforms.Num() <= 0)
+	{
+		return true;
+	}
+
+	for (int32 Index = 0; Index < Scales.Num(); Index++)
+	{
+		Transforms[Index] = Parser->RebaseTransform(Transforms[Index]);
+	}
+
+	return true;
+}
