@@ -923,12 +923,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		for (int32 Index = 0; Index < NumIndices; Index++)
 		{
 			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
-	}
+		}
 #endif
-}
+	}
 
 	return SkeletalMeshContext->SkeletalMesh;
-	}
+}
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
@@ -1120,7 +1120,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	if (bHasMorphTargets)
 	{
 		SkeletalMeshContext->SkeletalMesh->InitMorphTargets();
-}
+	}
 #endif
 
 	SkeletalMeshContext->SkeletalMesh->CalculateInvRefMatrices();
@@ -1326,7 +1326,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #endif
 
 	return SkeletalMeshContext->SkeletalMesh;
-	}
+}
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
@@ -1574,11 +1574,11 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 		TMap<FString, FRawAnimSequenceTrack> Tracks;
 		TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
 		bool bAnimationFound = false;
-		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound](const FglTFRuntimeNode& Node) -> bool
+		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
 			{
 				if (!bAnimationFound)
 				{
-					bAnimationFound = Joints.Contains(Node.Index);
+					bAnimationFound = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
 				}
 				return true;
 			}))
@@ -1675,7 +1675,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 		}
-}
+	}
 #endif
 
 	bool bHasTracks = false;
@@ -1988,7 +1988,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 #endif
 
 		}
-}
+	}
 #endif
 
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
