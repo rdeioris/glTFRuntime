@@ -1352,9 +1352,9 @@ public:
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
 
-	bool GetBuffer(int32 BufferIndex, FglTFRuntimeBlob& Blob);
-	bool GetBufferView(int32 BufferViewIndex, FglTFRuntimeBlob& Blob, int64& Stride);
-	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob, const FglTFRuntimeBlob* AdditionalBufferView);
+	bool GetBuffer(const int32 BufferIndex, FglTFRuntimeBlob& Blob);
+	bool GetBufferView(const int32 BufferViewIndex, FglTFRuntimeBlob& Blob, int64& Stride);
+	bool GetAccessor(const int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob, const FglTFRuntimeBlob* AdditionalBufferView);
 
 	bool GetAllNodes(TArray<FglTFRuntimeNode>& Nodes);
 
@@ -1521,6 +1521,7 @@ protected:
 	TMap<int32, UTexture2D*> TexturesCache;
 
 	TMap<int32, TArray64<uint8>> BuffersCache;
+	TMap<int32, TArray64<uint8>> CompressedBufferViewsCache;
 
 	TMap<UMaterialInterface*, FString> MaterialsNameCache;
 
@@ -1584,6 +1585,8 @@ protected:
 
 	bool CanReadFromCache(const EglTFRuntimeCacheMode CacheMode) { return CacheMode == EglTFRuntimeCacheMode::Read || CacheMode == EglTFRuntimeCacheMode::ReadWrite; }
 	bool CanWriteToCache(const EglTFRuntimeCacheMode CacheMode) { return CacheMode == EglTFRuntimeCacheMode::Write || CacheMode == EglTFRuntimeCacheMode::ReadWrite; }
+
+	bool DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, const int64 Stride, const int64 Elements, const FString& Mode, const FString& Filter, TArray64<uint8>& UncompressedBytes);
 
 	FMatrix SceneBasis;
 	float SceneScale;

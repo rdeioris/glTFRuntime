@@ -2428,7 +2428,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 }
 
 
-bool FglTFRuntimeParser::GetBuffer(int32 Index, FglTFRuntimeBlob& Blob)
+bool FglTFRuntimeParser::GetBuffer(const int32 Index, FglTFRuntimeBlob& Blob)
 {
 	if (Index < 0)
 	{
@@ -2545,35 +2545,28 @@ bool FglTFRuntimeParser::ParseBase64Uri(const FString& Uri, TArray64<uint8>& Byt
 	return bSuccess;
 }
 
-bool FglTFRuntimeParser::GetBufferView(int32 Index, FglTFRuntimeBlob& Blob, int64& Stride)
+bool FglTFRuntimeParser::GetBufferView(const int32 Index, FglTFRuntimeBlob& Blob, int64& Stride)
 {
-	if (Index < 0)
+	TSharedPtr<FJsonObject> JsonBufferViewObject = GetJsonObjectFromRootIndex("bufferViews", Index);
+	if (!JsonBufferViewObject)
 	{
 		return false;
 	}
 
-	const TArray<TSharedPtr<FJsonValue>>* JsonBufferViews;
-
-	// no bufferViews ?
-	if (!Root->TryGetArrayField("bufferViews", JsonBufferViews))
+	TSharedPtr<FJsonObject> JsonBufferViewCompressedObject = GetJsonObjectExtension(JsonBufferViewObject.ToSharedRef(), "EXT_meshopt_compression");
+	if (JsonBufferViewCompressedObject)
 	{
-		return false;
+		JsonBufferViewObject = JsonBufferViewCompressedObject;
+		if (CompressedBufferViewsCache.Contains(Index))
+		{
+			Blob.Data = CompressedBufferViewsCache[Index].GetData();
+			Blob.Num = CompressedBufferViewsCache[Index].Num();
+			return true;
+		}
 	}
-
-	if (Index >= JsonBufferViews->Num())
-	{
-		return false;
-	}
-
-	TSharedPtr<FJsonObject> JsonBufferObject = (*JsonBufferViews)[Index]->AsObject();
-	if (!JsonBufferObject)
-	{
-		return false;
-	}
-
 
 	int64 BufferIndex;
-	if (!JsonBufferObject->TryGetNumberField("buffer", BufferIndex))
+	if (!JsonBufferViewObject->TryGetNumberField("buffer", BufferIndex))
 	{
 		return false;
 	}
@@ -2585,18 +2578,18 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, FglTFRuntimeBlob& Blob, int6
 	}
 
 	int64 ByteLength;
-	if (!JsonBufferObject->TryGetNumberField("byteLength", ByteLength))
+	if (!JsonBufferViewObject->TryGetNumberField("byteLength", ByteLength))
 	{
 		return false;
 	}
 
 	int64 ByteOffset;
-	if (!JsonBufferObject->TryGetNumberField("byteOffset", ByteOffset))
+	if (!JsonBufferViewObject->TryGetNumberField("byteOffset", ByteOffset))
 	{
 		ByteOffset = 0;
 	}
 
-	if (!JsonBufferObject->TryGetNumberField("byteStride", Stride))
+	if (!JsonBufferViewObject->TryGetNumberField("byteStride", Stride))
 	{
 		Stride = 0;
 	}
@@ -2608,10 +2601,44 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, FglTFRuntimeBlob& Blob, int6
 
 	Blob.Data = BufferBlob.Data + ByteOffset;
 	Blob.Num = ByteLength;
+
+	if (JsonBufferViewCompressedObject)
+	{
+		// decompress bitstream
+		if (Stride == 0)
+		{
+			return false;
+		}
+		int64 Elements;
+		if (!JsonBufferViewObject->TryGetNumberField("count", Elements))
+		{
+			return false;
+		}
+		FString MeshOptMode;
+		if (!JsonBufferViewObject->TryGetStringField("mode", MeshOptMode))
+		{
+			return false;
+		}
+		FString MeshOptFilter;
+		if (!JsonBufferViewObject->TryGetStringField("filter", MeshOptFilter))
+		{
+			MeshOptFilter = "NONE";
+		}
+
+		CompressedBufferViewsCache.Add(Index);
+		if (!DecompressMeshOptimizer(Blob, Stride, Elements, MeshOptMode, MeshOptFilter, CompressedBufferViewsCache[Index]))
+		{
+			CompressedBufferViewsCache.Remove(Index);
+			return false;
+		}
+		Blob.Data = CompressedBufferViewsCache[Index].GetData();
+		Blob.Num = CompressedBufferViewsCache[Index].Num();
+	}
+
 	return true;
 }
 
-bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob, const FglTFRuntimeBlob* AdditionalBufferView)
+bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob, const FglTFRuntimeBlob* AdditionalBufferView)
 {
 
 	TSharedPtr<FJsonObject> JsonAccessorObject = GetJsonObjectFromRootIndex("accessors", Index);
@@ -3622,4 +3649,161 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeExtensionObject(const int32 N
 TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeObject(const int32 NodeIndex)
 {
 	return GetJsonObjectFromRootIndex("nodes", NodeIndex);
+}
+
+bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, const int64 Stride, const int64 Elements, const FString& Mode, const FString& Filter, TArray64<uint8>& UncompressedBytes)
+{
+	UE_LOG(LogTemp, Error, TEXT("Decompressing mode:%s filter:%s size:%d ..."), *Mode, *Filter, Blob.Num);
+
+	auto DecodeZigZag = [](uint8 V)
+	{
+		return ((V & 1) != 0) ? ~(V >> 1) : (V >> 1);
+	};
+
+	if (Mode == "ATTRIBUTES" && Blob.Num > 32 && Blob.Data[0] == 0xa0)
+	{
+		int64 Offset = 1;
+		const int64 Limit = Blob.Num - 32;
+
+		TArray<uint8> BaseLine;
+		BaseLine.Append(Blob.Data + Limit, 32);
+
+		const int64 MaxBlockElements = FMath::Min<int64>((8192 / Stride) & ~15, 256);
+
+		int64 RemainingElements = Elements;
+		while (RemainingElements > 0)
+		{
+			int64 BlockElements = FMath::Min<int64>(RemainingElements, MaxBlockElements);
+			UE_LOG(LogTemp, Error, TEXT("Remaining: %lld"), RemainingElements);
+			RemainingElements -= BlockElements;
+
+			int64 GroupCount = FMath::CeilToInt64(BlockElements / 16.0);
+			UE_LOG(LogTemp, Error, TEXT("Numeber of Groups: %lld (%lld)"), BlockElements, GroupCount);
+			int64 NumberOfHeaderBytes = GroupCount / 4;
+			if ((GroupCount % 4) > 0)
+			{
+				NumberOfHeaderBytes++;
+			}
+
+			if (Offset + NumberOfHeaderBytes >= Limit)
+			{
+				return false;
+			}
+
+			UE_LOG(LogTemp, Warning, TEXT("[Before] NumberOfHeaderBytes: %d"), NumberOfHeaderBytes);
+			TArray64<uint8> Groups;
+			while (NumberOfHeaderBytes--)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("NumberOfHeaderBytes: %d"), NumberOfHeaderBytes);
+				Groups.Add(Blob.Data[Offset] & 0x03);
+				Groups.Add((Blob.Data[Offset] >> 2) & 0x03);
+				Groups.Add((Blob.Data[Offset] >> 4) & 0x03);
+				Groups.Add((Blob.Data[Offset] >> 6) & 0x03);
+				Offset++;
+			}
+
+			for (int64 GroupIndex = 0; GroupIndex < GroupCount; GroupIndex++)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Group %d/%d = %x"), GroupIndex, GroupCount, Groups[GroupIndex]);
+				if (Groups[GroupIndex] == 0)
+				{
+					UncompressedBytes.Append(BaseLine.GetData(), 16);
+				}
+				else if (Groups[GroupIndex] == 3)
+				{
+					if (Offset + 16 >= Limit)
+					{
+						return false;
+					}
+					for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
+					{
+						int32 NewValueIndex = UncompressedBytes.Add(BaseLine[ByteIndex] + Blob.Data[Offset++]);
+						BaseLine[ByteIndex] = UncompressedBytes[NewValueIndex];
+					}
+				}
+				else if (Groups[GroupIndex] == 1)
+				{
+					if (Offset + 4 >= Limit)
+					{
+						return false;
+					}
+					TArray<uint8> Deltas;
+					for (int32 ByteIndex = 0; ByteIndex < 4; ByteIndex++)
+					{
+						Deltas.Add((Blob.Data[Offset] >> 6) & 0x03);
+						Deltas.Add((Blob.Data[Offset] >> 4) & 0x03);
+						Deltas.Add((Blob.Data[Offset] >> 2) & 0x03);
+						Deltas.Add(Blob.Data[Offset] & 0x03);
+						Offset++;
+					}
+
+					for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
+					{
+						uint8 Delta = 0;
+						if (Deltas[ByteIndex] == 0x03)
+						{
+							if (Offset + 1 < Limit)
+							{
+								Delta = Blob.Data[Offset++];
+							}
+							else
+							{
+								return false;
+							}
+						}
+						else
+						{
+							Delta = DecodeZigZag(Deltas[ByteIndex]);
+						}
+
+						int32 NewValueIndex = UncompressedBytes.Add(BaseLine[ByteIndex] + Delta);
+						BaseLine[ByteIndex] = UncompressedBytes[NewValueIndex];
+					}
+				}
+				else // 2
+				{
+					if (Offset + 8 >= Limit)
+					{
+						return false;
+					}
+					TArray<uint8> Deltas;
+					for (int32 ByteIndex = 0; ByteIndex < 8; ByteIndex++)
+					{
+						Deltas.Add((Blob.Data[Offset] >> 4) & 0x0F);
+						Deltas.Add(Blob.Data[Offset] & 0x0F);
+						Offset++;
+					}
+
+					for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
+					{
+						uint8 Delta = 0;
+						if (Deltas[ByteIndex] == 0x0F)
+						{
+							if (Offset + 1 < Limit)
+							{
+								Delta = Blob.Data[Offset++];
+							}
+							else
+							{
+								return false;
+							}
+						}
+						else
+						{
+							Delta = DecodeZigZag(Deltas[ByteIndex]);
+						}
+
+						int32 NewValueIndex = UncompressedBytes.Add(BaseLine[ByteIndex] + Delta);
+						BaseLine[ByteIndex] = UncompressedBytes[NewValueIndex];
+					}
+				}
+			}
+		}
+
+		UE_LOG(LogTemp, Error, TEXT("Successfully decompressed at Offset %lld (%lld)"), Offset, UncompressedBytes.Num());
+	}
+
+
+
+	return true;
 }
