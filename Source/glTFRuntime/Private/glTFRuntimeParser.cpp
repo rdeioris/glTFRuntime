@@ -1792,19 +1792,6 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 		return false;
 	}
 
-	if (bHasSpecificRoot && !Joints.Contains(RootBoneIndex))
-	{
-		FglTFRuntimeNode ParentNode = RootNode;
-		while (ParentNode.ParentIndex != INDEX_NONE)
-		{
-			if (!LoadNode(ParentNode.ParentIndex, ParentNode))
-			{
-				return false;
-			}
-			RootNode.Transform *= ParentNode.Transform;
-		}
-	}
-
 	TMap<int32, FMatrix> InverseBindMatricesMap;
 	int64 InverseBindMatricesIndex;
 	if (JsonSkinObject->TryGetNumberField("inverseBindMatrices", InverseBindMatricesIndex))
