@@ -1,4 +1,4 @@
-// Copyright 2020, Roberto De Ioris.
+// Copyright 2020-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
 #if ENGINE_MAJOR_VERSION > 4

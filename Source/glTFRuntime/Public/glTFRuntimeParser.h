@@ -612,6 +612,9 @@ struct FglTFRuntimeSkeletonConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, FTransform> BonesDeltaTransformMap;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, FString> NameCollisionsRemapper;
+
 	FglTFRuntimeSkeletonConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -1547,7 +1550,7 @@ protected:
 
 	bool FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 	bool FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
-	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
+	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, const int32 RootIndex, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
 	bool GetMorphTargetNames(const int32 MeshIndex, TArray<FName>& MorphTargetNames);
 
