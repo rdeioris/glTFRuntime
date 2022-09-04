@@ -3402,6 +3402,11 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 				return false;
 			}
 		}
+		else if (Uri.StartsWith("http://") || Uri.StartsWith("https://"))
+		{
+			AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to open from external url %s (feature not supported)"), *Uri));
+			return false;
+		}
 		else
 		{
 			bool bFound = false;
