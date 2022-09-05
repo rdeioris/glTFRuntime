@@ -565,6 +565,21 @@ struct FglTFRuntimeProceduralMeshConfig
 	}
 };
 
+DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(FString, FglTFRuntimeBoneRemapper, const int32, NodeIndex, const FString&, BoneName);
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletonBoneRemapperHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeBoneRemapper Remapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+};
+
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletonConfig
 {
@@ -613,8 +628,11 @@ struct FglTFRuntimeSkeletonConfig
 	TMap<FString, FTransform> BonesDeltaTransformMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TMap<FString, FString> NameCollisionsRemapper;
+	FglTFRuntimeSkeletonBoneRemapperHook BoneRemapper;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAppendNodeIndexOnNameCollision;
+	
 	FglTFRuntimeSkeletonConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -625,6 +643,7 @@ struct FglTFRuntimeSkeletonConfig
 		CopyRotationsFrom = nullptr;
 		bSkipAlreadyExistentBoneNames = false;
 		bAssignUnmappedBonesToParent = false;
+		bAppendNodeIndexOnNameCollision = false;
 	}
 };
 
@@ -792,7 +811,7 @@ struct FglTFRuntimePathItem
 	}
 };
 
-DECLARE_DYNAMIC_DELEGATE_RetVal_ThreeParams(FString, FglTFRuntimeAnimationCurveRemapper, const FString&, CurveName, const FString&, Path, UObject*, Context);
+DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FString, FglTFRuntimeAnimationCurveRemapper, const int32, NodeIndex, const FString&, CurveName, const FString&, Path, UObject*, Context);
 DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FVector, FglTFRuntimeAnimationFrameTranslationRemapper, const FString&, CurveName, const int32, FrameNumber, FVector, Translation, UObject*, Context);
 DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FRotator, FglTFRuntimeAnimationFrameRotationRemapper, const FString&, CurveName, const int32, FrameNumber, FRotator, Rotation, UObject*, Context);
 

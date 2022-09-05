@@ -2108,7 +2108,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 		if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
 		{
-			TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(TrackName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
+			TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(Node.Index, TrackName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
 		}
 
 		if (SkeletalAnimationConfig.RemoveTracks.Contains(TrackName))
