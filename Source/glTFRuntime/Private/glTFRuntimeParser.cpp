@@ -1862,6 +1862,11 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 	}
 
 	FName BoneName = FName(*Node.Name);
+	if (SkeletonConfig.BoneRemapper.Remapper.IsBound())
+	{
+		BoneName = FName(SkeletonConfig.BoneRemapper.Remapper.Execute(Node.Index, Node.Name));
+	}
+
 	if (SkeletonConfig.BonesNameMap.Contains(BoneName.ToString()))
 	{
 		FString BoneNameMapValue = SkeletonConfig.BonesNameMap[BoneName.ToString()];
@@ -1884,7 +1889,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 
 		BoneName = FName(BoneNameMapValue);
 	}
-	else if (SkeletonConfig.bAssignUnmappedBonesToParent)
+	else if (SkeletonConfig.BonesNameMap.Num() && SkeletonConfig.bAssignUnmappedBonesToParent)
 	{
 		int32 ParentNodeIndex = Node.ParentIndex;
 		while (ParentNodeIndex != INDEX_NONE)
@@ -1935,13 +1940,13 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 			AddError("TraverseJoints()", FString::Printf(TEXT("Stopping at Bone %s (already exists)."), *BoneName.ToString()));
 			return true;
 		}
-		else if (SkeletonConfig.NameCollisionsRemapper.Contains(BoneName.ToString()))
+		else if (SkeletonConfig.bAppendNodeIndexOnNameCollision)
 		{
-			BoneName = *(SkeletonConfig.NameCollisionsRemapper[BoneName.ToString()]);
+			BoneName = FName(FString::Printf(TEXT("%s%d"), *BoneName.ToString(), Node.Index));
 			CollidingIndex = Modifier.FindBoneIndex(BoneName);
 			if (CollidingIndex != INDEX_NONE)
 			{
-				AddError("TraverseJoints()", FString::Printf(TEXT("(Remapped) Bone %s already exists."), *BoneName.ToString()));
+				AddError("TraverseJoints()", FString::Printf(TEXT("Automatically renamed Bone %s already exists."), *BoneName.ToString()));
 				return false;
 			}
 		}
