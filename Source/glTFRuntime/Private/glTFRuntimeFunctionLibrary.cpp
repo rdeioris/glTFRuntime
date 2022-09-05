@@ -67,14 +67,14 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const
 	}
 
 	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
-	{
-		UglTFRuntimeAsset* Asset = nullptr;
-		if (bSuccess)
 		{
-			Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
-		}
-		Completed.ExecuteIfBound(Asset);
-	}, Completed, LoaderConfig);
+			UglTFRuntimeAsset* Asset = nullptr;
+			if (bSuccess)
+			{
+				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+			}
+			Completed.ExecuteIfBound(Asset);
+		}, Completed, LoaderConfig);
 
 	HttpRequest->ProcessRequest();
 }
@@ -98,7 +98,7 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 	return Asset;
 }
 
-bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, FString& ClipboardContent, const FglTFRuntimeConfig& LoaderConfig)
 {
 
 	FString Url;
@@ -115,6 +115,8 @@ bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpRes
 		Url = Url.RightChop(1).LeftChop(1);
 	}
 
+	ClipboardContent = Url;
+
 	if (Url.Contains("://"))
 	{
 		glTFLoadAssetFromUrl(Url, {}, Completed, LoaderConfig);
@@ -122,11 +124,7 @@ bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpRes
 	}
 
 	UglTFRuntimeAsset* Asset = glTFLoadAssetFromFilename(Url, false, LoaderConfig);
-	if (Asset)
-	{
-		Completed.ExecuteIfBound(Asset);
-		return true;
-	}
+	Completed.ExecuteIfBound(Asset);
 
-	return false;
+	return Asset != nullptr;
 }
