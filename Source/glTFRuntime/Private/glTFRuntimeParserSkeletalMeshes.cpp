@@ -1036,6 +1036,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 						CurrentMorphTarget->GetMorphLODModels()[0].NumBaseMeshVerts += MorphTargetLODModel.NumBaseMeshVerts;
 						CurrentMorphTarget->GetMorphLODModels()[0].SectionIndices.Append(MorphTargetLODModel.SectionIndices);
 						CurrentMorphTarget->GetMorphLODModels()[0].Vertices.Append(MorphTargetLODModel.Vertices);
+						CurrentMorphTarget->GetMorphLODModels()[0].NumVertices = CurrentMorphTarget->GetMorphLODModels()[0].Vertices.Num();
 #else
 						CurrentMorphTarget->MorphLODModels[0].NumBaseMeshVerts += MorphTargetLODModel.NumBaseMeshVerts;
 						CurrentMorphTarget->MorphLODModels[0].SectionIndices.Append(MorphTargetLODModel.SectionIndices);
