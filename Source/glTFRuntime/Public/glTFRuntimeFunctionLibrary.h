@@ -31,5 +31,5 @@ public:
 	static UglTFRuntimeAsset* glTFLoadAssetFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Clipboard", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
-	static bool glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig);
+	static bool glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, FString& ClipboardContent, const FglTFRuntimeConfig& LoaderConfig);
 };
