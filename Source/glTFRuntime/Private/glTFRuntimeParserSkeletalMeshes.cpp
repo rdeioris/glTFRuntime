@@ -1008,6 +1008,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					Delta.TangentZDelta = FVector::ZeroVector;
 #endif
 					MorphTargetLODModel.Vertices.Add(Delta);
+#if ENGINE_MAJOR_VERSION > 4
+					MorphTargetLODModel.NumVertices = MorphTargetLODModel.Vertices.Num();
+#endif
 				}
 
 				if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreEmptyMorphTargets && bSkip)
