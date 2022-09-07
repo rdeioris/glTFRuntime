@@ -2435,6 +2435,48 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		}
 	}
 
+	// fixing indices... 5: TRIANGLE_STRIP 6: TRIANGLE_FAN
+	if (Primitive.Mode == 5)
+	{
+		TArray<uint32> StripIndices;
+		if (Primitive.Indices.Num() >= 3)
+		{
+			StripIndices.Add(Primitive.Indices[0]);
+			StripIndices.Add(Primitive.Indices[1]);
+			StripIndices.Add(Primitive.Indices[2]);
+			StripIndices.AddUninitialized((Primitive.Indices.Num() - 3) * 3);
+		}
+		int64 StripIndex = 3;
+		for (int64 Index = 3; Index < Primitive.Indices.Num(); Index++)
+		{
+			StripIndices[StripIndex] = StripIndices[StripIndex - 1];
+			StripIndices[StripIndex + 1] = StripIndices[StripIndex - 2];
+			StripIndices[StripIndex + 2] = Primitive.Indices[Index];
+			StripIndex += 3;
+		}
+		Primitive.Indices = StripIndices;
+	}
+	else if (Primitive.Mode == 6)
+	{
+		TArray<uint32> FanIndices;
+		if (Primitive.Indices.Num() >= 3)
+		{
+			FanIndices.Add(Primitive.Indices[0]);
+			FanIndices.Add(Primitive.Indices[1]);
+			FanIndices.Add(Primitive.Indices[2]);
+			FanIndices.AddUninitialized((Primitive.Indices.Num() - 3) * 3);
+		}
+		int64 FanIndex = 3;
+		for (int64 Index = 3; Index < Primitive.Indices.Num(); Index++)
+		{
+			FanIndices[FanIndex] = FanIndices[0];
+			FanIndices[FanIndex + 1] = FanIndices[FanIndex - 1];
+			FanIndices[FanIndex + 2] = Primitive.Indices[Index];
+			FanIndex += 3;
+		}
+		Primitive.Indices = FanIndices;
+	}
+
 	Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
 
 	int64 MaterialIndex = INDEX_NONE;
