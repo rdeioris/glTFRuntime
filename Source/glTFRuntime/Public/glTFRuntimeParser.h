@@ -973,6 +973,7 @@ struct FglTFRuntimePrimitive
 	TMap<int32, int32> BonesCache;
 	FString MaterialName;
 	int64 AdditionalBufferView;
+	int32 Mode;
 
 	FglTFRuntimePrimitive()
 	{

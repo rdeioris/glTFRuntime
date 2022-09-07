@@ -2173,6 +2173,11 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 
 	OnPreLoadedPrimitive.Broadcast(AsShared(), JsonPrimitiveObject, Primitive);
 
+	if (!JsonPrimitiveObject->TryGetNumberField("mode", Primitive.Mode))
+	{
+		Primitive.Mode = 4; // triangles
+	}
+
 	const TSharedPtr<FJsonObject>* JsonAttributesObject;
 	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
 	{
