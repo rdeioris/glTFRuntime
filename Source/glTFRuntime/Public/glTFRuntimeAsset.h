@@ -232,6 +232,11 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool GetBooleanFromExtras(const FString& Key, bool& Value) const;
 
+	FORCEINLINE TSharedPtr<FglTFRuntimeParser> GetParser() const
+	{
+		return Parser;
+	}
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	
