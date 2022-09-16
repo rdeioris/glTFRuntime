@@ -237,6 +237,9 @@ public:
 		return Parser;
 	}
 
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
+	UAnimSequence* CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem> Path, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

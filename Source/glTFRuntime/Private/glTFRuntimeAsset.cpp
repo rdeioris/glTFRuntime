@@ -481,6 +481,12 @@ UMaterialInterface* UglTFRuntimeAsset::LoadMaterial(const int32 MaterialIndex, c
 	return Parser->LoadMaterial(MaterialIndex, MaterialsConfig, bUseVertexColors, MaterialName);
 }
 
+UAnimSequence* UglTFRuntimeAsset::CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem> Path, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	return Parser->CreateSkeletalAnimationFromPath(SkeletalMesh, Path, SkeletalAnimationConfig);
+}
+
 FString UglTFRuntimeAsset::GetStringFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER("");

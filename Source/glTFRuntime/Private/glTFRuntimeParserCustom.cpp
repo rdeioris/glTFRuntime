@@ -1,4 +1,4 @@
-// Copyright 2021, Roberto De Ioris.
+// Copyright 2021-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
 
@@ -15,8 +15,6 @@ TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromRelativePath(TShared
 	{
 		const FString& Part = Path[PathIndex].Path;
 
-		UE_LOG(LogTemp, Error, TEXT("PathIndex = %d Part = %s"), PathIndex, *Part);
-
 		TSharedPtr<FJsonValue> Value = nullptr;
 
 		if (!Part.IsEmpty())
@@ -28,8 +26,6 @@ TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromRelativePath(TShared
 			}
 
 			Value = (*IsObject)->TryGetField(Part);
-
-			UE_LOG(LogTemp, Error, TEXT("Value: %p"), Value.Get());
 		}
 		// pure array?
 		else if (Path[PathIndex].Index > INDEX_NONE)
