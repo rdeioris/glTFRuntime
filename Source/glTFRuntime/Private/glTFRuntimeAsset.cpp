@@ -481,37 +481,37 @@ UMaterialInterface* UglTFRuntimeAsset::LoadMaterial(const int32 MaterialIndex, c
 	return Parser->LoadMaterial(MaterialIndex, MaterialsConfig, bUseVertexColors, MaterialName);
 }
 
-UAnimSequence* UglTFRuntimeAsset::CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem> Path, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+UAnimSequence* UglTFRuntimeAsset::CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem>& BonesPath, const TArray<FglTFRuntimePathItem>& MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
-	return Parser->CreateSkeletalAnimationFromPath(SkeletalMesh, Path, SkeletalAnimationConfig);
+	return Parser->CreateSkeletalAnimationFromPath(SkeletalMesh, BonesPath, MorphTargetsPath, SkeletalAnimationConfig);
 }
 
-FString UglTFRuntimeAsset::GetStringFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+FString UglTFRuntimeAsset::GetStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER("");
 	return Parser->GetJSONStringFromPath(Path, bFound);
 }
 
-int64 UglTFRuntimeAsset::GetIntegerFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+int64 UglTFRuntimeAsset::GetIntegerFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(0);
 	return static_cast<int64>(Parser->GetJSONNumberFromPath(Path, bFound));
 }
 
-float UglTFRuntimeAsset::GetFloatFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+float UglTFRuntimeAsset::GetFloatFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(0);
 	return static_cast<float>(Parser->GetJSONNumberFromPath(Path, bFound));
 }
 
-bool UglTFRuntimeAsset::GetBooleanFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+bool UglTFRuntimeAsset::GetBooleanFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(false);
 	return Parser->GetJSONBooleanFromPath(Path, bFound);
 }
 
-int32 UglTFRuntimeAsset::GetArraySizeFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+int32 UglTFRuntimeAsset::GetArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(-1);
 	return Parser->GetJSONArraySizeFromPath(Path, bFound);

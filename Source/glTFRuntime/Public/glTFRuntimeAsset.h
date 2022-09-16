@@ -169,20 +169,20 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ProceduralMeshConfig", AutoCreateRefTerm = "ProceduralMeshConfig"), Category = "glTFRuntime")
 	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
 
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	FString GetStringFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
+	FString GetStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	int64 GetIntegerFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
+	int64 GetIntegerFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	float GetFloatFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
+	float GetFloatFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	bool GetBooleanFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
+	bool GetBooleanFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	int32 GetArraySizeFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
+	int32 GetArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
@@ -237,8 +237,8 @@ public:
 		return Parser;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "SkeletalAnimationConfig"), Category = "glTFRuntime")
-	UAnimSequence* CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem> Path, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "BonesPath,MorphTargetsPath,SkeletalAnimationConfig"), Category = "glTFRuntime")
+	UAnimSequence* CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem>& BonesPath, const TArray<FglTFRuntimePathItem>& MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;

@@ -20,5 +20,5 @@ public:
 	virtual float DecompressCurve(const FCompressedAnimSequence& AnimSeq, SmartName::UID_Type CurveUID, float CurrentTime) const override;
 
 	UPROPERTY()
-	UAnimSequence* AnimSequence;
+	UAnimSequence* AnimSequence = nullptr;
 };

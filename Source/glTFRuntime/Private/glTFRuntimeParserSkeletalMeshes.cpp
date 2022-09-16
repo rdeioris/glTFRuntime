@@ -2092,14 +2092,14 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	return AnimSequence;
 }
 
-UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh * SkeletalMesh, const TArray<FglTFRuntimePathItem> Path, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
+UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh * SkeletalMesh, const TArray<FglTFRuntimePathItem>& BonesPath, const TArray<FglTFRuntimePathItem>& MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
 	if (!SkeletalMesh)
 	{
 		return nullptr;
 	}
 
-	TSharedPtr<FJsonValue> JsonObject = GetJSONObjectFromPath(Path);
+	TSharedPtr<FJsonValue> JsonObject = GetJSONObjectFromPath(MorphTargetsPath);
 	if (!JsonObject)
 	{
 		return nullptr;
@@ -2255,6 +2255,11 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 		}
 
 		AnimSequence->GetSkeleton()->AccumulateCurveMetaData(Pair.Key, false, true);
+
+#if !WITH_EDITOR
+		AnimSequence->CompressedData.CompressedCurveNames.Add(SmartName);
+		const_cast<FCurveMetaData*>(AnimSequence->GetSkeleton()->GetCurveMetaData(SmartName.UID))->Type.bMorphtarget = true;
+#endif
 	}
 
 #if WITH_EDITOR
@@ -2271,7 +2276,9 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
 #endif
 	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
-	AnimSequence->CompressedData.CurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
+	UglTFAnimCurveCompressionCodec* AnimCurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
+	AnimCurveCompressionCodec->AnimSequence = AnimSequence;
+	AnimSequence->CompressedData.CurveCompressionCodec = AnimCurveCompressionCodec;
 	AnimSequence->PostLoad();
 #endif
 
