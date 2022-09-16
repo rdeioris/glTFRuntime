@@ -21,7 +21,7 @@ float UglTFAnimCurveCompressionCodec::DecompressCurve(const FCompressedAnimSeque
 		return 0.0f;
 	}
 #if !WITH_EDITOR
-	return reinterpret_cast<const FFloatCurve*>(AnimSequence->GetCurveData().GetCurveData(CurveUID))->Evaluate(CurrentTime);
+	return static_cast<const FFloatCurve*>(AnimSequence->GetCurveData().GetCurveData(CurveUID))->Evaluate(CurrentTime);
 #else
 	return 0.0f;
 #endif
