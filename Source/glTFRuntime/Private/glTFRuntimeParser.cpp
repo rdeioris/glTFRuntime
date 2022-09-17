@@ -208,6 +208,16 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		}
 	}
 
+	if (LoaderConfig.bAsBlob)
+	{
+		TSharedPtr<FglTFRuntimeParser> NewParser = MakeShared<FglTFRuntimeParser>(MakeShared<FJsonObject>(), LoaderConfig.GetMatrix(), LoaderConfig.SceneScale);
+		if (NewParser)
+		{
+			NewParser->AsBlob.Append(DataPtr, DataNum);
+		}
+		return NewParser;
+	}
+
 	// detect binary format
 	if (DataNum > 20)
 	{

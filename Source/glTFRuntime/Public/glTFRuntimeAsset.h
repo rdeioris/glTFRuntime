@@ -196,8 +196,11 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "StaticMeshConfig", AutoCreateRefTerm = "StaticMeshConfig"), Category = "glTFRuntime")
 	void LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
-	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ImagesConfig", AutoCreateRefTerm = "ImagesConfig"), Category = "glTFRuntime")
 	UTexture2D* LoadImage(const int32 ImageIndex, const FglTFRuntimeImagesConfig& ImagesConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ImagesConfig", AutoCreateRefTerm = "ImagesConfig"), Category = "glTFRuntime")
+	UTexture2D* LoadImageFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FString> GetExtensionsUsed() const;

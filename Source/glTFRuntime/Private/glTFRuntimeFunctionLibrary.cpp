@@ -79,6 +79,42 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const
 	HttpRequest->ProcessRequest();
 }
 
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
+{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+#else
+	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
+#endif
+	HttpRequest->SetURL(Url);
+	for (TPair<FString, FString> Header : Headers)
+	{
+		HttpRequest->AppendToHeader(Header.Key, Header.Value);
+	}
+
+	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+		{
+			UglTFRuntimeAsset* Asset = nullptr;
+			if (bSuccess)
+			{
+				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+			}
+			Completed.ExecuteIfBound(Asset);
+		}, Completed, LoaderConfig);
+
+	HttpRequest->OnRequestProgress().BindLambda([](FHttpRequestPtr RequestPtr, int32 BytesSent, int32 BytesReceived, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
+		{
+			int32 ContentLength = 0;
+			if (RequestPtr->GetResponse().IsValid())
+			{
+				ContentLength = RequestPtr->GetResponse()->GetContentLength();
+			}
+			Progress.ExecuteIfBound(LoaderConfig, BytesReceived, ContentLength);
+		}, Progress, LoaderConfig);
+
+	HttpRequest->ProcessRequest();
+}
+
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();

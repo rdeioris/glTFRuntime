@@ -8,6 +8,7 @@
 #include "glTFRuntimeFunctionLibrary.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeHttpResponse, UglTFRuntimeAsset*, Asset);
+DECLARE_DYNAMIC_DELEGATE_ThreeParams(FglTFRuntimeHttpProgress, const FglTFRuntimeConfig&, LoaderConfig, int32, BytesProcessed, int32, TotalBytes);
 
 /**
  * 
@@ -26,6 +27,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Url", AutoCreateRefTerm = "LoaderConfig, Headers"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromUrl(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Url with Progress", AutoCreateRefTerm = "LoaderConfig, Headers"), Category = "glTFRuntime")
+	static void glTFLoadAssetFromUrlWithProgress(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Data", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
 	static UglTFRuntimeAsset* glTFLoadAssetFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig);

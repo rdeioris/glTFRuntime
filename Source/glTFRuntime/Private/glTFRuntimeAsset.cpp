@@ -581,6 +581,30 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRunt
 	return nullptr;
 }
 
+UTexture2D* UglTFRuntimeAsset::LoadImageFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	TArray64<uint8> UncompressedBytes;
+	int32 Width = 0;
+	int32 Height = 0;
+	if (!Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width > 0 && Height > 0)
+	{
+		FglTFRuntimeMipMap Mip(-1);
+		Mip.Pixels = UncompressedBytes;
+		Mip.Width = Width;
+		Mip.Height = Height;
+		TArray<FglTFRuntimeMipMap> Mips = { Mip };
+		return Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
+	}
+
+	return nullptr;
+}
+
 TArray<FString> UglTFRuntimeAsset::GetExtensionsUsed() const
 {
 	GLTF_CHECK_PARSER(TArray<FString>());

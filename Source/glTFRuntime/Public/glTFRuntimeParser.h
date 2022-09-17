@@ -146,6 +146,9 @@ struct FglTFRuntimeConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FString RuntimeContextString;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAsBlob;
+
 	FglTFRuntimeConfig()
 	{
 		TransformBaseType = EglTFRuntimeTransformBaseType::Default;
@@ -157,6 +160,7 @@ struct FglTFRuntimeConfig
 		bOverrideBaseDirectoryFromContentDir = false;
 		ArchiveAutoEntryPointExtensions = ".glb .gltf .json .js";
 		RuntimeContextObject = nullptr;
+		bAsBlob = false;
 	}
 
 	FMatrix GetMatrix() const
@@ -1446,6 +1450,7 @@ public:
 	TArray<FString> ExtensionsRequired;
 
 	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig);
+	bool LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig);
 	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 
 	TArray<FString> MaterialsVariants;
@@ -1625,7 +1630,13 @@ protected:
 
 	FString BaseDirectory;
 
+	TArray64<uint8> AsBlob;
+
 public:
+
+	const TArray64<uint8>& GetBlob() const { return AsBlob; }
+	TArray64<uint8>& GetBlob() { return AsBlob; }
+
 	FTransform RebaseTransform(const FTransform& Transform) const
 	{
 		FMatrix M = Transform.ToMatrixWithScale();
