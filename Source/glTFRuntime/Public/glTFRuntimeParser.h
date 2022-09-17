@@ -1303,6 +1303,24 @@ struct FglTFRuntimeAnimationCurve
 	TArray<FVector4> OutTangents;
 };
 
+USTRUCT(BlueprintType)
+struct FglTFRuntimeAudioConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bLoop;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float Volume;
+
+	FglTFRuntimeAudioConfig()
+	{
+		bLoop = false;
+		Volume = 1.0f;
+	}
+};
+
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeStaticMeshAsync, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
 
