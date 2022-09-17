@@ -164,3 +164,38 @@ bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpRes
 
 	return Asset != nullptr;
 }
+
+TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArrayFromJSONPath(const FString& JSONPath)
+{
+	TArray<FglTFRuntimePathItem> Paths;
+	TArray<FString> Keys;
+	JSONPath.ParseIntoArray(Keys, TEXT("."));
+
+	for (const FString& Key : Keys)
+	{
+		FString PathKey = Key;
+		int32 PathIndex = -1;
+
+		int32 SquareBracketStart = 0;
+		int32 SquareBracketEnd = 0;
+		if (Key.FindChar('[', SquareBracketStart))
+		{
+			if (Key.FindChar(']', SquareBracketEnd))
+			{
+				if (SquareBracketEnd > SquareBracketStart)
+				{
+					const FString KeyIndex = Key.Mid(SquareBracketStart + 1, SquareBracketEnd - SquareBracketEnd);
+					PathIndex = FCString::Atoi(*KeyIndex);
+					PathKey = Key.Left(SquareBracketStart);
+				}
+			}
+		}
+
+		FglTFRuntimePathItem PathItem;
+		PathItem.Path = PathKey;
+		PathItem.Index = PathIndex;
+		Paths.Add(PathItem);
+	}
+
+	return Paths;
+}
