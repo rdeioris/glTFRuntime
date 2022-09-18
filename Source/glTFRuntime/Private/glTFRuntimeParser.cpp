@@ -208,6 +208,16 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		}
 	}
 
+	if (LoaderConfig.bAsBlob)
+	{
+		TSharedPtr<FglTFRuntimeParser> NewParser = MakeShared<FglTFRuntimeParser>(MakeShared<FJsonObject>(), LoaderConfig.GetMatrix(), LoaderConfig.SceneScale);
+		if (NewParser)
+		{
+			NewParser->AsBlob.Append(DataPtr, DataNum);
+		}
+		return NewParser;
+	}
+
 	// detect binary format
 	if (DataNum > 20)
 	{
@@ -890,11 +900,15 @@ bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 	if (!bAllNodesCached)
 	{
 		if (!LoadNodes())
+		{
 			return false;
+		}
 	}
 
 	if (Index >= AllNodesCache.Num())
+	{
 		return false;
+	}
 
 	Node = AllNodesCache[Index];
 	return true;
@@ -1788,29 +1802,16 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 		return false;
 	}
 
-	if (bHasSpecificRoot && !Joints.Contains(RootBoneIndex))
-	{
-		FglTFRuntimeNode ParentNode = RootNode;
-		while (ParentNode.ParentIndex != INDEX_NONE)
-		{
-			if (!LoadNode(ParentNode.ParentIndex, ParentNode))
-			{
-				return false;
-			}
-			RootNode.Transform *= ParentNode.Transform;
-		}
-	}
-
 	TMap<int32, FMatrix> InverseBindMatricesMap;
-	int64 inverseBindMatricesIndex;
-	if (JsonSkinObject->TryGetNumberField("inverseBindMatrices", inverseBindMatricesIndex))
+	int64 InverseBindMatricesIndex;
+	if (JsonSkinObject->TryGetNumberField("inverseBindMatrices", InverseBindMatricesIndex))
 	{
 		FglTFRuntimeBlob InverseBindMatricesBytes;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		bool bNormalized = false;
-		if (!GetAccessor(inverseBindMatricesIndex, ComponentType, Stride, Elements, ElementSize, Count, bNormalized, InverseBindMatricesBytes, nullptr))
+		if (!GetAccessor(InverseBindMatricesIndex, ComponentType, Stride, Elements, ElementSize, Count, bNormalized, InverseBindMatricesBytes, nullptr))
 		{
-			AddError("FillReferenceSkeleton()", FString::Printf(TEXT("Unable to load accessor: %lld."), inverseBindMatricesIndex));
+			AddError("FillReferenceSkeleton()", FString::Printf(TEXT("Unable to load accessor: %lld."), InverseBindMatricesIndex));
 			return false;
 		}
 
@@ -1845,7 +1846,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
 
 	// now traverse from the root and check if the node is in the "joints" list
-	if (!TraverseJoints(Modifier, INDEX_NONE, RootNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
+	if (!TraverseJoints(Modifier, RootNode.Index, INDEX_NONE, RootNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
 	{
 		return false;
 	}
@@ -1855,7 +1856,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	return true;
 }
 
-bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, const int32 RootIndex, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	TArray<FString> AppendBones;
 	// add fake root bone ?
@@ -1871,6 +1872,11 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 	}
 
 	FName BoneName = FName(*Node.Name);
+	if (SkeletonConfig.BoneRemapper.Remapper.IsBound())
+	{
+		BoneName = FName(SkeletonConfig.BoneRemapper.Remapper.Execute(Node.Index, Node.Name));
+	}
+
 	if (SkeletonConfig.BonesNameMap.Contains(BoneName.ToString()))
 	{
 		FString BoneNameMapValue = SkeletonConfig.BonesNameMap[BoneName.ToString()];
@@ -1893,7 +1899,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 
 		BoneName = FName(BoneNameMapValue);
 	}
-	else if (SkeletonConfig.bAssignUnmappedBonesToParent)
+	else if (SkeletonConfig.BonesNameMap.Num() && SkeletonConfig.bAssignUnmappedBonesToParent)
 	{
 		int32 ParentNodeIndex = Node.ParentIndex;
 		while (ParentNodeIndex != INDEX_NONE)
@@ -1920,7 +1926,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 						return false;
 					}
 
-					if (!TraverseJoints(Modifier, Parent, ChildNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
+					if (!TraverseJoints(Modifier, RootIndex, Parent, ChildNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
 					{
 						return false;
 					}
@@ -1937,28 +1943,89 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 
 	// Check if a bone with the same name exists
 	int32 CollidingIndex = Modifier.FindBoneIndex(BoneName);
-	while (CollidingIndex != INDEX_NONE)
+	if (CollidingIndex != INDEX_NONE)
 	{
-		AddError("TraverseJoints()", FString::Printf(TEXT("Bone %s already exists."), *BoneName.ToString()));
 		if (SkeletonConfig.bSkipAlreadyExistentBoneNames)
 		{
+			AddError("TraverseJoints()", FString::Printf(TEXT("Stopping at Bone %s (already exists)."), *BoneName.ToString()));
 			return true;
 		}
-		return false;
+		else if (SkeletonConfig.bAppendNodeIndexOnNameCollision)
+		{
+			BoneName = FName(FString::Printf(TEXT("%s%d"), *BoneName.ToString(), Node.Index));
+			CollidingIndex = Modifier.FindBoneIndex(BoneName);
+			if (CollidingIndex != INDEX_NONE)
+			{
+				AddError("TraverseJoints()", FString::Printf(TEXT("Automatically renamed Bone %s already exists."), *BoneName.ToString()));
+				return false;
+			}
+		}
+		else
+		{
+			AddError("TraverseJoints()", FString::Printf(TEXT("Bone %s already exists."), *BoneName.ToString()));
+			return false;
+		}
 	}
 
 	FTransform Transform = Node.Transform;
 	if (InverseBindMatricesMap.Contains(Node.Index))
 	{
+		bool bSlowPath = false;
 		FMatrix M = InverseBindMatricesMap[Node.Index].Inverse();
-		if (Node.ParentIndex != INDEX_NONE && Joints.Contains(Node.ParentIndex))
+		if (Node.ParentIndex != INDEX_NONE && Node.Index != RootIndex)
 		{
-			M *= InverseBindMatricesMap[Node.ParentIndex];
+			if (InverseBindMatricesMap.Contains(Node.ParentIndex))
+			{
+				M *= InverseBindMatricesMap[Node.ParentIndex];
+			}
+			else
+			{
+				bSlowPath = true;
+			}
 		}
 
 		M.ScaleTranslation(FVector(SceneScale, SceneScale, SceneScale));
-		FMatrix SkeletonBasis = SceneBasis;
+		const FMatrix SkeletonBasis = SceneBasis;
 		Transform = FTransform(SkeletonBasis.Inverse() * M * SkeletonBasis);
+
+		// we are here if the parent has no joint inverse bind matrix (and we need to build the bind pose from it
+		// we could use the Skeleton hiearchy here for building the pose but we will check for inverse bind matrix too
+		// for improving performance
+		if (bSlowPath)
+		{
+			FTransform ParentTransform = FTransform::Identity;
+			int32 CurrentParentIndex = Node.ParentIndex;
+			while (CurrentParentIndex > INDEX_NONE)
+			{
+				FglTFRuntimeNode ParentNode;
+				if (!LoadNode(CurrentParentIndex, ParentNode))
+				{
+					return false;
+				}
+
+				// do we have an inverse bind matrix ?
+				if (InverseBindMatricesMap.Contains(CurrentParentIndex))
+				{
+					M = InverseBindMatricesMap[CurrentParentIndex];
+					M.ScaleTranslation(FVector(SceneScale, SceneScale, SceneScale));
+					Transform *= FTransform(SkeletonBasis.Inverse() * M * SkeletonBasis) * ParentTransform.Inverse();
+					ParentTransform = FTransform::Identity; // this is required for avoiding double transform application
+					break;
+				}
+				else // fallback to (slower) node transform
+				{
+					ParentTransform *= ParentNode.Transform;
+				}
+
+				if (CurrentParentIndex == RootIndex) // stop at the root
+				{
+					break;
+				}
+				CurrentParentIndex = ParentNode.ParentIndex;
+			}
+
+			Transform *= ParentTransform.Inverse();
+		}
 	}
 	else if (Joints.Contains(Node.Index))
 	{
@@ -1999,7 +2066,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 			return false;
 		}
 
-		if (!TraverseJoints(Modifier, NewParentIndex, ChildNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
+		if (!TraverseJoints(Modifier, RootIndex, NewParentIndex, ChildNode, Joints, BoneMap, InverseBindMatricesMap, SkeletonConfig))
 		{
 			return false;
 		}
@@ -2115,6 +2182,11 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadPrimitive, FColor::Magenta);
 
 	OnPreLoadedPrimitive.Broadcast(AsShared(), JsonPrimitiveObject, Primitive);
+
+	if (!JsonPrimitiveObject->TryGetNumberField("mode", Primitive.Mode))
+	{
+		Primitive.Mode = 4; // triangles
+	}
 
 	const TSharedPtr<FJsonObject>* JsonAttributesObject;
 	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
@@ -2371,6 +2443,48 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		{
 			Primitive.Indices[VertexIndex] = VertexIndex;
 		}
+	}
+
+	// fixing indices... 5: TRIANGLE_STRIP 6: TRIANGLE_FAN
+	if (Primitive.Mode == 5)
+	{
+		TArray<uint32> StripIndices;
+		if (Primitive.Indices.Num() >= 3)
+		{
+			StripIndices.Add(Primitive.Indices[0]);
+			StripIndices.Add(Primitive.Indices[1]);
+			StripIndices.Add(Primitive.Indices[2]);
+			StripIndices.AddUninitialized((Primitive.Indices.Num() - 3) * 3);
+		}
+		int64 StripIndex = 3;
+		for (int64 Index = 3; Index < Primitive.Indices.Num(); Index++)
+		{
+			StripIndices[StripIndex] = StripIndices[StripIndex - 1];
+			StripIndices[StripIndex + 1] = StripIndices[StripIndex - 2];
+			StripIndices[StripIndex + 2] = Primitive.Indices[Index];
+			StripIndex += 3;
+		}
+		Primitive.Indices = StripIndices;
+	}
+	else if (Primitive.Mode == 6)
+	{
+		TArray<uint32> FanIndices;
+		if (Primitive.Indices.Num() >= 3)
+		{
+			FanIndices.Add(Primitive.Indices[0]);
+			FanIndices.Add(Primitive.Indices[1]);
+			FanIndices.Add(Primitive.Indices[2]);
+			FanIndices.AddUninitialized((Primitive.Indices.Num() - 3) * 3);
+		}
+		int64 FanIndex = 3;
+		for (int64 Index = 3; Index < Primitive.Indices.Num(); Index++)
+		{
+			FanIndices[FanIndex] = FanIndices[0];
+			FanIndices[FanIndex + 1] = FanIndices[FanIndex - 1];
+			FanIndices[FanIndex + 2] = Primitive.Indices[Index];
+			FanIndex += 3;
+		}
+		Primitive.Indices = FanIndices;
 	}
 
 	Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
@@ -3363,6 +3477,11 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 			{
 				return false;
 			}
+		}
+		else if (Uri.StartsWith("http://") || Uri.StartsWith("https://"))
+		{
+			AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to open from external url %s (feature not supported)"), *Uri));
+			return false;
 		}
 		else
 		{

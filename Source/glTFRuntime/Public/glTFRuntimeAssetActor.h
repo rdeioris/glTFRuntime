@@ -51,6 +51,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<USceneComponent*, UglTFRuntimeAnimationCurve*> CurveBasedAnimations;
 

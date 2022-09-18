@@ -481,7 +481,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			}
 
 			int32 CurrentPolygonGroupIndex = 0;
-			for (uint32 VertexIndex = 0; VertexIndex < static_cast<uint32>(LODIndices.Num()); VertexIndex += 3)
+			uint32 CleanedNumOfIndices = (LODIndices.Num() / 3) * 3; // avoid crash on non triangles...
+			for (uint32 VertexIndex = 0; VertexIndex < CleanedNumOfIndices; VertexIndex += 3)
 			{
 				const FVertexInstanceID VertexInstanceID0 = MeshDescription->CreateVertexInstance(FVertexID(LODIndices[VertexIndex]));;
 				const FVertexInstanceID VertexInstanceID1 = MeshDescription->CreateVertexInstance(FVertexID(LODIndices[VertexIndex + 1]));

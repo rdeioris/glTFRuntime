@@ -63,7 +63,9 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActorFromClipboard()
 	FglTFRuntimeHttpResponse HttpResponse;
 	HttpResponse.BindUFunction(glTFRuntimeEditorDelegates.Get(), GET_FUNCTION_NAME_CHECKED(UglTFRuntimeEditorDelegates, SpawnFromClipboard));
 
-	if (!UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(HttpResponse, LoaderConfig))
+	FString ClipboardContent;
+
+	if (!UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(HttpResponse, ClipboardContent, LoaderConfig))
 	{
 		UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to load asset from clipboard"));
 	}

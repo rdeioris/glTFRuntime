@@ -481,31 +481,37 @@ UMaterialInterface* UglTFRuntimeAsset::LoadMaterial(const int32 MaterialIndex, c
 	return Parser->LoadMaterial(MaterialIndex, MaterialsConfig, bUseVertexColors, MaterialName);
 }
 
-FString UglTFRuntimeAsset::GetStringFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+UAnimSequence* UglTFRuntimeAsset::CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem>& BonesPath, const TArray<FglTFRuntimePathItem>& MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	return Parser->CreateSkeletalAnimationFromPath(SkeletalMesh, BonesPath, MorphTargetsPath, SkeletalAnimationConfig);
+}
+
+FString UglTFRuntimeAsset::GetStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER("");
 	return Parser->GetJSONStringFromPath(Path, bFound);
 }
 
-int64 UglTFRuntimeAsset::GetIntegerFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+int64 UglTFRuntimeAsset::GetIntegerFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(0);
 	return static_cast<int64>(Parser->GetJSONNumberFromPath(Path, bFound));
 }
 
-float UglTFRuntimeAsset::GetFloatFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+float UglTFRuntimeAsset::GetFloatFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(0);
 	return static_cast<float>(Parser->GetJSONNumberFromPath(Path, bFound));
 }
 
-bool UglTFRuntimeAsset::GetBooleanFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+bool UglTFRuntimeAsset::GetBooleanFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(false);
 	return Parser->GetJSONBooleanFromPath(Path, bFound);
 }
 
-int32 UglTFRuntimeAsset::GetArraySizeFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const
+int32 UglTFRuntimeAsset::GetArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(-1);
 	return Parser->GetJSONArraySizeFromPath(Path, bFound);
@@ -558,6 +564,30 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRunt
 	int32 Width = 0;
 	int32 Height = 0;
 	if (!Parser->LoadImage(ImageIndex, UncompressedBytes, Width, Height, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width > 0 && Height > 0)
+	{
+		FglTFRuntimeMipMap Mip(-1);
+		Mip.Pixels = UncompressedBytes;
+		Mip.Width = Width;
+		Mip.Height = Height;
+		TArray<FglTFRuntimeMipMap> Mips = { Mip };
+		return Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
+	}
+
+	return nullptr;
+}
+
+UTexture2D* UglTFRuntimeAsset::LoadImageFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	TArray64<uint8> UncompressedBytes;
+	int32 Width = 0;
+	int32 Height = 0;
+	if (!Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, ImagesConfig))
 	{
 		return nullptr;
 	}
