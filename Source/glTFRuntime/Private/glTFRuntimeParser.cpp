@@ -3876,13 +3876,13 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 							{
 								Delta = DecodeZigZag(Deltas[ByteIndex]);
 							}
-							BaseLine[ElementByteIndex] += Delta;
 
 							const int64 DestinationOffset = (ElementIndex + (GroupIndex * 16) + ByteIndex) * Stride + ElementByteIndex;
 							if (DestinationOffset >= UncompressedBytes.Num())
 							{
-								break;
+								continue;
 							}
+							BaseLine[ElementByteIndex] += Delta;
 							UncompressedBytes[DestinationOffset] = BaseLine[ElementByteIndex];
 						}
 					}
@@ -3919,12 +3919,12 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 								Delta = DecodeZigZag(Deltas[ByteIndex]);
 							}
 
-							BaseLine[ElementByteIndex] += Delta;
 							const int64 DestinationOffset = (ElementIndex + (GroupIndex * 16) + ByteIndex) * Stride + ElementByteIndex;
 							if (DestinationOffset >= UncompressedBytes.Num())
 							{
-								break;
+								continue;
 							}
+							BaseLine[ElementByteIndex] += Delta;
 							UncompressedBytes[DestinationOffset] = BaseLine[ElementByteIndex];
 						}
 					}
@@ -3937,12 +3937,12 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 						for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
 						{
 							uint8 Delta = DecodeZigZag(Blob.Data[Offset++]);
-							BaseLine[ElementByteIndex] += Delta;
 							const int64 DestinationOffset = (ElementIndex + (GroupIndex * 16) + ByteIndex) * Stride + ElementByteIndex;
 							if (DestinationOffset >= UncompressedBytes.Num())
 							{
-								break;
+								continue;
 							}
+							BaseLine[ElementByteIndex] += Delta;
 							UncompressedBytes[DestinationOffset] = BaseLine[ElementByteIndex];
 						}
 					}
@@ -3967,7 +3967,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		const uint32 TrianglesNum = Elements / 3;
 		int64 DataOffset = Offset + TrianglesNum;
 
-		auto EmitTriangle = [Stride, &UncompressedBytes](const uint32 A, const uint32 B, const uint32 C)
+		auto EmitTriangle = [Stride, &UncompressedBytes, &Next, &Last](const uint32 A, const uint32 B, const uint32 C)
 		{
 			if (Stride == 2)
 			{
@@ -4117,8 +4117,8 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 				const uint8 W = ZW & 0x0f;
 
 				const uint32 A = Next++;
-				uint8 B = 0;
-				uint8 C = 0;
+				uint32 B = 0;
+				uint32 C = 0;
 
 				if (Z == 0)
 				{
@@ -4176,7 +4176,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 					Next = 0;
 				}
 
-				uint8 A = 0;
+				uint32 A = 0;
 				if (Code == 0xfe)
 				{
 					A = Next++;
@@ -4190,7 +4190,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 					A = Last;
 				}
 
-				uint8 B = 0;
+				uint32 B = 0;
 				if (Z == 0)
 				{
 					B = Next++;
@@ -4212,7 +4212,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 					B = Last;
 				}
 
-				uint8 C = 0;
+				uint32 C = 0;
 				if (W == 0)
 				{
 					C = Next++;
@@ -4256,6 +4256,87 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 	else
 	{
 		return false;
+	}
+
+	if (UncompressedBytes.Num() > 0)
+	{
+		if (Filter == "OCTAHEDRAL" && (Stride == 4 || Stride == 8))
+		{
+			for (int64 ElementIndex = 0; ElementIndex < Elements; ElementIndex++)
+			{
+				int64 Offset = ElementIndex * Stride;
+				if (Stride == 4)
+				{
+					int8* Data = reinterpret_cast<int8*>(UncompressedBytes.GetData());
+					float One = Data[Offset + 2];
+					float X = Data[Offset] / One;
+					float Y = Data[Offset + 1] / One;
+					float Z = 1.0f - FMath::Abs(X) - FMath::Abs(Y);
+
+					float T = FMath::Max(-Z, 0.0f);
+
+					X -= (X >= 0) ? T : -T;
+					Y -= (Y >= 0) ? T : -T;
+
+					float Len = FMath::Sqrt(X * X + Y * Y + Z * Z);
+
+					X /= Len;
+					Y /= Len;
+					Z /= Len;
+
+					Data[Offset] = FMath::RoundToInt(X * 127);
+					Data[Offset + 1] = FMath::RoundToInt(Y * 127);
+					Data[Offset + 2] = FMath::RoundToInt(Z * 127);
+				}
+				else
+				{
+					int16* Data = reinterpret_cast<int16*>(UncompressedBytes.GetData());
+					float One = Data[Offset + 2];
+					float X = Data[Offset] / One;
+					float Y = Data[Offset + 1] / One;
+					float Z = 1.0f - FMath::Abs(X) - FMath::Abs(Y);
+
+					float T = FMath::Max(-Z, 0.0f);
+
+					X -= (X >= 0) ? T : -T;
+					Y -= (Y >= 0) ? T : -T;
+
+					float Len = FMath::Sqrt(X * X + Y * Y + Z * Z);
+
+					X /= Len;
+					Y /= Len;
+					Z /= Len;
+
+					Data[Offset] = FMath::RoundToInt(X * 32767);
+					Data[Offset + 1] = FMath::RoundToInt(Y * 32767);
+					Data[Offset + 2] = FMath::RoundToInt(Z * 32767);
+				}
+			}
+		}
+		else if (Filter == "QUATERNION" && Stride == 8)
+		{
+			for (int64 ElementIndex = 0; ElementIndex < Elements; ElementIndex++)
+			{
+				int64 Offset = ElementIndex * Stride;
+				int16* Data = reinterpret_cast<int16*>(UncompressedBytes.GetData());
+
+				float Range = 1.0f / FMath::Sqrt(2.0f);
+				float One = Data[Offset + 3] | 3;
+
+				float X = Data[Offset] / One * Range;
+				float Y = Data[Offset + 1] / One * Range;
+				float Z = Data[Offset + 2] / One * Range;
+
+				float W = FMath::Sqrt(FMath::Max(0.0, 1.0 - X * X - Y * Y - Z * Z));
+
+				int32 MaxComp = Data[Offset + 3] & 3;
+
+				Data[(MaxComp + 1) % 4] = FMath::RoundToInt(X * 32767.0);
+				Data[(MaxComp + 2) % 4] = FMath::RoundToInt(Y * 32767.0);
+				Data[(MaxComp + 3) % 4] = FMath::RoundToInt(Z * 32767.0);
+				Data[(MaxComp + 0) % 4] = FMath::RoundToInt(W * 32767.0);
+			}
+		}
 	}
 
 	return true;
