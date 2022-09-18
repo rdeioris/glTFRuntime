@@ -3772,7 +3772,7 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeObject(const int32 NodeIndex)
 
 bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, const int64 Stride, const int64 Elements, const FString& Mode, const FString& Filter, TArray64<uint8>& UncompressedBytes)
 {
-	UE_LOG(LogTemp, Error, TEXT("Decompressing mode:%s filter:%s size:%d ..."), *Mode, *Filter, Blob.Num);
+	UE_LOG(LogTemp, Error, TEXT("Decompressing mode:%s filter:%s size:%d stride:%d count:%d"), *Mode, *Filter, Blob.Num, Stride, Elements);
 
 	auto DecodeZigZag = [](uint8 V)
 	{
@@ -3782,138 +3782,169 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 	if (Mode == "ATTRIBUTES" && Blob.Num > 32 && Blob.Data[0] == 0xa0)
 	{
 		int64 Offset = 1;
-		const int64 Limit = Blob.Num - 32;
+		const int64 Limit = Blob.Num - Stride;
 
 		TArray<uint8> BaseLine;
-		BaseLine.Append(Blob.Data + Limit, 32);
+		BaseLine.Append(Blob.Data + Blob.Num - Stride, Stride);
+		if (BaseLine.Num() < 16)
+		{
+			BaseLine.AddZeroed(16 - BaseLine.Num());
+		}
 
 		const int64 MaxBlockElements = FMath::Min<int64>((8192 / Stride) & ~15, 256);
 
-		int64 RemainingElements = Elements;
-		while (RemainingElements > 0)
+		// preallocated
+		UncompressedBytes.AddUninitialized(Elements * Stride);
+
+		for (int64 ElementIndex = 0; ElementIndex < Elements; ElementIndex += MaxBlockElements)
 		{
-			int64 BlockElements = FMath::Min<int64>(RemainingElements, MaxBlockElements);
-			UE_LOG(LogTemp, Error, TEXT("Remaining: %lld"), RemainingElements);
-			RemainingElements -= BlockElements;
+			int64 BlockElements = FMath::Min<int64>(Elements - ElementIndex, MaxBlockElements);
+
+			UE_LOG(LogTemp, Warning, TEXT("BlockElements %lld"), BlockElements);
 
 			int64 GroupCount = FMath::CeilToInt64(BlockElements / 16.0);
-			UE_LOG(LogTemp, Error, TEXT("Numeber of Groups: %lld (%lld)"), BlockElements, GroupCount);
+
 			int64 NumberOfHeaderBytes = GroupCount / 4;
 			if ((GroupCount % 4) > 0)
 			{
 				NumberOfHeaderBytes++;
 			}
 
-			if (Offset + NumberOfHeaderBytes >= Limit)
+			for (int64 ElementByteIndex = 0; ElementByteIndex < Stride; ElementByteIndex++)
 			{
-				return false;
-			}
 
-			UE_LOG(LogTemp, Warning, TEXT("[Before] NumberOfHeaderBytes: %d"), NumberOfHeaderBytes);
-			TArray64<uint8> Groups;
-			while (NumberOfHeaderBytes--)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("NumberOfHeaderBytes: %d"), NumberOfHeaderBytes);
-				Groups.Add(Blob.Data[Offset] & 0x03);
-				Groups.Add((Blob.Data[Offset] >> 2) & 0x03);
-				Groups.Add((Blob.Data[Offset] >> 4) & 0x03);
-				Groups.Add((Blob.Data[Offset] >> 6) & 0x03);
-				Offset++;
-			}
-
-			for (int64 GroupIndex = 0; GroupIndex < GroupCount; GroupIndex++)
-			{
-				UE_LOG(LogTemp, Error, TEXT("Group %d/%d = %x"), GroupIndex, GroupCount, Groups[GroupIndex]);
-				if (Groups[GroupIndex] == 0)
+				if (Offset + NumberOfHeaderBytes > Limit)
 				{
-					UncompressedBytes.Append(BaseLine.GetData(), 16);
+					return false;
 				}
-				else if (Groups[GroupIndex] == 3)
-				{
-					if (Offset + 16 >= Limit)
-					{
-						return false;
-					}
-					for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
-					{
-						int32 NewValueIndex = UncompressedBytes.Add(BaseLine[ByteIndex] + Blob.Data[Offset++]);
-						BaseLine[ByteIndex] = UncompressedBytes[NewValueIndex];
-					}
-				}
-				else if (Groups[GroupIndex] == 1)
-				{
-					if (Offset + 4 >= Limit)
-					{
-						return false;
-					}
-					TArray<uint8> Deltas;
-					for (int32 ByteIndex = 0; ByteIndex < 4; ByteIndex++)
-					{
-						Deltas.Add((Blob.Data[Offset] >> 6) & 0x03);
-						Deltas.Add((Blob.Data[Offset] >> 4) & 0x03);
-						Deltas.Add((Blob.Data[Offset] >> 2) & 0x03);
-						Deltas.Add(Blob.Data[Offset] & 0x03);
-						Offset++;
-					}
 
-					for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
+				TArray64<uint8> Groups;
+				for (int64 i = 0; i < NumberOfHeaderBytes; i++)
+				{
+					Groups.Add(Blob.Data[Offset] & 0x03);
+					Groups.Add((Blob.Data[Offset] >> 2) & 0x03);
+					Groups.Add((Blob.Data[Offset] >> 4) & 0x03);
+					Groups.Add((Blob.Data[Offset] >> 6) & 0x03);
+					Offset++;
+				}
+
+				for (int64 GroupIndex = 0; GroupIndex < GroupCount; GroupIndex++)
+				{
+					if (Groups[GroupIndex] == 0)
 					{
-						uint8 Delta = 0;
-						if (Deltas[ByteIndex] == 0x03)
+						for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
 						{
-							if (Offset + 1 < Limit)
+							const int64 DestinationOffset = (ElementIndex + (GroupIndex * 16) + ByteIndex) * Stride + ElementByteIndex;
+							if (DestinationOffset >= UncompressedBytes.Num())
 							{
-								Delta = Blob.Data[Offset++];
+								break;
+							}
+							UncompressedBytes[DestinationOffset] = BaseLine[ElementByteIndex];
+						}
+					}
+					else if (Groups[GroupIndex] == 1)
+					{
+						if (Offset + 4 > Limit)
+						{
+							return false;
+						}
+						TArray<uint8> Deltas;
+						for (int32 ByteIndex = 0; ByteIndex < 4; ByteIndex++)
+						{
+							Deltas.Add((Blob.Data[Offset] >> 6) & 0x03);
+							Deltas.Add((Blob.Data[Offset] >> 4) & 0x03);
+							Deltas.Add((Blob.Data[Offset] >> 2) & 0x03);
+							Deltas.Add(Blob.Data[Offset] & 0x03);
+							Offset++;
+						}
+
+						for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
+						{
+							uint8 Delta = 0;
+							if (Deltas[ByteIndex] == 0x03)
+							{
+								if (Offset + 1 <= Limit)
+								{
+									Delta = DecodeZigZag(Blob.Data[Offset++]);
+								}
+								else
+								{
+									return false;
+								}
 							}
 							else
 							{
-								return false;
+								Delta = DecodeZigZag(Deltas[ByteIndex]);
 							}
-						}
-						else
-						{
-							Delta = DecodeZigZag(Deltas[ByteIndex]);
-						}
+							BaseLine[ElementByteIndex] += Delta;
 
-						int32 NewValueIndex = UncompressedBytes.Add(BaseLine[ByteIndex] + Delta);
-						BaseLine[ByteIndex] = UncompressedBytes[NewValueIndex];
-					}
-				}
-				else // 2
-				{
-					if (Offset + 8 >= Limit)
-					{
-						return false;
-					}
-					TArray<uint8> Deltas;
-					for (int32 ByteIndex = 0; ByteIndex < 8; ByteIndex++)
-					{
-						Deltas.Add((Blob.Data[Offset] >> 4) & 0x0F);
-						Deltas.Add(Blob.Data[Offset] & 0x0F);
-						Offset++;
-					}
-
-					for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
-					{
-						uint8 Delta = 0;
-						if (Deltas[ByteIndex] == 0x0F)
-						{
-							if (Offset + 1 < Limit)
+							const int64 DestinationOffset = (ElementIndex + (GroupIndex * 16) + ByteIndex) * Stride + ElementByteIndex;
+							if (DestinationOffset >= UncompressedBytes.Num())
 							{
-								Delta = Blob.Data[Offset++];
+								break;
+							}
+							UncompressedBytes[DestinationOffset] = BaseLine[ElementByteIndex];
+						}
+					}
+					else if (Groups[GroupIndex] == 2)
+					{
+						if (Offset + 8 > Limit)
+						{
+							return false;
+						}
+						TArray<uint8> Deltas;
+						for (int32 ByteIndex = 0; ByteIndex < 8; ByteIndex++)
+						{
+							Deltas.Add((Blob.Data[Offset] >> 4) & 0x0F);
+							Deltas.Add(Blob.Data[Offset] & 0x0F);
+							Offset++;
+						}
+
+						for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
+						{
+							uint8 Delta = 0;
+							if (Deltas[ByteIndex] == 0x0F)
+							{
+								if (Offset + 1 <= Limit)
+								{
+									Delta = DecodeZigZag(Blob.Data[Offset++]);
+								}
+								else
+								{
+									return false;
+								}
 							}
 							else
 							{
-								return false;
+								Delta = DecodeZigZag(Deltas[ByteIndex]);
 							}
-						}
-						else
-						{
-							Delta = DecodeZigZag(Deltas[ByteIndex]);
-						}
 
-						int32 NewValueIndex = UncompressedBytes.Add(BaseLine[ByteIndex] + Delta);
-						BaseLine[ByteIndex] = UncompressedBytes[NewValueIndex];
+							BaseLine[ElementByteIndex] += Delta;
+							const int64 DestinationOffset = (ElementIndex + (GroupIndex * 16) + ByteIndex) * Stride + ElementByteIndex;
+							if (DestinationOffset >= UncompressedBytes.Num())
+							{
+								break;
+							}
+							UncompressedBytes[DestinationOffset] = BaseLine[ElementByteIndex];
+						}
+					}
+					else if (Groups[GroupIndex] == 3)
+					{
+						if (Offset + 16 > Limit)
+						{
+							return false;
+						}
+						for (int32 ByteIndex = 0; ByteIndex < 16; ByteIndex++)
+						{
+							uint8 Delta = DecodeZigZag(Blob.Data[Offset++]);
+							BaseLine[ElementByteIndex] += Delta;
+							const int64 DestinationOffset = (ElementIndex + (GroupIndex * 16) + ByteIndex) * Stride + ElementByteIndex;
+							if (DestinationOffset >= UncompressedBytes.Num())
+							{
+								break;
+							}
+							UncompressedBytes[DestinationOffset] = BaseLine[ElementByteIndex];
+						}
 					}
 				}
 			}
@@ -3921,8 +3952,311 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 
 		UE_LOG(LogTemp, Error, TEXT("Successfully decompressed at Offset %lld (%lld)"), Offset, UncompressedBytes.Num());
 	}
+	else if (Mode == "TRIANGLES" && Blob.Num >= 17 && Blob.Data[0] == 0xe1 && (Stride == 2 || Stride == 4) && ((Elements % 3) == 0))
+	{
+		TArray<uint8> CodeAux;
+		const int64 Limit = Blob.Num - 16;
+		CodeAux.Append(Blob.Data + Limit, 16);
 
+		uint32 Next = 0;
+		uint32 Last = 0;
+		TArray<TPair<uint32, uint32>> EdgeFifo;
+		TArray<uint32> VertexFifo;
 
+		int64 Offset = 1;
+		const uint32 TrianglesNum = Elements / 3;
+		int64 DataOffset = Offset + TrianglesNum;
+
+		auto EmitTriangle = [Stride, &UncompressedBytes](const uint32 A, const uint32 B, const uint32 C)
+		{
+			if (Stride == 2)
+			{
+				const uint16 AShort = A;
+				const uint16 BShort = B;
+				const uint16 CShort = C;
+				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&AShort), sizeof(uint16));
+				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&BShort), sizeof(uint16));
+				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&CShort), sizeof(uint16));
+			}
+			else
+			{
+				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&A), sizeof(uint32));
+				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&B), sizeof(uint32));
+				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&C), sizeof(uint32));
+			}
+		};
+
+		auto DecodeIndex = [&Blob, &DataOffset, &Last, Limit]() -> bool
+		{
+			uint32 V = 0;
+			for (int32 Shift = 0; ; Shift += 7)
+			{
+				if (DataOffset >= Limit)
+				{
+					return false;
+				}
+
+				const uint32 Byte = Blob.Data[DataOffset++];
+				V |= (Byte & 0x7F) << Shift;
+
+				if (Byte < 0x80)
+				{
+					break;
+				}
+			}
+
+			int32 Delta = ((V & 1) != 0) ? ~(V >> 1) : (V >> 1);
+
+			Last += Delta;
+			return true;
+		};
+
+		for (uint32 TriangleIndex = 0; TriangleIndex < TrianglesNum; TriangleIndex++)
+		{
+			if (Offset >= Limit)
+			{
+				return false;
+			}
+			uint8 Code = Blob.Data[Offset++];
+			uint8 NibbleLeft = Code >> 4;
+			uint8 NibbleRight = Code & 0x0f;
+
+			if (NibbleLeft < 0xf && NibbleRight == 0) // 0xX0
+			{
+				if (NibbleLeft >= EdgeFifo.Num())
+				{
+					return false;
+				}
+				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+				const uint32 C = Next++;
+
+				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
+				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
+				VertexFifo.Insert(C, 0);
+
+				EmitTriangle(AB.Key, AB.Value, C);
+			}
+			else if (NibbleLeft < 0xf && NibbleRight > 0 && NibbleRight < 0x0d) // 0xXY
+			{
+				if (NibbleLeft >= EdgeFifo.Num())
+				{
+					return false;
+				}
+				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+
+				if (NibbleRight >= VertexFifo.Num())
+				{
+					return false;
+				}
+
+				const uint32 C = VertexFifo[NibbleRight];
+				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
+				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
+
+				EmitTriangle(AB.Key, AB.Value, C);
+			}
+			else if (NibbleLeft < 0xf && NibbleRight == 0x0d) // 0xXd
+			{
+				if (NibbleLeft >= EdgeFifo.Num())
+				{
+					return false;
+				}
+				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+
+				const uint32 C = Last - 1;
+				Last = C;
+
+				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
+				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
+				VertexFifo.Insert(C, 0);
+
+				EmitTriangle(AB.Key, AB.Value, C);
+			}
+			else if (NibbleLeft < 0xf && NibbleRight == 0x0e) // 0xXe
+			{
+				if (NibbleLeft >= EdgeFifo.Num())
+				{
+					return false;
+				}
+				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+
+				const uint32 C = Last + 1;
+				Last = C;
+
+				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
+				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
+				VertexFifo.Insert(C, 0);
+
+				EmitTriangle(AB.Key, AB.Value, C);
+			}
+			else if (NibbleLeft < 0xf && NibbleRight == 0x0f) // 0xXf
+			{
+				if (NibbleLeft >= EdgeFifo.Num())
+				{
+					return false;
+				}
+				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+
+				if (!DecodeIndex())
+				{
+					return false;
+				}
+
+				const uint32 C = Last;
+
+				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
+				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
+				VertexFifo.Insert(C, 0);
+
+				EmitTriangle(AB.Key, AB.Value, C);
+			}
+			else if (NibbleLeft == 0xf && NibbleRight < 0xe) // 0xfY
+			{
+				const uint8 ZW = CodeAux[NibbleRight];
+				const uint8 Z = ZW >> 4;
+				const uint8 W = ZW & 0x0f;
+
+				const uint32 A = Next++;
+				uint8 B = 0;
+				uint8 C = 0;
+
+				if (Z == 0)
+				{
+					B = Next++;
+				}
+				else
+				{
+					if (Z - 1 >= VertexFifo.Num())
+					{
+						return false;
+					}
+					B = VertexFifo[Z - 1];
+				}
+
+				if (W == 0)
+				{
+					C = Next++;
+				}
+				else
+				{
+					if (W - 1 >= VertexFifo.Num())
+					{
+						return false;
+					}
+					C = VertexFifo[W - 1];
+				}
+
+				EdgeFifo.Insert(TPair<uint32, uint32>(B, A), 0); // push BA
+				EdgeFifo.Insert(TPair<uint32, uint32>(C, B), 0); // push CB
+				EdgeFifo.Insert(TPair<uint32, uint32>(A, C), 0); // push AC
+				VertexFifo.Insert(A, 0);
+				if (Z == 0)
+				{
+					VertexFifo.Insert(B, 0);
+				}
+				if (W == 0)
+				{
+					VertexFifo.Insert(C, 0);
+				}
+
+				EmitTriangle(A, B, C);
+			}
+			else if (Code == 0xfe || Code == 0xff) // 0xfe - 0xff
+			{
+				if (DataOffset >= Limit)
+				{
+					return false;
+				}
+
+				uint8 ZW = Blob.Data[DataOffset++];
+				uint8 Z = ZW >> 4;
+				uint8 W = ZW & 0x0f;
+				if (ZW == 0)
+				{
+					Next = 0;
+				}
+
+				uint8 A = 0;
+				if (Code == 0xfe)
+				{
+					A = Next++;
+				}
+				else
+				{
+					if (!DecodeIndex())
+					{
+						return false;
+					}
+					A = Last;
+				}
+
+				uint8 B = 0;
+				if (Z == 0)
+				{
+					B = Next++;
+				}
+				else if (Z < 0xf)
+				{
+					if (Z - 1 >= VertexFifo.Num())
+					{
+						return false;
+					}
+					B = VertexFifo[Z - 1];
+				}
+				else
+				{
+					if (!DecodeIndex())
+					{
+						return false;
+					}
+					B = Last;
+				}
+
+				uint8 C = 0;
+				if (W == 0)
+				{
+					C = Next++;
+				}
+				else if (W < 0xf)
+				{
+					if (W - 1 >= VertexFifo.Num())
+					{
+						return false;
+					}
+					C = VertexFifo[W - 1];
+				}
+				else
+				{
+					if (!DecodeIndex())
+					{
+						return false;
+					}
+					C = Last;
+				}
+
+				EdgeFifo.Insert(TPair<uint32, uint32>(B, A), 0); // push BA
+				EdgeFifo.Insert(TPair<uint32, uint32>(C, B), 0); // push CB
+				EdgeFifo.Insert(TPair<uint32, uint32>(A, C), 0); // push AC
+				VertexFifo.Insert(A, 0);
+				if (Z == 0 || Z == 0xf)
+				{
+					VertexFifo.Insert(B, 0);
+				}
+				if (W == 0 || W == 0xf)
+				{
+					VertexFifo.Insert(C, 0);
+				}
+
+				EmitTriangle(A, B, C);
+			}
+		}
+
+		UE_LOG(LogTemp, Error, TEXT("Decompressed TRIANGLES to %d bytes (Offset %lld DataOffset %lld Size %lld)"), UncompressedBytes.Num(), Offset, DataOffset, Blob.Num);
+	}
+	else
+	{
+		return false;
+	}
 
 	return true;
 }
