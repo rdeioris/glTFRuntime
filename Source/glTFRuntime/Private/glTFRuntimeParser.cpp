@@ -2675,6 +2675,7 @@ bool FglTFRuntimeParser::GetBufferView(const int32 Index, FglTFRuntimeBlob& Blob
 		{
 			Blob.Data = CompressedBufferViewsCache[Index].GetData();
 			Blob.Num = CompressedBufferViewsCache[Index].Num();
+			Stride = CompressedBufferViewsStridesCache[Index];
 			return true;
 		}
 	}
@@ -2747,6 +2748,7 @@ bool FglTFRuntimeParser::GetBufferView(const int32 Index, FglTFRuntimeBlob& Blob
 		}
 		Blob.Data = CompressedBufferViewsCache[Index].GetData();
 		Blob.Num = CompressedBufferViewsCache[Index].Num();
+		CompressedBufferViewsStridesCache.Add(Index, Stride);
 	}
 
 	return true;
@@ -3772,8 +3774,6 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeObject(const int32 NodeIndex)
 
 bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, const int64 Stride, const int64 Elements, const FString& Mode, const FString& Filter, TArray64<uint8>& UncompressedBytes)
 {
-	UE_LOG(LogTemp, Error, TEXT("Decompressing mode:%s filter:%s size:%d stride:%d count:%d"), *Mode, *Filter, Blob.Num, Stride, Elements);
-
 	auto DecodeZigZag = [](uint8 V)
 	{
 		return ((V & 1) != 0) ? ~(V >> 1) : (V >> 1);
@@ -3799,8 +3799,6 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		for (int64 ElementIndex = 0; ElementIndex < Elements; ElementIndex += MaxBlockElements)
 		{
 			int64 BlockElements = FMath::Min<int64>(Elements - ElementIndex, MaxBlockElements);
-
-			UE_LOG(LogTemp, Warning, TEXT("BlockElements %lld"), BlockElements);
 
 			int64 GroupCount = FMath::CeilToInt64(BlockElements / 16.0);
 
@@ -3950,7 +3948,6 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 			}
 		}
 
-		UE_LOG(LogTemp, Error, TEXT("Successfully decompressed at Offset %lld (%lld)"), Offset, UncompressedBytes.Num());
 	}
 	else if (Mode == "TRIANGLES" && Blob.Num >= 17 && Blob.Data[0] == 0xe1 && (Stride == 2 || Stride == 4) && ((Elements % 3) == 0))
 	{
@@ -4250,8 +4247,6 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 				EmitTriangle(A, B, C);
 			}
 		}
-
-		UE_LOG(LogTemp, Error, TEXT("Decompressed TRIANGLES to %d bytes (Offset %lld DataOffset %lld Size %lld)"), UncompressedBytes.Num(), Offset, DataOffset, Blob.Num);
 	}
 	else
 	{
@@ -4315,12 +4310,12 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		}
 		else if (Filter == "QUATERNION" && Stride == 8)
 		{
-			for (int64 ElementIndex = 0; ElementIndex < Elements; ElementIndex++)
-			{
-				int64 Offset = ElementIndex * Stride;
-				int16* Data = reinterpret_cast<int16*>(UncompressedBytes.GetData());
+			int16* Data = reinterpret_cast<int16*>(UncompressedBytes.GetData());
 
-				float Range = 1.0f / FMath::Sqrt(2.0f);
+			const float Range = 1.0f / FMath::Sqrt(2.0f);
+
+			for (int64 Offset = 0; Offset < Elements * 4; Offset += 4)
+			{
 				float One = Data[Offset + 3] | 3;
 
 				float X = Data[Offset] / One * Range;
@@ -4331,11 +4326,26 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 
 				int32 MaxComp = Data[Offset + 3] & 3;
 
-				Data[(MaxComp + 1) % 4] = FMath::RoundToInt(X * 32767.0);
-				Data[(MaxComp + 2) % 4] = FMath::RoundToInt(Y * 32767.0);
-				Data[(MaxComp + 3) % 4] = FMath::RoundToInt(Z * 32767.0);
-				Data[(MaxComp + 0) % 4] = FMath::RoundToInt(W * 32767.0);
+				Data[Offset + ((MaxComp + 1) % 4)] = FMath::RoundToInt(X * 32767.0);
+				Data[Offset + ((MaxComp + 2) % 4)] = FMath::RoundToInt(Y * 32767.0);
+				Data[Offset + ((MaxComp + 3) % 4)] = FMath::RoundToInt(Z * 32767.0);
+				Data[Offset + ((MaxComp + 0) % 4)] = FMath::RoundToInt(W * 32767.0);
 			}
+		}
+		else if (Filter == "EXPONENTIAL" && (Stride % 4) == 0)
+		{
+			int32* Data = reinterpret_cast<int32*>(UncompressedBytes.GetData());
+			for (int64 Offset = 0; Offset < UncompressedBytes.Num() / 4; Offset += 4)
+			{
+				int32 E = Data[Offset] >> 24;
+				int32 M = (Data[Offset] << 8) >> 8;
+				Data[Offset] = FMath::Pow(2.0f, E) * M;
+			}
+		}
+		else if (Filter != "" && Filter != "NONE")
+		{
+			AddError("DecompressMeshOptimizer()", "Unsupported Filter");
+			return false;
 		}
 	}
 

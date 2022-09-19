@@ -1570,6 +1570,7 @@ protected:
 
 	TMap<int32, TArray64<uint8>> BuffersCache;
 	TMap<int32, TArray64<uint8>> CompressedBufferViewsCache;
+	TMap<int32, int64> CompressedBufferViewsStridesCache;
 
 	TMap<UMaterialInterface*, FString> MaterialsNameCache;
 
@@ -1772,6 +1773,7 @@ public:
 		FglTFRuntimeBlob Blob;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
 		bool bOverrideNormalized = false;
+
 		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob, GetAdditionalBufferView(AdditionalBufferView, Name)))
 		{
 			return false;
