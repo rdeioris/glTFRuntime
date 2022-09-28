@@ -2015,37 +2015,40 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 			continue;
 		}
 
+		FTransform Transform = Node.Transform;
+
+		if (BoneIndex == 0)
+		{
+			FglTFRuntimeNode ParentNode = Node;
+			while (ParentNode.ParentIndex != INDEX_NONE)
+			{
+				if (!LoadNode(ParentNode.ParentIndex, ParentNode))
+				{
+					break; // overengineering... (useless)
+				}
+				Transform *= ParentNode.Transform;
+			}
+		}
+
 		FRawAnimSequenceTrack Track;
-		// positions (check for root motion)
-		if (BoneIndex == 0 && !AnimSequence->bEnableRootMotion)
-		{
 #if ENGINE_MAJOR_VERSION > 4
-			Track.PosKeys.Add(FVector3f(BonesPoses[0].GetLocation()));
+		Track.PosKeys.Add(FVector3f(Transform.GetLocation()));
 #else
-			Track.PosKeys.Add(BonesPoses[0].GetLocation());
-#endif
-		}
-		else
-		{
-#if ENGINE_MAJOR_VERSION > 4
-			Track.PosKeys.Add(FVector3f(Node.Transform.GetLocation()));
-#else
-			Track.PosKeys.Add(Node.Transform.GetLocation());
-#endif
-		}
-
-
-#if ENGINE_MAJOR_VERSION > 4
-		Track.RotKeys.Add(FQuat4f(Node.Transform.GetRotation()));
-#else
-		Track.RotKeys.Add(Node.Transform.GetRotation());
+		Track.PosKeys.Add(Transform.GetLocation());
 #endif
 
 
 #if ENGINE_MAJOR_VERSION > 4
-		Track.ScaleKeys.Add(FVector3f(Node.Transform.GetScale3D()));
+		Track.RotKeys.Add(FQuat4f(Transform.GetRotation()));
 #else
-		Track.ScaleKeys.Add(Node.Transform.GetScale3D());
+		Track.RotKeys.Add(Transform.GetRotation());
+#endif
+
+
+#if ENGINE_MAJOR_VERSION > 4
+		Track.ScaleKeys.Add(FVector3f(Transform.GetScale3D()));
+#else
+		Track.ScaleKeys.Add(Transform.GetScale3D());
 #endif
 
 		Tracks.Add(TrackName, Track);

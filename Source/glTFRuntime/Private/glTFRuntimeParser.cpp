@@ -3963,23 +3963,39 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		int64 Offset = 1;
 		const uint32 TrianglesNum = Elements / 3;
 		int64 DataOffset = Offset + TrianglesNum;
+		int64 TriangleOffset = 0;
 
-		auto EmitTriangle = [Stride, &UncompressedBytes, &Next, &Last](const uint32 A, const uint32 B, const uint32 C)
+		UncompressedBytes.AddUninitialized(Elements * Stride);
+
+		auto EmitTriangle = [Stride, &TriangleOffset, &UncompressedBytes](const uint32 A, const uint32 B, const uint32 C)
 		{
 			if (Stride == 2)
 			{
 				const uint16 AShort = A;
 				const uint16 BShort = B;
 				const uint16 CShort = C;
-				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&AShort), sizeof(uint16));
-				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&BShort), sizeof(uint16));
-				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&CShort), sizeof(uint16));
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&AShort)[0];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&AShort)[1];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&BShort)[0];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&BShort)[1];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&CShort)[0];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&CShort)[1];
+
 			}
 			else
 			{
-				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&A), sizeof(uint32));
-				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&B), sizeof(uint32));
-				UncompressedBytes.Append(reinterpret_cast<const uint8*>(&C), sizeof(uint32));
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[0];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[1];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[2];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[3];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[0];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[1];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[2];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[3];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[0];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[1];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[2];
+				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[3];
 			}
 		};
 
