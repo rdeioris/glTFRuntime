@@ -2006,7 +2006,6 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 #endif
 
 	int64 RootBoneIndex = INDEX_NONE;
-	bool bHasSpecificRoot;
 	TArray<int32> Joints;
 	if (SkinIndex > INDEX_NONE)
 	{
@@ -2015,7 +2014,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 		{
 			return nullptr;
 		}
-		if (!GetRootBoneIndex(SkinObject.ToSharedRef(), RootBoneIndex, bHasSpecificRoot, Joints, FglTFRuntimeSkeletonConfig()))
+		if (!GetRootBoneIndex(SkinObject.ToSharedRef(), RootBoneIndex, Joints, FglTFRuntimeSkeletonConfig()))
 		{
 			return nullptr;
 		}

@@ -1776,7 +1776,7 @@ bool FglTFRuntimeParser::FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<
 }
 
 
-bool FglTFRuntimeParser::GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, bool& bHasSpecificRoot, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+bool FglTFRuntimeParser::GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	// get the list of valid joints	
 	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
@@ -1801,7 +1801,6 @@ bool FglTFRuntimeParser::GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject
 
 	FglTFRuntimeNode RootNode;
 	RootBoneIndex = INDEX_NONE;
-	bHasSpecificRoot = false;
 
 	if (SkeletonConfig.RootNodeIndex > INDEX_NONE)
 	{
@@ -1817,7 +1816,6 @@ bool FglTFRuntimeParser::GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject
 	else if (JsonSkinObject->TryGetNumberField("skeleton", RootBoneIndex))
 	{
 		// use the "skeleton" field as the root bone
-		bHasSpecificRoot = true;
 	}
 	else
 	{
@@ -1836,10 +1834,9 @@ bool FglTFRuntimeParser::GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject
 bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	int64 RootBoneIndex = INDEX_NONE;
-	bool bHasSpecificRoot = false;
 	TArray<int32> Joints;
 
-	if (!GetRootBoneIndex(JsonSkinObject, RootBoneIndex, bHasSpecificRoot, Joints, SkeletonConfig))
+	if (!GetRootBoneIndex(JsonSkinObject, RootBoneIndex, Joints, SkeletonConfig))
 	{
 		return false;
 	}
@@ -1851,19 +1848,6 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	{
 		AddError("FillReferenceSkeleton()", "Unable to load joint node.");
 		return false;
-	}
-
-	if (bHasSpecificRoot && !Joints.Contains(RootBoneIndex))
-	{
-		FglTFRuntimeNode ParentNode = RootNode;
-		while (ParentNode.ParentIndex != INDEX_NONE)
-		{
-			if (!LoadNode(ParentNode.ParentIndex, ParentNode))
-			{
-				return false;
-			}
-			RootNode.Transform *= ParentNode.Transform;
-		}
 	}
 
 	TMap<int32, FMatrix> InverseBindMatricesMap;

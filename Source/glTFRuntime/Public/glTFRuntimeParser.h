@@ -1560,7 +1560,7 @@ public:
 	TArray<double> GetJsonExtensionObjectNumbers(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName);
 	TArray<TSharedRef<FJsonObject>> GetJsonObjectArrayOfObjects(TSharedRef<FJsonObject> JsonObject, const FString& FieldName);
 
-	bool GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, bool& bHasSpecificRoot, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
+	bool GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 protected:
 	TSharedRef<FJsonObject> Root;
 
