@@ -937,6 +937,41 @@ bool FglTFRuntimeParser::LoadNodeByName(const FString& Name, FglTFRuntimeNode& N
 	return false;
 }
 
+bool FglTFRuntimeParser::LoadJointByName(const int64 RootBoneIndex, const FString& Name, FglTFRuntimeNode& Node)
+{
+	// a bit hacky, but allows zero-copy for cached values
+	if (!bAllNodesCached)
+	{
+		if (!LoadNodes())
+		{
+			return false;
+		}
+	}
+
+	if (!LoadNode(RootBoneIndex, Node))
+	{
+		return false;
+	}
+
+	if (Node.Name == Name)
+	{
+		return true;
+	}
+
+	for (int32 Index : Node.ChildrenIndices)
+	{
+		FglTFRuntimeNode ChildNode;
+		if (LoadJointByName(Index, Name, ChildNode))
+		{
+			Node = ChildNode;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
 void FglTFRuntimeParser::AddError(const FString& ErrorContext, const FString& ErrorMessage)
 {
 	FString FullMessage = ErrorContext + ": " + ErrorMessage;
@@ -1740,11 +1775,11 @@ bool FglTFRuntimeParser::FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<
 	return true;
 }
 
-bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+
+bool FglTFRuntimeParser::GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, bool& bHasSpecificRoot, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	// get the list of valid joints	
 	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
-	TArray<int32> Joints;
 	if (JsonSkinObject->TryGetArrayField("joints", JsonJoints))
 	{
 		for (TSharedPtr<FJsonValue> JsonJoint : *JsonJoints)
@@ -1760,14 +1795,13 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 	if (Joints.Num() == 0)
 	{
-		AddError("FillReferenceSkeleton()", "No Joints available");
+		AddError("GetRootBoneIndex()", "No Joints available");
 		return false;
 	}
 
-	// fill the root bone
 	FglTFRuntimeNode RootNode;
-	int64 RootBoneIndex = INDEX_NONE;
-	bool bHasSpecificRoot = false;
+	RootBoneIndex = INDEX_NONE;
+	bHasSpecificRoot = false;
 
 	if (SkeletonConfig.RootNodeIndex > INDEX_NONE)
 	{
@@ -1792,14 +1826,44 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 	if (RootBoneIndex == INDEX_NONE)
 	{
-		AddError("FillReferenceSkeleton()", "Unable to find root node.");
+		AddError("GetRootBoneIndex()", "Unable to find root node.");
 		return false;
 	}
+
+	return true;
+}
+
+bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinObject, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	int64 RootBoneIndex = INDEX_NONE;
+	bool bHasSpecificRoot = false;
+	TArray<int32> Joints;
+
+	if (!GetRootBoneIndex(JsonSkinObject, RootBoneIndex, bHasSpecificRoot, Joints, SkeletonConfig))
+	{
+		return false;
+	}
+
+	// fill the root bone
+	FglTFRuntimeNode RootNode;
 
 	if (!LoadNode(RootBoneIndex, RootNode))
 	{
 		AddError("FillReferenceSkeleton()", "Unable to load joint node.");
 		return false;
+	}
+
+	if (bHasSpecificRoot && !Joints.Contains(RootBoneIndex))
+	{
+		FglTFRuntimeNode ParentNode = RootNode;
+		while (ParentNode.ParentIndex != INDEX_NONE)
+		{
+			if (!LoadNode(ParentNode.ParentIndex, ParentNode))
+			{
+				return false;
+			}
+			RootNode.Transform *= ParentNode.Transform;
+		}
 	}
 
 	TMap<int32, FMatrix> InverseBindMatricesMap;

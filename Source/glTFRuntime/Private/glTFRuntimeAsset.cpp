@@ -623,10 +623,10 @@ TArray<FString> UglTFRuntimeAsset::GetMaterialsVariants() const
 	return Parser->MaterialsVariants;
 }
 
-UAnimSequence* UglTFRuntimeAsset::CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+UAnimSequence* UglTFRuntimeAsset::CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const int32 SkinIndex)
 {
 	GLTF_CHECK_PARSER(nullptr);
-	return Parser->CreateAnimationFromPose(SkeletalMesh, SkeletalAnimationConfig);
+	return Parser->CreateAnimationFromPose(SkeletalMesh, SkinIndex, SkeletalAnimationConfig);
 }
 
 bool UglTFRuntimeAsset::LoadMeshAsRuntimeLOD(const int32 MeshIndex, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig)

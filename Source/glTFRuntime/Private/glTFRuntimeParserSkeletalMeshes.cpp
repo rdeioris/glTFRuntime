@@ -1937,7 +1937,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	return AnimSequence;
 }
 
-UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * SkeletalMesh, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
+UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * SkeletalMesh, const int32 SkinIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
 	if (!SkeletalMesh)
 	{
@@ -2005,14 +2005,41 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	}
 #endif
 
+	int64 RootBoneIndex = INDEX_NONE;
+	bool bHasSpecificRoot;
+	TArray<int32> Joints;
+	if (SkinIndex > INDEX_NONE)
+	{
+		TSharedPtr<FJsonObject> SkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+		if (!SkinObject)
+		{
+			return nullptr;
+		}
+		if (!GetRootBoneIndex(SkinObject.ToSharedRef(), RootBoneIndex, bHasSpecificRoot, Joints, FglTFRuntimeSkeletonConfig()))
+		{
+			return nullptr;
+		}
+	}
+
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
 	for (int32 BoneIndex = 0; BoneIndex < BonesPoses.Num(); BoneIndex++)
 	{
 		FglTFRuntimeNode Node;
 		const FString TrackName = MeshBoneInfos[BoneIndex].Name.ToString();
-		if (!LoadNodeByName(TrackName, Node))
+
+		if (RootBoneIndex > INDEX_NONE)
 		{
-			continue;
+			if (!LoadJointByName(RootBoneIndex, TrackName, Node))
+			{
+				continue;
+			}
+		}
+		else
+		{
+			if (!LoadNodeByName(TrackName, Node))
+			{
+				continue;
+			}
 		}
 
 		FTransform Transform = Node.Transform;
