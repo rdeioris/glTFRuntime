@@ -776,6 +776,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	UPhysicsAsset* PhysicsAssetTemplate;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAddVirtualBones;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -795,6 +798,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		ShiftBounds = FVector::ZeroVector;
 		bUseHighPrecisionUVs = false;
 		PhysicsAssetTemplate = nullptr;
+		bAddVirtualBones = false;
 	}
 };
 

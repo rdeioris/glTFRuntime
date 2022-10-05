@@ -245,14 +245,22 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		AddSkeletonDeltaTranforms(RefSkeleton, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.BonesDeltaTransformMap);
 	}
 
-	if (SkeletalMeshContext->SkeletalMeshConfig.Skeleton && SkeletalMeshContext->SkeletalMeshConfig.bOverwriteRefSkeleton)
+	if (SkeletalMeshContext->SkeletalMeshConfig.Skeleton)
 	{
+		if (SkeletalMeshContext->SkeletalMeshConfig.bOverwriteRefSkeleton)
+		{
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-		SkeletalMeshContext->SkeletalMesh->SetRefSkeleton(SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton());
+			SkeletalMeshContext->SkeletalMesh->SetRefSkeleton(SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton());
 #else
-		SkeletalMeshContext->SkeletalMesh->RefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
+			SkeletalMeshContext->SkeletalMesh->RefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
 #endif
+		}
+		else if (SkeletalMeshContext->SkeletalMeshConfig.bAddVirtualBones)
+		{
+			RefSkeleton.RebuildRefSkeleton(SkeletalMeshContext->SkeletalMeshConfig.Skeleton, false);
+		}
 	}
+
 
 	TMap<int32, int32> MainBonesCache;
 	int32 MatIndex = 0;
