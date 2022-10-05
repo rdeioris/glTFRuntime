@@ -3848,7 +3848,11 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		{
 			int64 BlockElements = FMath::Min<int64>(Elements - ElementIndex, MaxBlockElements);
 
+#if ENGINE_MAJOR_VERSION > 4
 			int64 GroupCount = FMath::CeilToInt64(BlockElements / 16.0);
+#else
+			int64 GroupCount = FMath::CeilToInt(BlockElements / 16.0);
+#endif
 
 			int64 NumberOfHeaderBytes = GroupCount / 4;
 			if ((GroupCount % 4) > 0)
