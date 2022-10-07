@@ -228,14 +228,14 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				{
 #if ENGINE_MAJOR_VERSION > 4
 					StaticMeshVertex.Position = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformPosition(FVector3d(StaticMeshVertex.Position)));
-					StaticMeshVertex.TangentX = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(FVector3d(StaticMeshVertex.TangentX)));
-					StaticMeshVertex.TangentY = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(FVector3d(StaticMeshVertex.TangentY)));
-					StaticMeshVertex.TangentZ = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(FVector3d(StaticMeshVertex.TangentZ)));
+					StaticMeshVertex.TangentX = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentX)));
+					StaticMeshVertex.TangentY = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentY)));
+					StaticMeshVertex.TangentZ = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentZ)));
 #else
 					StaticMeshVertex.Position = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformPosition(StaticMeshVertex.Position);
-					StaticMeshVertex.TangentX = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(StaticMeshVertex.TangentX);
-					StaticMeshVertex.TangentY = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(StaticMeshVertex.TangentY);
-					StaticMeshVertex.TangentZ = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVector(StaticMeshVertex.TangentZ);
+					StaticMeshVertex.TangentX = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentX);
+					StaticMeshVertex.TangentY = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentY);
+					StaticMeshVertex.TangentZ = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentZ);
 #endif
 				}
 
