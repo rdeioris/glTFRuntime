@@ -3,6 +3,8 @@
 
 #include "glTFAnimCurveCompressionCodec.h"
 
+#include "Animation/AnimSequence.h"
+
 void UglTFAnimCurveCompressionCodec::DecompressCurves(const FCompressedAnimSequence& AnimSeq, FBlendedCurve& Curves, float CurrentTime) const
 {
 	if (!AnimSequence)
