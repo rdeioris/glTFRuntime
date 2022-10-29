@@ -1070,7 +1070,7 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 		return "FglTFRuntimeSkeletalMeshContext_Referencer";
 	}
 
-	void AddReferencedObjects(FReferenceCollector& Collector)
+	void AddReferencedObjects(FReferenceCollector& Collector) override
 	{
 		Collector.AddReferencedObject(SkeletalMesh);
 	}
