@@ -2075,10 +2075,6 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 			Transform *= ParentTransform.Inverse();
 		}
 	}
-	else if (Joints.Contains(Node.Index))
-	{
-		AddError("TraverseJoints()", FString::Printf(TEXT("No bind transform for node %d %s"), Node.Index, *Node.Name));
-	}
 
 	Modifier.Add(FMeshBoneInfo(BoneName, Node.Name, Parent), Transform);
 
