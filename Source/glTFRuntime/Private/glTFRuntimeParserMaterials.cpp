@@ -642,6 +642,20 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		(Height % GPixelFormats[PixelFormat].BlockSizeY) == 0)
 	{
 
+		// limit image size
+		if (MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0)
+		{
+			const int32 NewWidth = MaterialsConfig.ImagesConfig.MaxWidth > 0 ? MaterialsConfig.ImagesConfig.MaxWidth : Width;
+			const int32 NewHeight = MaterialsConfig.ImagesConfig.MaxHeight > 0 ? MaterialsConfig.ImagesConfig.MaxHeight : Height;
+			TArray64<FColor> ResizedPixels;
+			ResizedPixels.AddUninitialized(NewWidth * NewHeight);
+			FImageUtils::ImageResize(Width, Height, TArrayView<FColor>(reinterpret_cast<FColor*>(UncompressedBytes.GetData()), UncompressedBytes.Num()), NewWidth, NewHeight, ResizedPixels, sRGB);
+			Width = NewWidth;
+			Height = NewHeight;
+			UncompressedBytes.Empty(ResizedPixels.Num() * 4);
+			UncompressedBytes.Append(reinterpret_cast<uint8*>(ResizedPixels.GetData()), ResizedPixels.Num() * 4);
+		}
+
 		int32 NumOfMips = 1;
 
 		TArray64<FColor> UncompressedColors;

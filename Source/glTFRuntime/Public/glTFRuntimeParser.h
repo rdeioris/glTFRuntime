@@ -342,12 +342,19 @@ struct FglTFRuntimeImagesConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bSRGB;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 MaxWidth;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 MaxHeight;
 
 	FglTFRuntimeImagesConfig()
 	{
 		Compression = TextureCompressionSettings::TC_Default;
 		Group = TextureGroup::TEXTUREGROUP_World;
 		bSRGB = false;
+		MaxWidth = 0;
+		MaxHeight = 0;
 	}
 };
 
