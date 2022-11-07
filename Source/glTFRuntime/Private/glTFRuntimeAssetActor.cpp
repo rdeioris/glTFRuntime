@@ -3,6 +3,7 @@
 
 #include "glTFRuntimeAssetActor.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/LightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
@@ -197,6 +198,19 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				Asset->LoadEmitterIntoAudioComponent(AudioEmitter, AudioComponent);
 				AudioComponent->Play();
 			}
+		}
+	}
+
+	int32 LightIndex;
+	if (Asset->GetNodeExtensionIndex(Node.Index, "KHR_lights_punctual", "light", LightIndex))
+	{
+		ULightComponent* LightComponent = Asset->LoadPunctualLight(LightIndex, this);
+		if (LightComponent)
+		{
+			LightComponent->SetupAttachment(NewComponent);
+			LightComponent->RegisterComponent();
+			LightComponent->SetRelativeTransform(Node.Transform);
+			AddInstanceComponent(LightComponent);
 		}
 	}
 

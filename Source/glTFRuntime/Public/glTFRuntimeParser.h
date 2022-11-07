@@ -1468,6 +1468,7 @@ public:
 	bool GetBooleanFromExtras(const FString& Key, bool& Value) const;
 
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
+	ULightComponent* LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor);
 
 	TArray<FString> ExtensionsUsed;
 	TArray<FString> ExtensionsRequired;
@@ -1563,6 +1564,7 @@ public:
 	TArray<int32> GetJsonExtensionObjectIndices(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName);
 	TArray<double> GetJsonExtensionObjectNumbers(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName);
 	TArray<TSharedRef<FJsonObject>> GetJsonObjectArrayOfObjects(TSharedRef<FJsonObject> JsonObject, const FString& FieldName);
+	FLinearColor GetJsonObjectLinearColor(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FLinearColor DefaultValue);
 
 	bool GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 protected:

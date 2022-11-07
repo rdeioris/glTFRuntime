@@ -523,6 +523,12 @@ bool UglTFRuntimeAsset::LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeA
 	return Parser->LoadAudioEmitter(EmitterIndex, Emitter);
 }
 
+ULightComponent* UglTFRuntimeAsset::LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	return Parser->LoadPunctualLight(PunctualLightIndex, Actor);
+}
+
 bool UglTFRuntimeAsset::LoadEmitterIntoAudioComponent(const FglTFRuntimeAudioEmitter& Emitter, UAudioComponent* AudioComponent)
 {
 	GLTF_CHECK_PARSER(false);
@@ -774,4 +780,18 @@ bool UglTFRuntimeAsset::GetNodeExtensionIndices(const int32 NodeIndex, const FSt
 
 	Indices = Parser->GetJsonExtensionObjectIndices(NodeObject.ToSharedRef(), ExtensionName, FieldName);
 	return true;
+}
+
+bool UglTFRuntimeAsset::GetNodeExtensionIndex(const int32 NodeIndex, const FString& ExtensionName, const FString& FieldName, int32& Index)
+{
+	GLTF_CHECK_PARSER(false);
+
+	TSharedPtr<FJsonObject> NodeObject = Parser->GetNodeObject(NodeIndex);
+	if (!NodeObject)
+	{
+		return false;
+	}
+
+	Index = Parser->GetJsonExtensionObjectIndex(NodeObject.ToSharedRef(), ExtensionName, FieldName, INDEX_NONE);
+	return Index > INDEX_NONE;
 }

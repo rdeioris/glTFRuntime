@@ -705,6 +705,25 @@ TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetJsonObjectArrayOfObjects(
 	return Items;
 }
 
+FLinearColor FglTFRuntimeParser::GetJsonObjectLinearColor(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FLinearColor DefaultValue)
+{
+	TArray<TSharedRef<FJsonObject>> Items;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	if (!JsonObject->TryGetArrayField(FieldName, JsonArray))
+	{
+		return DefaultValue;
+	}
+
+	if (JsonArray->Num() < 3)
+	{
+		return DefaultValue;
+	}
+
+	
+	return DefaultValue;
+}
+
 FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue)
 {
 	FString Value;
