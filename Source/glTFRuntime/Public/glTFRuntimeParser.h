@@ -1443,6 +1443,7 @@ public:
 
 	int32 GetNumMeshes() const;
 	int32 GetNumImages() const;
+	void GetAnimationNames(TArray<FString>& OutAnimationNames);
 
 	FglTFRuntimeError OnError;
 	FglTFRuntimeOnStaticMeshCreated OnStaticMeshCreated;

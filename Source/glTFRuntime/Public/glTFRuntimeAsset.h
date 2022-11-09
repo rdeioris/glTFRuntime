@@ -221,6 +221,12 @@ public:
 	UAnimSequence* CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const int32 SkinIndex = -1);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	void GetAnimationNames(TArray<FString>& OutAnimationNames);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool HasAnimations();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool GetStringMapFromExtras(const FString& Key, TMap<FString, FString>& StringMap) const;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")

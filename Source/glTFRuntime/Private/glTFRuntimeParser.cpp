@@ -4415,3 +4415,27 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 
 	return true;
 }
+
+void FglTFRuntimeParser::GetAnimationNames(TArray<FString>& OutAnimationNames)
+{
+	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
+	if (!Root->TryGetArrayField("animations", JsonAnimations))
+	{
+		return;
+	}
+
+	for (int32 AnimationIndex = 0; AnimationIndex < JsonAnimations->Num(); AnimationIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[AnimationIndex]->AsObject();
+		if (!JsonAnimationObject)
+		{
+			OutAnimationNames.Empty();
+			return;
+		}
+		FString JsonAnimationName;
+		if (JsonAnimationObject->TryGetStringField("name", JsonAnimationName))
+		{
+			OutAnimationNames.Add(JsonAnimationName);
+		}
+	}
+}

@@ -775,3 +775,16 @@ bool UglTFRuntimeAsset::GetNodeExtensionIndices(const int32 NodeIndex, const FSt
 	Indices = Parser->GetJsonExtensionObjectIndices(NodeObject.ToSharedRef(), ExtensionName, FieldName);
 	return true;
 }
+
+void UglTFRuntimeAsset::GetAnimationNames(TArray<FString>& OutAnimationNames)
+{
+	GLTF_CHECK_PARSER_VOID();
+	Parser->GetAnimationNames(OutAnimationNames);
+}
+
+bool UglTFRuntimeAsset::HasAnimations()
+{
+	TArray<FString> animationNames;
+	GetAnimationNames(animationNames);
+	return animationNames.Num() != 0;
+}
