@@ -94,6 +94,15 @@ struct FglTFRuntimeBasisMatrix
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FVector Origin;
 
+	FglTFRuntimeBasisMatrix()
+	{
+		XAxis = FVector::ZeroVector;
+		YAxis = FVector::ZeroVector;
+		ZAxis = FVector::ZeroVector;
+		Origin = FVector::ZeroVector;
+	}
+
+
 	FMatrix GetMatrix() const
 	{
 		return FBasisVectorMatrix(XAxis, YAxis, ZAxis, Origin);
@@ -214,6 +223,11 @@ struct FglTFRuntimeScene
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
 	TArray<int32> RootNodesIndices;
+
+	FglTFRuntimeScene()
+	{
+		Index = INDEX_NONE;
+	}
 };
 
 
@@ -311,6 +325,11 @@ struct FglTFRuntimeBone
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FTransform Transform;
+
+	FglTFRuntimeBone()
+	{
+		ParentIndex = INDEX_NONE;
+	}
 };
 
 USTRUCT(BlueprintType)
