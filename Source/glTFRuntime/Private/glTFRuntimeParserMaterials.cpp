@@ -266,6 +266,8 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	Texture->PlatformData = PlatformData;
 #endif
 
+	Texture->NeverStream = true;
+
 	for (const FglTFRuntimeMipMap& MipMap : Mips)
 	{
 		FTexture2DMipMap* Mip = new FTexture2DMipMap();

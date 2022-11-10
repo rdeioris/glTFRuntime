@@ -98,6 +98,14 @@ struct FglTFRuntimeBasisMatrix
 	{
 		return FBasisVectorMatrix(XAxis, YAxis, ZAxis, Origin);
 	}
+
+	FglTFRuntimeBasisMatrix()
+	{
+		XAxis = FVector::ZeroVector;
+		YAxis = FVector::ZeroVector;
+		ZAxis = FVector::ZeroVector;
+		Origin = FVector::ZeroVector;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -214,6 +222,11 @@ struct FglTFRuntimeScene
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
 	TArray<int32> RootNodesIndices;
+
+	FglTFRuntimeScene()
+	{
+		Index = INDEX_NONE;
+	}
 };
 
 
@@ -311,6 +324,11 @@ struct FglTFRuntimeBone
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FTransform Transform;
+
+	FglTFRuntimeBone()
+	{
+		ParentIndex = INDEX_NONE;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -1068,6 +1086,7 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 		}
 #endif
 		SkeletalMesh = NewObject<USkeletalMesh>(Outer, NAME_None, Flags);
+		SkeletalMesh->NeverStream = true;
 		BoundingBox = FBox(EForceInit::ForceInitToZero);
 		SkinIndex = -1;
 	}
