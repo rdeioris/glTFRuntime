@@ -598,6 +598,20 @@ struct FglTFRuntimeProceduralMeshConfig
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FglTFRuntimeLightConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float DefaultAttenuationMultiplier;
+
+	FglTFRuntimeLightConfig()
+	{
+		DefaultAttenuationMultiplier = 1.0;
+	}
+};
+
 DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(FString, FglTFRuntimeBoneRemapper, const int32, NodeIndex, const FString&, BoneName);
 
 USTRUCT(BlueprintType)
@@ -1498,7 +1512,7 @@ public:
 	bool GetBooleanFromExtras(const FString& Key, bool& Value) const;
 
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
-	ULightComponent* LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor);
+	ULightComponent* LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor, const FglTFRuntimeLightConfig& LightConfig);
 
 	TArray<FString> ExtensionsUsed;
 	TArray<FString> ExtensionsRequired;
@@ -1594,7 +1608,7 @@ public:
 	TArray<int32> GetJsonExtensionObjectIndices(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName);
 	TArray<double> GetJsonExtensionObjectNumbers(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName);
 	TArray<TSharedRef<FJsonObject>> GetJsonObjectArrayOfObjects(TSharedRef<FJsonObject> JsonObject, const FString& FieldName);
-	FLinearColor GetJsonObjectLinearColor(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FLinearColor DefaultValue);
+	FVector4 GetJsonObjectVector4(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FVector4 DefaultValue);
 
 	bool GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 protected:

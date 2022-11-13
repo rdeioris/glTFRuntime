@@ -523,10 +523,10 @@ bool UglTFRuntimeAsset::LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeA
 	return Parser->LoadAudioEmitter(EmitterIndex, Emitter);
 }
 
-ULightComponent* UglTFRuntimeAsset::LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor)
+ULightComponent* UglTFRuntimeAsset::LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor, const FglTFRuntimeLightConfig& LightConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
-	return Parser->LoadPunctualLight(PunctualLightIndex, Actor);
+	return Parser->LoadPunctualLight(PunctualLightIndex, Actor, LightConfig);
 }
 
 bool UglTFRuntimeAsset::LoadEmitterIntoAudioComponent(const FglTFRuntimeAudioEmitter& Emitter, UAudioComponent* AudioComponent)

@@ -190,8 +190,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
 
-	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
-	ULightComponent* LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor);
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "LightConfig", AutoCreateRefTerm = "LightConfig"), Category = "glTFRuntime")
+	ULightComponent* LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor, const FglTFRuntimeLightConfig& LightConfig);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	bool LoadEmitterIntoAudioComponent(const FglTFRuntimeAudioEmitter& Emitter, UAudioComponent* AudioComponent);

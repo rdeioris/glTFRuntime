@@ -705,23 +705,36 @@ TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetJsonObjectArrayOfObjects(
 	return Items;
 }
 
-FLinearColor FglTFRuntimeParser::GetJsonObjectLinearColor(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FLinearColor DefaultValue)
+FVector4 FglTFRuntimeParser::GetJsonObjectVector4(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FVector4 DefaultValue)
 {
-	TArray<TSharedRef<FJsonObject>> Items;
-
 	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
 	if (!JsonObject->TryGetArrayField(FieldName, JsonArray))
 	{
 		return DefaultValue;
 	}
 
-	if (JsonArray->Num() < 3)
+	FVector4 NewValue = DefaultValue;
+	for (int32 Index = 0; Index < 4; Index++)
 	{
-		return DefaultValue;
+		if (JsonArray->IsValidIndex(Index))
+		{
+			TSharedPtr<FJsonValue> Item = (*JsonArray)[Index];
+			if (Item)
+			{
+				double Value = 0;
+				if (Item->TryGetNumber(Value))
+				{
+					NewValue[Index] = Value;
+				}
+			}
+		}
+		else
+		{
+			break;
+		}
 	}
 
-	
-	return DefaultValue;
+	return NewValue;
 }
 
 FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue)
@@ -1680,7 +1693,7 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 	}
 
 	return Skeleton;
-}
+	}
 
 bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
 {
@@ -3855,7 +3868,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		if (BaseLine.Num() < 16)
 		{
 			BaseLine.AddZeroed(16 - BaseLine.Num());
-		}
+	}
 
 		const int64 MaxBlockElements = FMath::Min<int64>((8192 / Stride) & ~15, 256);
 
@@ -4018,7 +4031,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 			}
 		}
 
-	}
+}
 	else if (Mode == "TRIANGLES" && Blob.Num >= 17 && Blob.Data[0] == 0xe1 && (Stride == 2 || Stride == 4) && ((Elements % 3) == 0))
 	{
 		TArray<uint8> CodeAux;
