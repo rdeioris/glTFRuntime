@@ -924,6 +924,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			}
 		}
 
+		LodRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision);
 		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(4);
 		LodRenderData->SkinWeightVertexBuffer = InWeights;
 		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));

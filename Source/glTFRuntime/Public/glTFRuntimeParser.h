@@ -98,6 +98,14 @@ struct FglTFRuntimeBasisMatrix
 	{
 		return FBasisVectorMatrix(XAxis, YAxis, ZAxis, Origin);
 	}
+
+	FglTFRuntimeBasisMatrix()
+	{
+		XAxis = FVector::ZeroVector;
+		YAxis = FVector::ZeroVector;
+		ZAxis = FVector::ZeroVector;
+		Origin = FVector::ZeroVector;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -214,6 +222,11 @@ struct FglTFRuntimeScene
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
 	TArray<int32> RootNodesIndices;
+
+	FglTFRuntimeScene()
+	{
+		Index = INDEX_NONE;
+	}
 };
 
 
@@ -311,6 +324,11 @@ struct FglTFRuntimeBone
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FTransform Transform;
+
+	FglTFRuntimeBone()
+	{
+		ParentIndex = INDEX_NONE;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -342,12 +360,19 @@ struct FglTFRuntimeImagesConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bSRGB;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 MaxWidth;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 MaxHeight;
 
 	FglTFRuntimeImagesConfig()
 	{
 		Compression = TextureCompressionSettings::TC_Default;
 		Group = TextureGroup::TEXTUREGROUP_World;
 		bSRGB = false;
+		MaxWidth = 0;
+		MaxHeight = 0;
 	}
 };
 
@@ -424,6 +449,9 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FString Variant;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bSkipLoad;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -432,6 +460,7 @@ struct FglTFRuntimeMaterialsConfig
 		SpecularFactor = 0;
 		bDisableVertexColors = false;
 		bMaterialsOverrideMapInjectParams = false;
+		bSkipLoad = false;
 	}
 };
 
@@ -1061,6 +1090,7 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 		}
 #endif
 		SkeletalMesh = NewObject<USkeletalMesh>(Outer, NAME_None, Flags);
+		SkeletalMesh->NeverStream = true;
 		BoundingBox = FBox(EForceInit::ForceInitToZero);
 		SkinIndex = -1;
 	}
