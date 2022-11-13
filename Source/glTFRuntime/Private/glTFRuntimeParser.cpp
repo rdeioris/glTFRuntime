@@ -2533,50 +2533,53 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 
 	Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
 
-	int64 MaterialIndex = INDEX_NONE;
-	if (!MaterialsConfig.Variant.IsEmpty() && MaterialsVariants.Contains(MaterialsConfig.Variant))
+	if (!MaterialsConfig.bSkipLoad)
 	{
-		int32 WantedIndex = MaterialsVariants.IndexOfByKey(MaterialsConfig.Variant);
-		TArray<TSharedRef<FJsonObject>> VariantsMappings = GetJsonObjectArrayFromExtension(JsonPrimitiveObject, "KHR_materials_variants", "mappings");
-		bool bMappingFound = false;
-		for (TSharedRef<FJsonObject> VariantsMapping : VariantsMappings)
+		int64 MaterialIndex = INDEX_NONE;
+		if (!MaterialsConfig.Variant.IsEmpty() && MaterialsVariants.Contains(MaterialsConfig.Variant))
 		{
-			const TArray<TSharedPtr<FJsonValue>>* Variants;
-			if (VariantsMapping->TryGetArrayField("variants", Variants))
+			int32 WantedIndex = MaterialsVariants.IndexOfByKey(MaterialsConfig.Variant);
+			TArray<TSharedRef<FJsonObject>> VariantsMappings = GetJsonObjectArrayFromExtension(JsonPrimitiveObject, "KHR_materials_variants", "mappings");
+			bool bMappingFound = false;
+			for (TSharedRef<FJsonObject> VariantsMapping : VariantsMappings)
 			{
-				for (TSharedPtr<FJsonValue> Variant : (*Variants))
+				const TArray<TSharedPtr<FJsonValue>>* Variants;
+				if (VariantsMapping->TryGetArrayField("variants", Variants))
 				{
-					int64 VariantIndex;
-					if (Variant->TryGetNumber(VariantIndex) && VariantIndex == WantedIndex)
+					for (TSharedPtr<FJsonValue> Variant : (*Variants))
 					{
-						MaterialIndex = VariantsMapping->GetNumberField("material");
-						bMappingFound = true;
-						break;
+						int64 VariantIndex;
+						if (Variant->TryGetNumber(VariantIndex) && VariantIndex == WantedIndex)
+						{
+							MaterialIndex = VariantsMapping->GetNumberField("material");
+							bMappingFound = true;
+							break;
+						}
 					}
 				}
+				if (bMappingFound)
+				{
+					break;
+				}
 			}
-			if (bMappingFound)
+		}
+
+		if (MaterialIndex == INDEX_NONE)
+		{
+			if (!JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
 			{
-				break;
+				MaterialIndex = INDEX_NONE;
 			}
 		}
-	}
 
-	if (MaterialIndex == INDEX_NONE)
-	{
-		if (!JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
+		if (MaterialIndex != INDEX_NONE)
 		{
-			MaterialIndex = INDEX_NONE;
-		}
-	}
-
-	if (MaterialIndex != INDEX_NONE)
-	{
-		Primitive.Material = LoadMaterial(MaterialIndex, MaterialsConfig, Primitive.Colors.Num() > 0, Primitive.MaterialName);
-		if (!Primitive.Material)
-		{
-			AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
-			return false;
+			Primitive.Material = LoadMaterial(MaterialIndex, MaterialsConfig, Primitive.Colors.Num() > 0, Primitive.MaterialName);
+			if (!Primitive.Material)
+			{
+				AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
+				return false;
+			}
 		}
 	}
 

@@ -449,6 +449,9 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FString Variant;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bSkipLoad;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -457,6 +460,7 @@ struct FglTFRuntimeMaterialsConfig
 		SpecularFactor = 0;
 		bDisableVertexColors = false;
 		bMaterialsOverrideMapInjectParams = false;
+		bSkipLoad = false;
 	}
 };
 

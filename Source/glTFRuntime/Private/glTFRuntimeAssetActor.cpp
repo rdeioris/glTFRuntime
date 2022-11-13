@@ -156,6 +156,10 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(SkeletalMeshComponent);
+			if (SkeletalMeshConfig.Outer == nullptr)
+			{
+				SkeletalMeshConfig.Outer = SkeletalMeshComponent;
+			}
 			USkeletalMesh* SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfig);
 			SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
 			DiscoveredSkeletalMeshComponents.Add(SkeletalMeshComponent);
