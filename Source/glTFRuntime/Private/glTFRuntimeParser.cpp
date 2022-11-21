@@ -705,6 +705,38 @@ TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetJsonObjectArrayOfObjects(
 	return Items;
 }
 
+FVector4 FglTFRuntimeParser::GetJsonObjectVector4(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FVector4 DefaultValue)
+{
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	if (!JsonObject->TryGetArrayField(FieldName, JsonArray))
+	{
+		return DefaultValue;
+	}
+
+	FVector4 NewValue = DefaultValue;
+	for (int32 Index = 0; Index < 4; Index++)
+	{
+		if (JsonArray->IsValidIndex(Index))
+		{
+			TSharedPtr<FJsonValue> Item = (*JsonArray)[Index];
+			if (Item)
+			{
+				double Value = 0;
+				if (Item->TryGetNumber(Value))
+				{
+					NewValue[Index] = Value;
+				}
+			}
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	return NewValue;
+}
+
 FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue)
 {
 	FString Value;
@@ -1661,7 +1693,7 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 	}
 
 	return Skeleton;
-}
+	}
 
 bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
 {
@@ -2533,50 +2565,53 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 
 	Primitive.Material = UMaterial::GetDefaultMaterial(MD_Surface);
 
-	int64 MaterialIndex = INDEX_NONE;
-	if (!MaterialsConfig.Variant.IsEmpty() && MaterialsVariants.Contains(MaterialsConfig.Variant))
+	if (!MaterialsConfig.bSkipLoad)
 	{
-		int32 WantedIndex = MaterialsVariants.IndexOfByKey(MaterialsConfig.Variant);
-		TArray<TSharedRef<FJsonObject>> VariantsMappings = GetJsonObjectArrayFromExtension(JsonPrimitiveObject, "KHR_materials_variants", "mappings");
-		bool bMappingFound = false;
-		for (TSharedRef<FJsonObject> VariantsMapping : VariantsMappings)
+		int64 MaterialIndex = INDEX_NONE;
+		if (!MaterialsConfig.Variant.IsEmpty() && MaterialsVariants.Contains(MaterialsConfig.Variant))
 		{
-			const TArray<TSharedPtr<FJsonValue>>* Variants;
-			if (VariantsMapping->TryGetArrayField("variants", Variants))
+			int32 WantedIndex = MaterialsVariants.IndexOfByKey(MaterialsConfig.Variant);
+			TArray<TSharedRef<FJsonObject>> VariantsMappings = GetJsonObjectArrayFromExtension(JsonPrimitiveObject, "KHR_materials_variants", "mappings");
+			bool bMappingFound = false;
+			for (TSharedRef<FJsonObject> VariantsMapping : VariantsMappings)
 			{
-				for (TSharedPtr<FJsonValue> Variant : (*Variants))
+				const TArray<TSharedPtr<FJsonValue>>* Variants;
+				if (VariantsMapping->TryGetArrayField("variants", Variants))
 				{
-					int64 VariantIndex;
-					if (Variant->TryGetNumber(VariantIndex) && VariantIndex == WantedIndex)
+					for (TSharedPtr<FJsonValue> Variant : (*Variants))
 					{
-						MaterialIndex = VariantsMapping->GetNumberField("material");
-						bMappingFound = true;
-						break;
+						int64 VariantIndex;
+						if (Variant->TryGetNumber(VariantIndex) && VariantIndex == WantedIndex)
+						{
+							MaterialIndex = VariantsMapping->GetNumberField("material");
+							bMappingFound = true;
+							break;
+						}
 					}
 				}
+				if (bMappingFound)
+				{
+					break;
+				}
 			}
-			if (bMappingFound)
+		}
+
+		if (MaterialIndex == INDEX_NONE)
+		{
+			if (!JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
 			{
-				break;
+				MaterialIndex = INDEX_NONE;
 			}
 		}
-	}
 
-	if (MaterialIndex == INDEX_NONE)
-	{
-		if (!JsonPrimitiveObject->TryGetNumberField("material", MaterialIndex))
+		if (MaterialIndex != INDEX_NONE)
 		{
-			MaterialIndex = INDEX_NONE;
-		}
-	}
-
-	if (MaterialIndex != INDEX_NONE)
-	{
-		Primitive.Material = LoadMaterial(MaterialIndex, MaterialsConfig, Primitive.Colors.Num() > 0, Primitive.MaterialName);
-		if (!Primitive.Material)
-		{
-			AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
-			return false;
+			Primitive.Material = LoadMaterial(MaterialIndex, MaterialsConfig, Primitive.Colors.Num() > 0, Primitive.MaterialName);
+			if (!Primitive.Material)
+			{
+				AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
+				return false;
+			}
 		}
 	}
 
@@ -3833,7 +3868,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		if (BaseLine.Num() < 16)
 		{
 			BaseLine.AddZeroed(16 - BaseLine.Num());
-		}
+	}
 
 		const int64 MaxBlockElements = FMath::Min<int64>((8192 / Stride) & ~15, 256);
 
@@ -3996,7 +4031,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 			}
 		}
 
-	}
+}
 	else if (Mode == "TRIANGLES" && Blob.Num >= 17 && Blob.Data[0] == 0xe1 && (Stride == 2 || Stride == 4) && ((Elements % 3) == 0))
 	{
 		TArray<uint8> CodeAux;
