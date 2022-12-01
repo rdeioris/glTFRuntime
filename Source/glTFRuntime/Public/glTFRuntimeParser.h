@@ -958,6 +958,9 @@ struct FglTFRuntimeSkeletalAnimationConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	float FramesPerSecond;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bFillAllCurves;
+
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
 		RootNodeIndex = INDEX_NONE;
@@ -971,6 +974,7 @@ struct FglTFRuntimeSkeletalAnimationConfig
 		bRemoveMorphTargets = false;
 		RetargetTo = nullptr;
 		FramesPerSecond = 30.0f;
+		bFillAllCurves = true;
 	}
 };
 

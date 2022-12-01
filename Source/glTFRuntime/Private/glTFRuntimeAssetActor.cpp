@@ -22,7 +22,6 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 	bAllowPoseAnimations = true;
 	bAllowCameras = true;
 	bAllowLights = true;
-	bAllowNonRootSkins = false;
 }
 
 // Called when the game starts or when spawned
@@ -156,7 +155,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		else
 		{
 			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, GetSafeNodeName<USkeletalMeshComponent>(Node));
-			SkeletalMeshComponent->SetupAttachment(bAllowNonRootSkins ? NodeParentComponent : GetRootComponent());
+			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(SkeletalMeshComponent);
