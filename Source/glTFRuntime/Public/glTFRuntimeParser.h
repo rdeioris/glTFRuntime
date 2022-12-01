@@ -974,7 +974,7 @@ struct FglTFRuntimeSkeletalAnimationConfig
 		bRemoveMorphTargets = false;
 		RetargetTo = nullptr;
 		FramesPerSecond = 30.0f;
-		bFillAllCurves = true;
+		bFillAllCurves = false;
 	}
 };
 
