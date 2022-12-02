@@ -926,7 +926,7 @@ bool FglTFRuntimeParser::GetAllNodes(TArray<FglTFRuntimeNode>& Nodes)
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
+bool FglTFRuntimeParser::LoadNode(const int32 Index, FglTFRuntimeNode& Node)
 {
 	// a bit hacky, but allows zero-copy for cached values
 	if (!bAllNodesCached)
@@ -1693,7 +1693,51 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 	}
 
 	return Skeleton;
+}
+
+USkeleton* FglTFRuntimeParser::LoadSkeletonFromNode(const FglTFRuntimeNode& Node, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	TMap<int32, FName> BoneMap;
+
+	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
+	USkeleton* Skeleton = NewObject<USkeleton>(GetTransientPackage(), NAME_None, RF_Public);
+
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+	FReferenceSkeleton& RefSkeleton = SkeletalMesh->GetRefSkeleton();
+#else
+	FReferenceSkeleton& RefSkeleton = SkeletalMesh->RefSkeleton;
+#endif
+
+	if (!FillReferenceSkeletonFromNode(Node, RefSkeleton, BoneMap, SkeletonConfig))
+	{
+		AddError("FillReferenceSkeleton()", "Unable to fill RefSkeleton.");
+		return nullptr;
 	}
+
+	if (SkeletonConfig.bNormalizeSkeletonScale)
+	{
+		NormalizeSkeletonScale(RefSkeleton);
+	}
+
+	if (SkeletonConfig.bClearRotations || SkeletonConfig.CopyRotationsFrom)
+	{
+		ClearSkeletonRotations(RefSkeleton);
+	}
+
+	if (SkeletonConfig.CopyRotationsFrom)
+	{
+		CopySkeletonRotationsFrom(RefSkeleton, SkeletonConfig.CopyRotationsFrom->GetReferenceSkeleton());
+	}
+
+	if (SkeletonConfig.BonesDeltaTransformMap.Num() > 0)
+	{
+		AddSkeletonDeltaTranforms(RefSkeleton, SkeletonConfig.BonesDeltaTransformMap);
+	}
+
+	Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
+
+	return Skeleton;
+}
 
 bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
 {
@@ -1936,7 +1980,17 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	return true;
 }
 
-bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, const int32 RootIndex, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+bool FglTFRuntimeParser::FillReferenceSkeletonFromNode(const FglTFRuntimeNode& RootNode, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	RefSkeleton.Empty();
+
+	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
+
+	// now traverse from the root and check if the node is in the "joints" list
+	return TraverseJoints(Modifier, RootNode.Index, INDEX_NONE, RootNode, {}, BoneMap, {}, SkeletonConfig);
+}
+
+bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, const int32 RootIndex, int32 Parent, const FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	TArray<FString> AppendBones;
 	// add fake root bone ?
@@ -3868,7 +3922,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		if (BaseLine.Num() < 16)
 		{
 			BaseLine.AddZeroed(16 - BaseLine.Num());
-	}
+		}
 
 		const int64 MaxBlockElements = FMath::Min<int64>((8192 / Stride) & ~15, 256);
 
@@ -4031,7 +4085,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 			}
 		}
 
-}
+	}
 	else if (Mode == "TRIANGLES" && Blob.Num >= 17 && Blob.Data[0] == 0xe1 && (Stride == 2 || Stride == 4) && ((Elements % 3) == 0))
 	{
 		TArray<uint8> CodeAux;

@@ -326,6 +326,32 @@ USkeleton* UglTFRuntimeAsset::LoadSkeleton(const int32 SkinIndex, const FglTFRun
 	return Parser->LoadSkeleton(SkinIndex, SkeletonConfig);
 }
 
+USkeleton* UglTFRuntimeAsset::LoadSkeletonFromNodeTree(const int32 NodeIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	FglTFRuntimeNode Node;
+	if (!Parser->LoadNode(NodeIndex, Node))
+	{
+		return nullptr;
+	}
+
+	return Parser->LoadSkeletonFromNode(Node, SkeletonConfig);
+}
+
+USkeleton* UglTFRuntimeAsset::LoadSkeletonFromNodeTreeByName(const FString& NodeName, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	FglTFRuntimeNode Node;
+	if (!Parser->LoadNodeByName(NodeName, Node))
+	{
+		return nullptr;
+	}
+
+	return Parser->LoadSkeletonFromNode(Node, SkeletonConfig);
+}
+
 UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
