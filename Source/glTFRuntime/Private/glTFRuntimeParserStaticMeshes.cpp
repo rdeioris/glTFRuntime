@@ -551,6 +551,8 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	UBodySetup* BodySetup = StaticMesh->BodySetup;
 #endif
 
+	StaticMesh->InitResources();
+
 	// set default LODs screen sizes
 	float DeltaScreenSize = (1.0f / RenderData->LODResources.Num()) / 2.0f;
 	float ScreenSize = 1;
@@ -569,8 +571,6 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 			RenderData->ScreenSize[CurrentLODIndex].Default = Pair.Value;
 		}
 	}
-
-	StaticMesh->InitResources();
 
 	RenderData->Bounds = StaticMeshContext->BoundingBoxAndSphere;
 	StaticMesh->CalculateExtendedBounds();

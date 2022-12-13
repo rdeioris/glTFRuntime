@@ -808,6 +808,41 @@ bool UglTFRuntimeAsset::GetNodeExtensionIndices(const int32 NodeIndex, const FSt
 	return true;
 }
 
+bool UglTFRuntimeAsset::GetNodeExtrasNumbers(const int32 NodeIndex, const FString& Key, TArray<float>& Values)
+{
+	GLTF_CHECK_PARSER(false);
+
+	TSharedPtr<FJsonObject> NodeObject = Parser->GetNodeObject(NodeIndex);
+	if (!NodeObject)
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> NodeExtrasObject = Parser->GetJsonObjectExtras(NodeObject.ToSharedRef());
+	if (!NodeExtrasObject)
+	{
+		return false;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	if (!NodeExtrasObject->TryGetArrayField(Key, JsonArray))
+	{
+		return false;
+	}
+
+	for (const TSharedPtr<FJsonValue>& JsonItem : *JsonArray)
+	{
+		double Value = 0;
+		if (!JsonItem->TryGetNumber(Value))
+		{
+			return false;
+		}
+		Values.Add(Value);
+	}
+
+	return true;
+}
+
 bool UglTFRuntimeAsset::GetNodeExtensionIndex(const int32 NodeIndex, const FString& ExtensionName, const FString& FieldName, int32& Index)
 {
 	GLTF_CHECK_PARSER(false);

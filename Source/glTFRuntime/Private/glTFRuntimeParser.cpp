@@ -3889,6 +3889,33 @@ bool FglTFRuntimeParser::GetStringArrayFromExtras(const FString& Key, TArray<FSt
 	return JsonExtras->TryGetStringArrayField(Key, StringArray);
 }
 
+bool FglTFRuntimeParser::GetNumberArrayFromExtras(const FString& Key, TArray<float>& NumberArray) const
+{
+	TSharedPtr<FJsonObject> JsonExtras = GetJsonObjectExtras(Root);
+	if (!JsonExtras)
+	{
+		return false;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	if (!JsonExtras->TryGetArrayField(Key, JsonArray))
+	{
+		return false;
+	}
+
+	for (const TSharedPtr<FJsonValue>& JsonItem : *JsonArray)
+	{
+		double Value = 0;
+		if (!JsonItem->TryGetNumber(Value))
+		{
+			return false;
+		}
+		NumberArray.Add(Value);
+	}
+
+	return true;
+}
+
 TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeExtensionObject(const int32 NodeIndex, const FString& ExtensionName)
 {
 	TSharedPtr<FJsonObject> JsonNodeObject = GetJsonObjectFromRootIndex("nodes", NodeIndex);

@@ -136,7 +136,42 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			{
 				StaticMeshConfig.Outer = StaticMeshComponent;
 			}
-			UStaticMesh* StaticMesh = Asset->LoadStaticMesh(Node.MeshIndex, StaticMeshConfig);
+
+			TArray<int32> MeshIndices;
+			MeshIndices.Add(Node.MeshIndex);
+
+			TArray<int32> LODNodeIndices;
+			if (Asset->GetNodeExtensionIndices(Node.Index, "MSFT_lod", "ids", LODNodeIndices))
+			{
+				for (const int32 LODNodeIndex : LODNodeIndices)
+				{
+					FglTFRuntimeNode LODNode;
+					// stop the chain at the first invalid node/mesh
+					if (!Asset->GetNode(LODNodeIndex, LODNode))
+					{
+						break;
+					}
+					if (LODNode.MeshIndex <= INDEX_NONE)
+					{
+						break;
+					}
+					MeshIndices.Add(LODNode.MeshIndex);
+				}
+			}
+
+			if (MeshIndices.Num() > 1)
+			{
+				TArray<float> ScreenCoverages;
+				if (Asset->GetNodeExtrasNumbers(Node.Index, "MSFT_screencoverage", ScreenCoverages))
+				{
+					for (int32 SCIndex = 0; SCIndex < ScreenCoverages.Num(); SCIndex++)
+					{
+						StaticMeshConfig.LODScreenSize.Add(SCIndex, ScreenCoverages[SCIndex]);
+					}
+				}
+			}
+
+			UStaticMesh* StaticMesh = Asset->LoadStaticMeshLODs(MeshIndices, StaticMeshConfig);
 			if (StaticMesh && !StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
 			{
 				UStaticMeshSocket* DeltaSocket = StaticMesh->FindSocket(FName(StaticMeshConfig.ExportOriginalPivotToSocket));
@@ -254,7 +289,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			if (!SkeletalAnimation && bAllowPoseAnimations)
 			{
 				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfig, Node.SkinIndex);
-			}
+	}
 #else
 			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
 			if (!SkeletalAnimation && bAllowPoseAnimations)
@@ -269,8 +304,8 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
 				SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 			}
+}
 		}
-	}
 
 	for (int32 ChildIndex : Node.ChildrenIndices)
 	{
@@ -281,7 +316,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		}
 		ProcessNode(NewComponent, NAME_None, Child);
 	}
-}
+	}
 
 void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimationName)
 {

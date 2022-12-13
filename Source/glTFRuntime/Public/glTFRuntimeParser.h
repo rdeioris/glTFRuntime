@@ -1512,6 +1512,7 @@ public:
 
 	bool GetStringMapFromExtras(const FString& Key, TMap<FString, FString>& StringMap) const;
 	bool GetStringArrayFromExtras(const FString& Key, TArray<FString>& StringArray) const;
+	bool GetNumberArrayFromExtras(const FString& Key, TArray<float>& NumberArray) const;
 	bool GetNumberFromExtras(const FString& Key, float& Value) const;
 	bool GetStringFromExtras(const FString& Key, FString& Value) const;
 	bool GetBooleanFromExtras(const FString& Key, bool& Value) const;

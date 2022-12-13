@@ -140,6 +140,9 @@ public:
 	bool GetNodeExtensionIndex(const int32 NodeIndex, const FString& ExtensionName, const FString& FieldName, int32& Index);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetNodeExtrasNumbers(const int32 NodeIndex, const FString& Key, TArray<float>& Values);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool BuildTransformFromNodeBackward(const int32 NodeIndex, FTransform& Transform);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
