@@ -1029,10 +1029,12 @@ struct FglTFRuntimePrimitive
 	FString MaterialName;
 	int64 AdditionalBufferView;
 	int32 Mode;
+	bool bHasMaterial;
 
 	FglTFRuntimePrimitive()
 	{
 		AdditionalBufferView = INDEX_NONE;
+		bHasMaterial = false;
 	}
 };
 

@@ -941,7 +941,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	}
 
 	return SkeletalMeshContext->SkeletalMesh;
-}
+	}
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
@@ -1737,7 +1737,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			for (int32 FrameIndex = FirstNewFrame; FrameIndex < NumFrames; FrameIndex++)
 			{
 				Pair.Value.PosKeys.Add(LastValidPosition);
-		}
+			}
 		}
 		else
 		{
@@ -1767,7 +1767,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			for (int32 FrameIndex = FirstNewFrame; FrameIndex < NumFrames; FrameIndex++)
 			{
 				Pair.Value.RotKeys.Add(LastValidRotation);
-		}
+			}
 		}
 		else
 		{
@@ -1796,7 +1796,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			for (int32 FrameIndex = FirstNewFrame; FrameIndex < NumFrames; FrameIndex++)
 			{
 				Pair.Value.ScaleKeys.Add(LastValidScale);
-		}
+			}
 		}
 		else
 		{
@@ -1851,7 +1851,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 					Pair.Value.PosKeys[FrameIndex] = Pair.Value.PosKeys[0];
 				}
 			}
-			}
+		}
 
 
 #if WITH_EDITOR
@@ -1910,10 +1910,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 					CompressionCodec->Tracks[BoneIndex] = NewTrack;
 #endif
-					}
+				}
 			}
 		}
-				}
+	}
 
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
@@ -1956,7 +1956,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			NewCurve->FloatCurve.SetKeyInterpMode(NewKeyHandle, NewInterpMode);
 			NewCurve->FloatCurve.SetKeyTangentMode(NewKeyHandle, NewTangentMode);
 			NewCurve->FloatCurve.SetKeyTangentWeightMode(NewKeyHandle, NewTangentWeightMode);
-	}
+		}
 
 		AnimSequence->GetSkeleton()->AccumulateCurveMetaData(Pair.Key, false, true);
 
@@ -2340,7 +2340,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 			NewCurve->FloatCurve.SetKeyInterpMode(NewKeyHandle, NewInterpMode);
 			NewCurve->FloatCurve.SetKeyTangentMode(NewKeyHandle, NewTangentMode);
 			NewCurve->FloatCurve.SetKeyTangentWeightMode(NewKeyHandle, NewTangentWeightMode);
-	}
+		}
 
 		AnimSequence->GetSkeleton()->AccumulateCurveMetaData(Pair.Key, false, true);
 
@@ -2620,11 +2620,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-		};
+	};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
-		}
+}
 
 
 bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & NodeName, int32 & SkinIndex, const TArray<FString>&ExcludeNodes, FglTFRuntimeMeshLOD & RuntimeLOD, const FglTFRuntimeMaterialsConfig & MaterialsConfig, const FglTFRuntimeSkeletonConfig & SkeletonConfig)

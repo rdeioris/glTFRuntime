@@ -2666,6 +2666,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 				AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
 				return false;
 			}
+			Primitive.bHasMaterial = true;
 		}
 	}
 
