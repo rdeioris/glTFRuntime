@@ -83,16 +83,16 @@ struct FglTFRuntimeBasisMatrix
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FVector XAxis;
+	FVector XAxis = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FVector YAxis;
+	FVector YAxis = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FVector ZAxis;
+	FVector ZAxis = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FVector Origin;
+	FVector Origin = FVector::ZeroVector;
 
 	FMatrix GetMatrix() const
 	{
@@ -196,7 +196,7 @@ struct FglTFRuntimeScene
 	GENERATED_BODY()
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
-	int32 Index;
+	int32 Index = INDEX_NONE;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "glTFRuntime")
 	FString Name;
@@ -302,7 +302,7 @@ struct FglTFRuntimeBone
 	FString BoneName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	int32 ParentIndex;
+	int32 ParentIndex = INDEX_NONE;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FTransform Transform;
