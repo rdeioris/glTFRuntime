@@ -51,7 +51,7 @@ struct FglTFRuntimeSkeletalMeshContextFinalizer
 				{
 					SkeletalMeshContext->SkeletalMesh = SkeletalMeshContext->Parser->FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
 				}
-				AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
+		AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
 			}, TStatId(), nullptr, ENamedThreads::GameThread);
 		FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 	}
@@ -941,7 +941,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	}
 
 	return SkeletalMeshContext->SkeletalMesh;
-	}
+}
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
@@ -1405,22 +1405,22 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 		{
 			FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
 
-			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
-			if (!JsonMeshObject)
-			{
-				AddError("LoadSkeletalMeshAsync()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
-				return;
-			}
+	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+	if (!JsonMeshObject)
+	{
+		AddError("LoadSkeletalMeshAsync()", FString::Printf(TEXT("Unable to find Mesh with index %d"), MeshIndex));
+		return;
+	}
 
-			FglTFRuntimeMeshLOD* LOD = nullptr;
-			if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig))
-			{
-				return;
-			}
+	FglTFRuntimeMeshLOD* LOD = nullptr;
+	if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig))
+	{
+		return;
+	}
 
-			SkeletalMeshContext->LODs.Add(LOD);
+	SkeletalMeshContext->LODs.Add(LOD);
 
-			SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
+	SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
 		});
 }
 
@@ -1484,18 +1484,18 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, ExcludeNodes, NodeName, SkinIndex, AsyncCallback]()
 		{
 			FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
-			// ensure to cache it as the finalizer requires LOD access
-			FglTFRuntimeMeshLOD& CombinedLOD = SkeletalMeshContext->CachedRuntimeMeshLODs.AddDefaulted_GetRef();
-			int32 NewSkinIndex = SkinIndex;
-			if (!LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, NewSkinIndex, ExcludeNodes, CombinedLOD, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig))
-			{
-				return;
-			}
+	// ensure to cache it as the finalizer requires LOD access
+	FglTFRuntimeMeshLOD& CombinedLOD = SkeletalMeshContext->CachedRuntimeMeshLODs.AddDefaulted_GetRef();
+	int32 NewSkinIndex = SkinIndex;
+	if (!LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, NewSkinIndex, ExcludeNodes, CombinedLOD, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig))
+	{
+		return;
+	}
 
-			SkeletalMeshContext->SkinIndex = NewSkinIndex;
-			SkeletalMeshContext->LODs.Add(&CombinedLOD);
+	SkeletalMeshContext->SkinIndex = NewSkinIndex;
+	SkeletalMeshContext->LODs.Add(&CombinedLOD);
 
-			SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
+	SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
 		});
 }
 
@@ -1601,7 +1601,7 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 				{
 					bAnimationFound = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
 				}
-				return true;
+		return true;
 			}))
 		{
 			return nullptr;
@@ -2395,10 +2395,99 @@ FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const f
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
+	TArray<FTransform> AnimWorldTransforms;
+	TArray<FTransform> RetargetWorldTransforms;
+	FReferenceSkeleton AnimRefSkeleton;
+	FReferenceSkeleton RetargetRefSkeleton;
+
+	// build retargeting structures
+	if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
+	{
+		if (SkeletalAnimationConfig.RetargetSkinIndex > INDEX_NONE)
+		{
+			TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkeletalAnimationConfig.RetargetSkinIndex);
+			if (!JsonSkinObject)
+			{
+				AddError("LoadSkeletalAnimation_Internal()", "Unable to find retarget skin.");
+				return nullptr;
+			}
+
+
+			TMap<int32, FName> AnimBoneMap;
+
+			if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), AnimRefSkeleton, AnimBoneMap, FglTFRuntimeSkeletonConfig()))
+			{
+				AddError("LoadSkeletalAnimation_Internal()", "Unable to fill retarget RefSkeleton.");
+				return nullptr;
+			}
+
+			const TArray<FTransform>& BonesTransforms = AnimRefSkeleton.GetRefBonePose();
+			for (int32 BoneIndex = 0; BoneIndex < AnimRefSkeleton.GetNum(); BoneIndex++)
+			{
+				AnimWorldTransforms.Add(BonesTransforms[BoneIndex]);
+				int32 AnimParentIndex = AnimRefSkeleton.GetParentIndex(BoneIndex);
+				while (AnimParentIndex > INDEX_NONE)
+				{
+					AnimWorldTransforms[BoneIndex] *= BonesTransforms[AnimParentIndex];
+					AnimParentIndex = AnimRefSkeleton.GetParentIndex(AnimParentIndex);
+				}
+			}
+		}
+
+		RetargetRefSkeleton = SkeletalAnimationConfig.RetargetTo ? SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton() : SkeletalAnimationConfig.RetargetToSkeletalMesh->GetRefSkeleton();
+		const TArray<FTransform>& BonesTransforms = RetargetRefSkeleton.GetRefBonePose();
+		for (int32 BoneIndex = 0; BoneIndex < RetargetRefSkeleton.GetNum(); BoneIndex++)
+		{
+			RetargetWorldTransforms.Add(BonesTransforms[BoneIndex]);
+			int32 RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(BoneIndex);
+			while (RetargetParentIndex > INDEX_NONE)
+			{
+				RetargetWorldTransforms[BoneIndex] *= BonesTransforms[RetargetParentIndex];
+				RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(RetargetParentIndex);
+			}
+		}
+	}
+
+	auto RetargetQuat = [&](const FQuat LocalAnimQuat, const FQuat WorldPoseQuat, const FQuat WorldParentPoseQuat, const FQuat WorldRetargetPoseQuat, const FQuat WorldRetargetParentPoseQuat) -> FQuat
+	{
+
+		FQuat WorldPoseToRetarget = WorldPoseQuat.Inverse() * WorldRetargetPoseQuat;
+
+		FQuat WorldAnimQuat = WorldParentPoseQuat * LocalAnimQuat;
+
+		// check for singularity
+		if ((WorldAnimQuat | WorldPoseQuat) < 0)
+		{
+			WorldAnimQuat *= -WorldPoseToRetarget;
+		}
+		else
+		{
+			WorldAnimQuat *= WorldPoseToRetarget;
+		}
+
+		return WorldRetargetParentPoseQuat.Inverse() * WorldAnimQuat;
+	};
+
+	auto RetargetTransform = [&](const FTransform& LocalAnimTransform, const FTransform& WorldPoseTransform, const FTransform& WorldParentPoseTransform, const FTransform& WorldRetargetPoseTransform, const FTransform& WorldRetargetParentPoseTransform) -> FTransform
+	{
+
+		FMatrix WorldAnimMatrix = LocalAnimTransform.ToMatrixWithScale() * WorldParentPoseTransform.ToMatrixWithScale();
+
+		FMatrix DeltaMatrix = WorldAnimMatrix * WorldPoseTransform.ToMatrixWithScale().Inverse();
+
+		FMatrix WorldRetargetMatrix = DeltaMatrix * WorldRetargetPoseTransform.ToMatrixWithScale();
+
+		return FTransform(WorldRetargetMatrix * WorldRetargetParentPoseTransform.ToMatrixWithScale().Inverse());
+	};
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
 	{
 		FString TrackName = Node.Name;
+
+		if (SkeletalAnimationConfig.CurvesNameMap.Contains(TrackName))
+		{
+			TrackName = SkeletalAnimationConfig.CurvesNameMap[TrackName];
+		}
 
 		if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
 		{
@@ -2468,14 +2557,37 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
 				}
 
-				if (SkeletalAnimationConfig.RetargetTo)
+				if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
 				{
-					const int32 RetargetBoneIndex = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().FindBoneIndex(*TrackName);
+					const int32 RetargetBoneIndex = RetargetRefSkeleton.FindBoneIndex(*TrackName);
 					if (RetargetBoneIndex > INDEX_NONE)
 					{
-						FTransform RetargetBoneTransform = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().GetRefBonePose()[RetargetBoneIndex];
-						AnimQuat = Node.Transform.InverseTransformRotation(AnimQuat);
-						AnimQuat = RetargetBoneTransform.TransformRotation(AnimQuat);
+						const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
+
+						if (AnimWorldTransforms.Num() > 0)
+						{
+							const int32 AnimBoneIndex = AnimRefSkeleton.FindBoneIndex(*Node.Name);
+							if (AnimBoneIndex > INDEX_NONE)
+							{
+								const int32 AnimParentBoneIndex = AnimRefSkeleton.GetParentIndex(AnimBoneIndex);
+
+								AnimQuat = RetargetQuat(AnimQuat,
+									AnimWorldTransforms[AnimBoneIndex].GetRotation(),
+									AnimParentBoneIndex > INDEX_NONE ? AnimWorldTransforms[AnimParentBoneIndex].GetRotation() : FQuat::Identity,
+									RetargetWorldTransforms[RetargetBoneIndex].GetRotation(),
+									RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex].GetRotation() : FQuat::Identity
+								).GetNormalized();
+							}
+						}
+						else
+						{
+							AnimQuat = RetargetQuat(AnimQuat,
+								GetNodeWorldTransform(Node).GetRotation(),
+								GetParentNodeWorldTransform(Node).GetRotation(),
+								RetargetWorldTransforms[RetargetBoneIndex].GetRotation(),
+								RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex].GetRotation() : FQuat::Identity
+							).GetNormalized();
+						}
 					}
 				}
 
@@ -2511,7 +2623,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
-
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
 				const float FrameBase = FrameDelta * Frame;
@@ -2534,21 +2645,50 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
 				}
 
-				if (SkeletalAnimationConfig.RetargetTo)
+				if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
 				{
-					const int32 RetargetBoneIndex = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().FindBoneIndex(*TrackName);
+					const int32 RetargetBoneIndex = RetargetRefSkeleton.FindBoneIndex(*TrackName);
 					if (RetargetBoneIndex > INDEX_NONE)
 					{
-						FTransform RetargetBoneTransform = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().GetRefBonePose()[RetargetBoneIndex];
-						AnimLocation = Node.Transform.InverseTransformPosition(AnimLocation);
-						AnimLocation = RetargetBoneTransform.TransformPosition(AnimLocation);
+						const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
+
+						if (AnimWorldTransforms.Num() > 0)
+						{
+							const int32 AnimBoneIndex = AnimRefSkeleton.FindBoneIndex(*Node.Name);
+							if (AnimBoneIndex > INDEX_NONE)
+							{
+								const int32 AnimParentBoneIndex = AnimRefSkeleton.GetParentIndex(AnimBoneIndex);
+
+								FTransform LocalAnimTransform = AnimRefSkeleton.GetRefBonePose()[AnimBoneIndex];
+								LocalAnimTransform.SetLocation(AnimLocation);
+
+								AnimLocation = RetargetTransform(LocalAnimTransform,
+									AnimWorldTransforms[AnimBoneIndex],
+									AnimParentBoneIndex > INDEX_NONE ? AnimWorldTransforms[AnimParentBoneIndex] : FTransform::Identity,
+									RetargetWorldTransforms[RetargetBoneIndex],
+									RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex] : FTransform::Identity
+								).GetLocation();
+							}
+						}
+						else
+						{
+							FTransform LocalAnimTransform = Node.Transform;
+							LocalAnimTransform.SetLocation(AnimLocation);
+
+							AnimLocation = RetargetTransform(LocalAnimTransform,
+								GetNodeWorldTransform(Node),
+								GetParentNodeWorldTransform(Node),
+								RetargetWorldTransforms[RetargetBoneIndex],
+								RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex] : FTransform::Identity
+							).GetLocation();
+						}
 					}
 				}
 
 				if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
 				{
 					AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
-				}
+			}
 
 				if (SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.IsBound())
 				{
@@ -2560,8 +2700,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 				Track.PosKeys.Add(AnimLocation);
 #endif
-			}
 		}
+	}
 		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
@@ -2620,7 +2760,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-	};
+};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);

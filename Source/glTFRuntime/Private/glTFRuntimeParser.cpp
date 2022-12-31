@@ -4532,3 +4532,28 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 
 	return true;
 }
+
+FTransform FglTFRuntimeParser::GetParentNodeWorldTransform(const FglTFRuntimeNode& Node)
+{
+	FTransform WorldTransform = FTransform::Identity;
+	int32 ParentIndex = Node.ParentIndex;
+	while (ParentIndex > INDEX_NONE)
+	{
+		FglTFRuntimeNode ParentNode;
+		if (!LoadNode(ParentIndex, ParentNode))
+		{
+			UE_LOG(LogTemp, Error, TEXT("OOOOPS"));
+			break;
+		}
+
+		WorldTransform = ParentNode.Transform * WorldTransform;
+		ParentIndex = ParentNode.ParentIndex;
+	}
+
+	return WorldTransform;
+}
+
+FTransform FglTFRuntimeParser::GetNodeWorldTransform(const FglTFRuntimeNode& Node)
+{
+	return GetParentNodeWorldTransform(Node) * Node.Transform;
+}

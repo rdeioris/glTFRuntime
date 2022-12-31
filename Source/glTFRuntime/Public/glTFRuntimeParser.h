@@ -947,6 +947,9 @@ struct FglTFRuntimeSkeletalAnimationConfig
 	USkeleton* RetargetTo;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	USkeletalMesh* RetargetToSkeletalMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, FTransform> TransformPose;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -960,6 +963,12 @@ struct FglTFRuntimeSkeletalAnimationConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bFillAllCurves;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, FString> CurvesNameMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 RetargetSkinIndex;
 
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
@@ -975,6 +984,8 @@ struct FglTFRuntimeSkeletalAnimationConfig
 		RetargetTo = nullptr;
 		FramesPerSecond = 30.0f;
 		bFillAllCurves = false;
+		RetargetToSkeletalMesh = nullptr;
+		RetargetSkinIndex = INDEX_NONE;
 	}
 };
 
@@ -1484,6 +1495,9 @@ public:
 	void ClearErrors();
 
 	bool NodeIsBone(const int32 NodeIndex);
+
+	FTransform GetNodeWorldTransform(const FglTFRuntimeNode& Node);
+	FTransform GetParentNodeWorldTransform(const FglTFRuntimeNode& Node);
 
 	int32 GetNumMeshes() const;
 	int32 GetNumImages() const;
