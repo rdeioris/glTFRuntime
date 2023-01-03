@@ -2409,7 +2409,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			if (!JsonSkinObject)
 			{
 				AddError("LoadSkeletalAnimation_Internal()", "Unable to find retarget skin.");
-				return nullptr;
+				return false;
 			}
 
 
@@ -2418,7 +2418,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), AnimRefSkeleton, AnimBoneMap, FglTFRuntimeSkeletonConfig()))
 			{
 				AddError("LoadSkeletalAnimation_Internal()", "Unable to fill retarget RefSkeleton.");
-				return nullptr;
+				return false;
 			}
 
 			const TArray<FTransform>& BonesTransforms = AnimRefSkeleton.GetRefBonePose();
