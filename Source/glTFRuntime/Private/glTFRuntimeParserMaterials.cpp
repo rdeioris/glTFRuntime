@@ -245,7 +245,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			{
 				return;
 			}
-			Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+	Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 		}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 
@@ -324,6 +324,27 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
 
 	return Texture;
+}
+
+UMaterialInterface* FglTFRuntimeParser::BuildVertexColorOnlyMaterial(const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	UMaterialInterface* BaseMaterial = MetallicRoughnessMaterialsMap[EglTFRuntimeMaterialType::TwoSided];
+
+	if (MaterialsConfig.VertexColorOnlyMaterial)
+	{
+		BaseMaterial = MaterialsConfig.VertexColorOnlyMaterial;
+	}
+
+	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+	if (!Material)
+	{
+		AddError("BuildVertexColorOnlyMaterial()", "Unable to create material instance, falling back to default material");
+		return UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
+	}
+
+	Material->SetScalarParameterValue("bUseVertexColors", true);
+
+	return Material;
 }
 
 UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)

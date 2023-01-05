@@ -2668,6 +2668,11 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			}
 			Primitive.bHasMaterial = true;
 		}
+		// special case for primitives without a material but with a color buffer
+		else if (Primitive.Colors.Num() > 0)
+		{
+			Primitive.Material = BuildVertexColorOnlyMaterial(MaterialsConfig);
+		}
 	}
 
 	OnLoadedPrimitive.Broadcast(AsShared(), JsonPrimitiveObject, Primitive);
