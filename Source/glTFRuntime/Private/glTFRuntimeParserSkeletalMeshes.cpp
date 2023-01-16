@@ -2434,7 +2434,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			}
 		}
 
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 		RetargetRefSkeleton = SkeletalAnimationConfig.RetargetTo ? SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton() : SkeletalAnimationConfig.RetargetToSkeletalMesh->GetRefSkeleton();
+#else
+		RetargetRefSkeleton = SkeletalAnimationConfig.RetargetTo ? SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton() : SkeletalAnimationConfig.RetargetToSkeletalMesh->RefSkeleton;
+#endif
 		const TArray<FTransform>& BonesTransforms = RetargetRefSkeleton.GetRefBonePose();
 		for (int32 BoneIndex = 0; BoneIndex < RetargetRefSkeleton.GetNum(); BoneIndex++)
 		{
@@ -2458,7 +2462,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 		// check for singularity
 		if ((WorldAnimQuat | WorldPoseQuat) < 0)
 		{
-			WorldAnimQuat *= -WorldPoseToRetarget;
+			WorldAnimQuat *= WorldPoseToRetarget * -1;
 		}
 		else
 		{
@@ -2688,7 +2692,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
 				{
 					AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
-			}
+				}
 
 				if (SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.IsBound())
 				{
@@ -2700,8 +2704,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 				Track.PosKeys.Add(AnimLocation);
 #endif
+			}
 		}
-	}
 		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
@@ -2760,7 +2764,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-};
+	};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
