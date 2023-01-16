@@ -20,13 +20,19 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	virtual void ProcessNode(USceneComponent* NodeParentComponent, FglTFRuntimeNode& Node);
+	virtual void ProcessNode(USceneComponent* NodeParentComponent, const FName SocketName, FglTFRuntimeNode& Node);
 
 	template<typename T>
 	FName GetSafeNodeName(const FglTFRuntimeNode& Node)
 	{
 		return MakeUniqueObjectName(this, T::StaticClass(), *Node.Name);
 	}
+
+	TMap<USceneComponent*, FName> SocketMapping;
+	TMap<USkeletalMeshComponent*, USkeletalMesh*> DiscoveredSkeletalMeshComponents;
+	TMap<UStaticMeshComponent*, UStaticMesh*> DiscoveredStaticMeshComponents;
+
+	void ScenesLoaded();
 
 public:	
 
@@ -41,6 +47,9 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On Scenes Loaded"))
 	void ReceiveOnScenesLoaded();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	bool bShowWhileLoading;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")
