@@ -1,4 +1,4 @@
-﻿//
+﻿// Copyright 2020, Roberto De Ioris.
 
 #pragma once
 
@@ -6,9 +6,6 @@
 #include "UObject/Object.h"
 #include "glTFRuntimeAnimSequence.generated.h"
 
-/**
- *
- */
 UCLASS()
 class GLTFRUNTIME_API UglTFRuntimeAnimSequence : public UAnimSequence
 {

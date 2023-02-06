@@ -1,8 +1,6 @@
-﻿//
-
+﻿// Copyright 2020, Roberto De Ioris.
 
 #include "glTFRuntimeAnimSequence.h"
-
 
 float UglTFRuntimeAnimSequence::GetDuration()
 {
