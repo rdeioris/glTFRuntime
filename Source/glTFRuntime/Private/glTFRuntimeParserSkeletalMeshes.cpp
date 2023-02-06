@@ -27,6 +27,7 @@
 #include "Engine/SkeletalMeshSocket.h"
 #include "glTFAnimBoneCompressionCodec.h"
 #include "glTFAnimCurveCompressionCodec.h"
+#include "glTFRuntimeAnimSequence.h"
 #include "Model.h"
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
@@ -1648,7 +1649,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	}
 
 	int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
-	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
+	UglTFRuntimeAnimSequence* AnimSequence = NewObject<UglTFRuntimeAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
 #else
@@ -1669,17 +1670,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
 #else
-
-#if ENGINE_MINOR_VERSION < 2
-	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		AnimSequence->SequenceLength = Duration;
-	PRAGMA_ENABLE_DEPRECATION_WARNINGS
-#else
-	    TScriptInterface<IAnimationDataController> AnimDataController = AnimSequence->GetDataModel()->GetController();
-	    FFrameNumber Frames = AnimDataController->ConvertSecondsToFrameNumber(Duration);
-	    AnimDataController->SetNumberOfFrames(Frames);
-#endif
-
+    AnimSequence->SetDuration(Duration);
 #endif
 #else
 	AnimSequence->SetRawNumberOfFrame(NumFrames);
@@ -2029,7 +2020,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	constexpr int32 NumFrames = 1;
 	const float Duration = NumFrames / SkeletalAnimationConfig.FramesPerSecond;
 
-	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
+	UglTFRuntimeAnimSequence* AnimSequence = NewObject<UglTFRuntimeAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
 #else
@@ -2050,17 +2041,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
 #else
-
-#if ENGINE_MINOR_VERSION < 2
-	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		AnimSequence->SequenceLength = Duration;
-	PRAGMA_ENABLE_DEPRECATION_WARNINGS
-#else
-	    TScriptInterface<IAnimationDataController> AnimDataController = AnimSequence->GetDataModel()->GetController();
-	    FFrameNumber Frames = AnimDataController->ConvertSecondsToFrameNumber(Duration);
-	    AnimDataController->SetNumberOfFrames(Frames);
-#endif
-
+    AnimSequence->SetDuration(Duration);
 #endif
 #else
 	AnimSequence->SetRawNumberOfFrame(NumFrames);
@@ -2303,7 +2284,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	}
 
 
-	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
+	UglTFRuntimeAnimSequence* AnimSequence = NewObject<UglTFRuntimeAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
 #else
@@ -2325,15 +2306,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	*FrameRatePtr = FrameRate;
 #else
 
-#if ENGINE_MINOR_VERSION < 2
-	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		AnimSequence->SequenceLength = Duration;
-	PRAGMA_ENABLE_DEPRECATION_WARNINGS
-#else
-	TScriptInterface<IAnimationDataController> AnimDataController = AnimSequence->GetDataModel()->GetController();
-	FFrameNumber Frames = AnimDataController->ConvertSecondsToFrameNumber(Duration);
-	AnimDataController->SetNumberOfFrames(Frames);
-#endif
+    AnimSequence->SetDuration(Duration);
 #endif
 #else
 	AnimSequence->SetRawNumberOfFrame(NumFrames);
