@@ -19,6 +19,7 @@
 #include "AssetRegistryModule.h"
 #endif
 #endif
+#include "AnimDataController.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "glTFAnimBoneCompressionCodec.h"
 #include "glTFAnimCurveCompressionCodec.h"
@@ -1663,9 +1664,17 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
 #else
+
+#if ENGINE_MINOR_VERSION < 2
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		AnimSequence->SequenceLength = Duration;
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
+	    TScriptInterface<IAnimationDataController> AnimDataController = AnimSequence->GetDataModel()->GetController();
+	    FFrameNumber Frames = AnimDataController->ConvertSecondsToFrameNumber(Duration);
+	    AnimDataController->SetNumberOfFrames(Frames);
+#endif
+
 #endif
 #else
 	AnimSequence->SetRawNumberOfFrame(NumFrames);
@@ -2036,9 +2045,17 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
 #else
+
+#if ENGINE_MINOR_VERSION < 2
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		AnimSequence->SequenceLength = Duration;
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
+	    TScriptInterface<IAnimationDataController> AnimDataController = AnimSequence->GetDataModel()->GetController();
+	    FFrameNumber Frames = AnimDataController->ConvertSecondsToFrameNumber(Duration);
+	    AnimDataController->SetNumberOfFrames(Frames);
+#endif
+
 #endif
 #else
 	AnimSequence->SetRawNumberOfFrame(NumFrames);
@@ -2302,9 +2319,16 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
 #else
+
+#if ENGINE_MINOR_VERSION < 2
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		AnimSequence->SequenceLength = Duration;
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
+	TScriptInterface<IAnimationDataController> AnimDataController = AnimSequence->GetDataModel()->GetController();
+	FFrameNumber Frames = AnimDataController->ConvertSecondsToFrameNumber(Duration);
+	AnimDataController->SetNumberOfFrames(Frames);
+#endif
 #endif
 #else
 	AnimSequence->SetRawNumberOfFrame(NumFrames);
