@@ -1856,7 +1856,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
+	    PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
+	    PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		FBoneAnimationTrack BoneTrack;
 		BoneTrack.Name = BoneName;
 		BoneTrack.BoneTreeIndex = BoneIndex;
@@ -1898,7 +1900,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 					}
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
+				    PRAGMA_DISABLE_DEPRECATION_WARNINGS
 					TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
+				    PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					FBoneAnimationTrack BoneTrack;
 					BoneTrack.Name = *BoneName;
 					BoneTrack.BoneTreeIndex = BoneIndex;
@@ -1975,9 +1979,14 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	}
 
 #if WITH_EDITOR
+
 #if ENGINE_MAJOR_VERSION > 4
+
+#if ENGINE_MINOR_VERSION < 2
 	// hack for calling GenerateTransientData()
 	AnimSequence->GetDataModel()->PostDuplicate(false);
+#endif
+
 #else
 	AnimSequence->PostProcessSequence();
 #endif
@@ -2146,7 +2155,9 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 		const int32 BoneIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(*Pair.Key);
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
+	    PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
+	    PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		FBoneAnimationTrack BoneTrack;
 		BoneTrack.Name = *Pair.Key;
 		BoneTrack.BoneTreeIndex = BoneIndex;
@@ -2162,8 +2173,12 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
+
+#if ENGINE_MINOR_VERSION < 2
 	// hack for calling GenerateTransientData()
 	AnimSequence->GetDataModel()->PostDuplicate(false);
+#endif
+
 #else
 	AnimSequence->PostProcessSequence();
 #endif
@@ -2216,7 +2231,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 			{
 				if (!MorphTargetCurves.Contains(*Pair.Key))
 				{
-					MorphTargetCurves.Add(*Pair.Key);
+					MorphTargetCurves.Add(FName(*Pair.Key));
 				}
 			}
 		}
@@ -2352,8 +2367,12 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
+
+#if ENGINE_MINOR_VERSION < 2
 	// hack for calling GenerateTransientData()
 	AnimSequence->GetDataModel()->PostDuplicate(false);
+#endif
+
 #else
 	AnimSequence->PostProcessSequence();
 #endif

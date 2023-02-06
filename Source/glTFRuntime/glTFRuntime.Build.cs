@@ -43,7 +43,8 @@ public class glTFRuntime : ModuleRules
                 "PhysicsCore",
                 "Projects",
                 "MeshDescription",
-                "StaticMeshDescription"
+                "StaticMeshDescription",
+                "AudioExtensions"
             }
             );
 
