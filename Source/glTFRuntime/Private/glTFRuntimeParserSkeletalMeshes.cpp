@@ -20,10 +20,13 @@
 #endif
 #endif
 
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION < 2
+#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MINOR_VERSION < 2
 #include "AnimDataController.h"
 #else
 #include "Engine/SkinnedAssetCommon.h"
+#endif
+
 #endif
 
 #include "Engine/SkeletalMeshSocket.h"
