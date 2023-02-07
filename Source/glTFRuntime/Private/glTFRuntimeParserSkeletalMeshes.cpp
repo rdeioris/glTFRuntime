@@ -26,7 +26,6 @@
 #else
 #include "Engine/SkinnedAssetCommon.h"
 #endif
-
 #endif
 
 #include "Engine/SkeletalMeshSocket.h"
