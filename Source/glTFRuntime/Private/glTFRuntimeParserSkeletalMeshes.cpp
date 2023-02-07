@@ -3,6 +3,9 @@
 #include "glTFRuntimeParser.h"
 #if ENGINE_MAJOR_VERSION > 4
 #include "Animation/AnimData/AnimDataModel.h"
+#if ENGINE_MINOR_VERSION > 1
+#include "Animation/AnimData/IAnimationDataModel.h"
+#endif
 #endif
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Rendering/SkeletalMeshModel.h"
@@ -1977,7 +1980,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
 	// hack for calling GenerateTransientData()
-	AnimSequence->GetDataModel()->PostDuplicate(false);
+#if ENGINE_MINOR_VERSION > 1
+	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
+#else
+	AnimSequence->GetDataModel()->PostDuplicate(false)
+#endif
 #else
 	AnimSequence->PostProcessSequence();
 #endif
@@ -2163,7 +2170,11 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
 	// hack for calling GenerateTransientData()
-	AnimSequence->GetDataModel()->PostDuplicate(false);
+#if ENGINE_MINOR_VERSION > 1
+	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
+#else
+	AnimSequence->GetDataModel()->PostDuplicate(false)
+#endif
 #else
 	AnimSequence->PostProcessSequence();
 #endif
@@ -2353,7 +2364,11 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
 	// hack for calling GenerateTransientData()
-	AnimSequence->GetDataModel()->PostDuplicate(false);
+#if ENGINE_MINOR_VERSION > 1
+	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
+#else
+	AnimSequence->GetDataModel()->PostDuplicate(false)
+#endif
 #else
 	AnimSequence->PostProcessSequence();
 #endif
