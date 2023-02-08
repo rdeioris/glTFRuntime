@@ -497,6 +497,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			TVertexInstanceAttributesRef<FVector4> VertexInstanceColors = StaticMeshAttributes.GetVertexInstanceColors();
 #endif
 
+			VertexInstanceUVs.SetNumChannels(NumUVs);
+
 			for (int32 PositionIndex = 0; PositionIndex < StaticMeshBuildVertices.Num(); PositionIndex++)
 			{
 				MeshDescription->CreateVertexWithID(FVertexID(PositionIndex));
