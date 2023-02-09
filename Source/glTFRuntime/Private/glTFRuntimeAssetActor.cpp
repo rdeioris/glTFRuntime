@@ -45,7 +45,8 @@ void AglTFRuntimeAssetActor::BeginPlay()
 		{
 			return;
 		}
-		ProcessNode(AssetRoot, NAME_None, Node);
+		AssetRoot = nullptr;
+		ProcessNode(nullptr, NAME_None, Node);
 	}
 	else
 	{
@@ -106,7 +107,14 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	if (bAllowCameras && Node.CameraIndex != INDEX_NONE)
 	{
 		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, GetSafeNodeName<UCameraComponent>(Node));
-		NewCameraComponent->SetupAttachment(NodeParentComponent);
+		if (!NodeParentComponent)
+		{
+			SetRootComponent(NewCameraComponent);
+		}
+		else
+		{
+			NewCameraComponent->SetupAttachment(NodeParentComponent);
+		}
 		NewCameraComponent->RegisterComponent();
 		NewCameraComponent->SetRelativeTransform(Node.Transform);
 		AddInstanceComponent(NewCameraComponent);
@@ -117,7 +125,14 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	else if (Node.MeshIndex < 0)
 	{
 		NewComponent = NewObject<USceneComponent>(this, GetSafeNodeName<USceneComponent>(Node));
-		NewComponent->SetupAttachment(NodeParentComponent);
+		if (!NodeParentComponent)
+		{
+			SetRootComponent(NewComponent);
+		}
+		else
+		{
+			NewComponent->SetupAttachment(NodeParentComponent);
+		}
 		NewComponent->RegisterComponent();
 		NewComponent->SetRelativeTransform(Node.Transform);
 		AddInstanceComponent(NewComponent);
@@ -141,7 +156,15 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			{
 				StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
 			}
-			StaticMeshComponent->SetupAttachment(NodeParentComponent);
+
+			if (!NodeParentComponent)
+			{
+				SetRootComponent(StaticMeshComponent);
+			}
+			else
+			{
+				StaticMeshComponent->SetupAttachment(NodeParentComponent);
+			}
 			StaticMeshComponent->RegisterComponent();
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(StaticMeshComponent);
@@ -204,7 +227,14 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		else
 		{
 			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, GetSafeNodeName<USkeletalMeshComponent>(Node));
-			SkeletalMeshComponent->SetupAttachment(bForceSkinnedMeshToRoot ? GetRootComponent() : NodeParentComponent);
+			if (!NodeParentComponent)
+			{
+				SetRootComponent(SkeletalMeshComponent);
+			}
+			else
+			{
+				SkeletalMeshComponent->SetupAttachment(bForceSkinnedMeshToRoot ? GetRootComponent() : NodeParentComponent);
+			}
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(SkeletalMeshComponent);
@@ -318,7 +348,9 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 			}
 }
-		}
+	}
+
+	OnNodeProcessed.Broadcast(Node, NewComponent);
 
 	for (int32 ChildIndex : Node.ChildrenIndices)
 	{
@@ -329,7 +361,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		}
 		ProcessNode(NewComponent, NAME_None, Child);
 	}
-	}
+}
 
 void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimationName)
 {
