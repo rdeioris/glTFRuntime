@@ -1988,7 +1988,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #if ENGINE_MINOR_VERSION > 1
 	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
 #else
-	AnimSequence->GetDataModel()->PostDuplicate(false)
+	AnimSequence->GetDataModel()->PostDuplicate(false);
 #endif
 #else
 	AnimSequence->PostProcessSequence();
@@ -2183,7 +2183,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 #if ENGINE_MINOR_VERSION > 1
 	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
 #else
-	AnimSequence->GetDataModel()->PostDuplicate(false)
+	AnimSequence->GetDataModel()->PostDuplicate(false);
 #endif
 #else
 	AnimSequence->PostProcessSequence();
@@ -2382,7 +2382,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 #if ENGINE_MINOR_VERSION > 1
 	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
 #else
-	AnimSequence->GetDataModel()->PostDuplicate(false)
+	AnimSequence->GetDataModel()->PostDuplicate(false);
 #endif
 #else
 	AnimSequence->PostProcessSequence();
