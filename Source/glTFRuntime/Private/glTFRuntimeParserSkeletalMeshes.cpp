@@ -3,6 +3,7 @@
 #include "glTFRuntimeParser.h"
 #if ENGINE_MAJOR_VERSION > 4
 #include "Animation/AnimData/AnimDataModel.h"
+#include "Animation/AnimData/IAnimationDataController.h"
 #if ENGINE_MINOR_VERSION > 1
 #include "Animation/AnimData/IAnimationDataModel.h"
 #endif
@@ -1667,7 +1668,12 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	*FrameRatePtr = FrameRate;
 #else
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+#if ENGINE_MINOR_VERSION >= 2
+		FFloatProperty* FloatProperty = CastField<FFloatProperty>(UAnimSequence::StaticClass()->FindPropertyByName(TEXT("SequenceLength")));
+		FloatProperty->SetPropertyValue_InContainer(AnimSequence, Duration);
+#else
 		AnimSequence->SequenceLength = Duration;
+#endif
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif
 #else
@@ -1676,7 +1682,6 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 	AnimSequence->bEnableRootMotion = SkeletalAnimationConfig.bRootMotion;
 	AnimSequence->RootMotionRootLock = SkeletalAnimationConfig.RootMotionRootLock;
-
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
 
 #if !WITH_EDITOR
@@ -2035,7 +2040,12 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	*FrameRatePtr = FrameRate;
 #else
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+#if ENGINE_MINOR_VERSION >= 2
+		FFloatProperty* FloatProperty = CastField<FFloatProperty>(UAnimSequence::StaticClass()->FindPropertyByName(TEXT("SequenceLength")));
+	FloatProperty->SetPropertyValue_InContainer(AnimSequence, Duration);
+#else
 		AnimSequence->SequenceLength = Duration;
+#endif
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif
 #else
@@ -2299,7 +2309,12 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	*FrameRatePtr = FrameRate;
 #else
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+#if ENGINE_MINOR_VERSION >= 2
+		FFloatProperty* FloatProperty = CastField<FFloatProperty>(UAnimSequence::StaticClass()->FindPropertyByName(TEXT("SequenceLength")));
+	FloatProperty->SetPropertyValue_InContainer(AnimSequence, Duration);
+#else
 		AnimSequence->SequenceLength = Duration;
+#endif
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif
 #else
