@@ -1168,6 +1168,8 @@ struct FglTFRuntimeStaticMeshContext : public FGCObject
 	FVector LOD0PivotDelta = FVector::ZeroVector;
 	TArray<FStaticMaterial> StaticMaterials;
 
+	TMap<FString, FTransform> AdditionalSockets;
+
 	FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig);
 
 	FString GetReferencerName() const override

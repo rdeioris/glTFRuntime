@@ -679,6 +679,21 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 		StaticMesh->AddSocket(Socket);
 	}
 
+	for (const TPair<FString, FTransform>& Pair : StaticMeshContext->AdditionalSockets)
+	{
+		if (StaticMeshConfig.Sockets.Contains(Pair.Key))
+		{
+			continue;
+		}
+
+		UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
+		Socket->SocketName = FName(Pair.Key);
+		Socket->RelativeLocation = Pair.Value.GetLocation();
+		Socket->RelativeRotation = Pair.Value.Rotator();
+		Socket->RelativeScale = Pair.Value.GetScale3D();
+		StaticMesh->AddSocket(Socket);
+	}
+
 	if (!StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
 	{
 		UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
@@ -1065,6 +1080,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshRecursive(const FString& NodeName
 			{
 				CombinedLOD.Primitives.Add(Primitive);
 				CombinedLOD.AdditionalTransforms.Add(AdditionalTransform);
+				if (!ChildNode.Name.IsEmpty())
+				{
+					StaticMeshContext->AdditionalSockets.Add(ChildNode.Name, AdditionalTransform);
+				}
 			}
 		}
 	}
@@ -1164,6 +1183,10 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 					{
 						CombinedLOD.Primitives.Add(Primitive);
 						CombinedLOD.AdditionalTransforms.Add(AdditionalTransform);
+						if (!ChildNode.Name.IsEmpty())
+						{
+							StaticMeshContext->AdditionalSockets.Add(ChildNode.Name, AdditionalTransform);
+						}
 					}
 				}
 			}
