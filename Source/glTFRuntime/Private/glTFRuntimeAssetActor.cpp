@@ -23,6 +23,7 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 	bAllowCameras = true;
 	bAllowLights = true;
 	bForceSkinnedMeshToRoot = false;
+	RootNodeIndex = INDEX_NONE;
 }
 
 // Called when the game starts or when spawned
@@ -37,21 +38,33 @@ void AglTFRuntimeAssetActor::BeginPlay()
 
 	double LoadingStartTime = FPlatformTime::Seconds();
 
-	TArray<FglTFRuntimeScene> Scenes = Asset->GetScenes();
-	for (FglTFRuntimeScene& Scene : Scenes)
+	if (RootNodeIndex > INDEX_NONE)
 	{
-		USceneComponent* SceneComponent = NewObject<USceneComponent>(this, *FString::Printf(TEXT("Scene %d"), Scene.Index));
-		SceneComponent->SetupAttachment(RootComponent);
-		SceneComponent->RegisterComponent();
-		AddInstanceComponent(SceneComponent);
-		for (int32 NodeIndex : Scene.RootNodesIndices)
+		FglTFRuntimeNode Node;
+		if (!Asset->GetNode(RootNodeIndex, Node))
 		{
-			FglTFRuntimeNode Node;
-			if (!Asset->GetNode(NodeIndex, Node))
+			return;
+		}
+		ProcessNode(AssetRoot, NAME_None, Node);
+	}
+	else
+	{
+		TArray<FglTFRuntimeScene> Scenes = Asset->GetScenes();
+		for (FglTFRuntimeScene& Scene : Scenes)
+		{
+			USceneComponent* SceneComponent = NewObject<USceneComponent>(this, *FString::Printf(TEXT("Scene %d"), Scene.Index));
+			SceneComponent->SetupAttachment(RootComponent);
+			SceneComponent->RegisterComponent();
+			AddInstanceComponent(SceneComponent);
+			for (int32 NodeIndex : Scene.RootNodesIndices)
 			{
-				return;
+				FglTFRuntimeNode Node;
+				if (!Asset->GetNode(NodeIndex, Node))
+				{
+					return;
+				}
+				ProcessNode(SceneComponent, NAME_None, Node);
 			}
-			ProcessNode(SceneComponent, NAME_None, Node);
 		}
 	}
 
