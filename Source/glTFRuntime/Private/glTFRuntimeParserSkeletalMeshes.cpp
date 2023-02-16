@@ -629,6 +629,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 		int32 TotalVertexIndex = 0;
 		int32 Base = 0;
+		int32 MaxBoneInfluences = 4;
 
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.RuntimeLOD->Primitives.Num(); PrimitiveIndex++)
 		{
@@ -641,7 +642,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			MeshSection.BaseIndex = TotalVertexIndex;
 			MeshSection.NumTriangles = Primitive.Indices.Num() / 3;
 			MeshSection.BaseVertexIndex = Base;
-			MeshSection.MaxBoneInfluences = 4;
+			MeshSection.MaxBoneInfluences = FMath::Min(Primitive.Joints.Num() * 4, MAX_TOTAL_INFLUENCES);
+
+			if (MeshSection.MaxBoneInfluences > MaxBoneInfluences)
+			{
+				MaxBoneInfluences = MeshSection.MaxBoneInfluences;
+			}
 
 			MeshSection.NumVertices = Primitive.Indices.Num();
 
@@ -712,11 +718,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 				if (!SkeletalMeshContext->SkeletalMeshConfig.bIgnoreSkin && SkeletalMeshContext->SkinIndex > INDEX_NONE)
 				{
-					for (int32 JointsIndex = 0; JointsIndex < Primitive.Joints.Num(); JointsIndex++)
+					uint32 TotalWeight = 0;
+					const int32 JoitsNum = FMath::Min(Primitive.Joints.Num(), MeshSection.MaxBoneInfluences / 4);
+					for (int32 JointsIndex = 0; JointsIndex < JoitsNum; JointsIndex++)
 					{
 						FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
 						FVector4 Weights = Primitive.Weights[JointsIndex][Index];
-						uint32 TotalWeight = 0;
 						for (int32 j = 0; j < 4; j++)
 						{
 							if (BoneMapInUse.Contains(Joints[j]))
@@ -739,8 +746,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 									QuantizedWeight = 255 - TotalWeight;
 								}
 
-								InWeights[TotalVertexIndex].InfluenceWeights[j] = QuantizedWeight;
-								InWeights[TotalVertexIndex].InfluenceBones[j] = BoneIndex;
+								InWeights[TotalVertexIndex].InfluenceWeights[JointsIndex * 4 + j] = QuantizedWeight;
+								InWeights[TotalVertexIndex].InfluenceBones[JointsIndex * 4 + j] = BoneIndex;
 
 								TotalWeight += QuantizedWeight;
 							}
@@ -750,18 +757,17 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 								return nullptr;
 							}
 						}
+					}
 
-						// fix weight
-						if (TotalWeight < 255)
-						{
-							InWeights[TotalVertexIndex].InfluenceWeights[0] += 255 - TotalWeight;
-						}
-
+					// fix weight
+					if (TotalWeight < 255)
+					{
+						InWeights[TotalVertexIndex].InfluenceWeights[0] += 255 - TotalWeight;
 					}
 				}
 				else
 				{
-					for (int32 j = 0; j < 4; j++)
+					for (int32 j = 0; j < MeshSection.MaxBoneInfluences; j++)
 					{
 						InWeights[TotalVertexIndex].InfluenceWeights[j] = j == 0 ? 0xFF : 0;
 						InWeights[TotalVertexIndex].InfluenceBones[j] = 0;
@@ -933,7 +939,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		}
 
 		LodRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision);
-		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(4);
+		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences);
 		LodRenderData->SkinWeightVertexBuffer = InWeights;
 		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));
 
@@ -1670,7 +1676,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #if ENGINE_MINOR_VERSION >= 2
 		FFloatProperty* FloatProperty = CastField<FFloatProperty>(UAnimSequence::StaticClass()->FindPropertyByName(TEXT("SequenceLength")));
-		FloatProperty->SetPropertyValue_InContainer(AnimSequence, Duration);
+	FloatProperty->SetPropertyValue_InContainer(AnimSequence, Duration);
 #else
 		AnimSequence->SequenceLength = Duration;
 #endif
