@@ -499,7 +499,6 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			VertexInstanceUVs.SetNumIndices(NumUVs);
 #endif
 
-
 			for (int32 PositionIndex = 0; PositionIndex < StaticMeshBuildVertices.Num(); PositionIndex++)
 			{
 				MeshDescription->CreateVertexWithID(FVertexID(PositionIndex));
