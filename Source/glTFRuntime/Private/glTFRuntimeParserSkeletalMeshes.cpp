@@ -424,6 +424,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #endif
 						LOD.bHasTangents = true;
 					}
+					else
+					{
+						LOD.bHasTangents = false;
+					}
 
 					Triangle.MatIndex = MatIndex;
 
@@ -681,6 +685,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #endif
 					LOD.bHasNormals = true;
 				}
+				else
+				{
+					LOD.bHasNormals = false;
+				}
+
 				if (Index < Primitive.Tangents.Num())
 				{
 #if ENGINE_MAJOR_VERSION > 4
@@ -690,6 +699,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #endif
 					LOD.bHasTangents = true;
 				}
+				else
+				{
+					LOD.bHasTangents = false;
+				}
+
 				if (Primitive.UVs.Num() > 0 && Index < Primitive.UVs[0].Num())
 				{
 
@@ -707,6 +721,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 					ModelVertex.TexCoord = FVector2D::ZeroVector;
 #endif
+					LOD.bHasUV = false;
 				}
 
 				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
