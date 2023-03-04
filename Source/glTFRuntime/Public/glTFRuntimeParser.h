@@ -531,6 +531,9 @@ struct FglTFRuntimeStaticMeshConfig
 	bool bGenerateStaticMeshDescription;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bBuildNavCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, FString> CustomConfigMap;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -564,6 +567,7 @@ struct FglTFRuntimeStaticMeshConfig
 		bReverseTangents = false;
 		bUseHighPrecisionUVs = false;
 		bGenerateStaticMeshDescription = false;
+		bBuildNavCollision = false;
 	}
 };
 

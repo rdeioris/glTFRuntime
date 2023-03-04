@@ -704,6 +704,13 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 		StaticMesh->AddSocket(Socket);
 	}
 
+	StaticMesh->bHasNavigationData = StaticMeshConfig.bBuildNavCollision;
+
+	if (StaticMesh->bHasNavigationData)
+	{
+		StaticMesh->CreateNavCollision();
+	}
+
 	OnFinalizedStaticMesh.Broadcast(AsShared(), StaticMesh, StaticMeshConfig);
 
 	if (OnStaticMeshCreated.IsBound())
