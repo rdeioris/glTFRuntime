@@ -1,4 +1,4 @@
-// Copyright 2022, Roberto De Ioris.
+// Copyright 2023, Roberto De Ioris.
 
 
 #include "glTFAnimCurveCompressionCodec.h"
