@@ -93,7 +93,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	int32 RootNodeIndex;
 
-	DECLARE_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeAssetActorNodeProcessed, const FglTFRuntimeNode& Node, USceneComponent* SceneComponent);
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeAssetActorNodeProcessed, const FglTFRuntimeNode&, USceneComponent*);
 	FglTFRuntimeAssetActorNodeProcessed OnNodeProcessed;
 
 private:

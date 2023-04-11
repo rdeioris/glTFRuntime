@@ -1299,6 +1299,10 @@ struct FglTFRuntimeMaterial
 	bool bHasIOR;
 	double IOR;
 
+	bool bKHR_materials_clearcoat;
+	double ClearCoatFactor;
+	double ClearCoatRoughnessFactor;
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -1330,6 +1334,7 @@ struct FglTFRuntimeMaterial
 		bKHR_materials_unlit = false;
 		bHasIOR = false;
 		IOR = 1;
+		bKHR_materials_clearcoat = false;
 	}
 };
 
@@ -1733,6 +1738,7 @@ protected:
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SpecularGlossinessMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UnlitMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> TransmissionMaterialsMap;
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> ClearCoatMaterialsMap;
 
 	TArray<FString> Errors;
 

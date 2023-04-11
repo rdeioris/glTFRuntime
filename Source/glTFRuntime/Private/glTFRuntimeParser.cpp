@@ -459,6 +459,23 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, TrasmissionTwoSidedMaterial);
 	}
 
+	// KHR_materials_transmission
+	UMaterialInterface* ClearCoatMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeBase"));
+	if (ClearCoatMaterial)
+	{
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Opaque, ClearCoatMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, ClearCoatMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Translucent, ClearCoatMaterial);
+	}
+
+	UMaterialInterface* ClearCoatTwoSidedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeTwoSided_Inst"));
+	if (ClearCoatTwoSidedMaterial)
+	{
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSided, ClearCoatTwoSidedMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, ClearCoatTwoSidedMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, ClearCoatTwoSidedMaterial);
+	}
+
 	JsonObject->TryGetStringArrayField("extensionsUsed", ExtensionsUsed);
 	JsonObject->TryGetStringArrayField("extensionsRequired", ExtensionsRequired);
 
