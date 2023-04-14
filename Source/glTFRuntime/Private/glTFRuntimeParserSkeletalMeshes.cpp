@@ -286,6 +286,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		TArray<SkeletalMeshImportData::FVertex> Wedges;
 		TArray<SkeletalMeshImportData::FTriangle> Triangles;
 		TArray<SkeletalMeshImportData::FRawBoneInfluence> Influences;
+		bool bAllPrimitivesHaveTangents = true;
 
 #if ENGINE_MAJOR_VERSION > 4
 		TArray<FVector3f> Points;
@@ -422,12 +423,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						Triangle.TangentX[1] = Primitive.Tangents[Primitive.Indices[i - 1]];
 						Triangle.TangentX[2] = Primitive.Tangents[Primitive.Indices[i]];
 #endif
-						LOD.bHasTangents = true;
 					}
 					else
 					{
-						LOD.bHasTangents = false;
+						bAllPrimitivesHaveTangents = false;
 					}
+					LOD.bHasTangents = bAllPrimitivesHaveTangents;
 
 					Triangle.MatIndex = MatIndex;
 
@@ -634,6 +635,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		int32 TotalVertexIndex = 0;
 		int32 Base = 0;
 		int32 MaxBoneInfluences = 4;
+		bool bAllPrimitivesHaveTangents = true;
 
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.RuntimeLOD->Primitives.Num(); PrimitiveIndex++)
 		{
@@ -697,12 +699,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 					ModelVertex.TangentX = Primitive.Tangents[Index];
 #endif
-					LOD.bHasTangents = true;
 				}
 				else
 				{
-					LOD.bHasTangents = false;
+					bAllPrimitivesHaveTangents = false;
 				}
+				LOD.bHasTangents = bAllPrimitivesHaveTangents;
 
 				if (Primitive.UVs.Num() > 0 && Index < Primitive.UVs[0].Num())
 				{
