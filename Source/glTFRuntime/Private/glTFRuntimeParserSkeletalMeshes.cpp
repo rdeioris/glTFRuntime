@@ -280,8 +280,14 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	FSkeletalMeshModel* ImportedResource = SkeletalMeshContext->SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
 
+	const bool bForceNormalsGeneration = SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Always;
+
 	for (FglTFRuntimeSkeletalMeshLOD& LOD : SkeletalMeshContext->LODs)
 	{
+
+		// we initially set bHasTangents and bHasNormals as true: if a primitive misses them we set reset them as false
+		LOD.bHasTangents = true;
+		LOD.bHasNormals = true;
 
 		TArray<SkeletalMeshImportData::FVertex> Wedges;
 		TArray<SkeletalMeshImportData::FTriangle> Triangles;
@@ -377,7 +383,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					Triangle.WedgeIndex[1] = WedgeIndex - 1;
 					Triangle.WedgeIndex[2] = WedgeIndex;
 
-					if (Primitive.Normals.Num() > 0)
+					if (Primitive.Normals.Num() > 0 && !bForceNormalsGeneration)
 					{
 #if ENGINE_MAJOR_VERSION > 4
 						Triangle.TangentZ[0] = FVector3f(Primitive.Normals[Primitive.Indices[i - 2]]);
@@ -388,9 +394,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						Triangle.TangentZ[1] = Primitive.Normals[Primitive.Indices[i - 1]];
 						Triangle.TangentZ[2] = Primitive.Normals[Primitive.Indices[i]];
 #endif
-						LOD.bHasNormals = true;
+
 					}
-					else
+					else if (SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::IfMissing || bForceNormalsGeneration)
 					{
 						FVector Position0 = Primitive.Positions[Primitive.Indices[i - 2]];
 						FVector Position1 = Primitive.Positions[Primitive.Indices[i - 1]];
@@ -408,7 +414,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						Triangle.TangentZ[1] = NormalFromCross;
 						Triangle.TangentZ[2] = NormalFromCross;
 #endif
-						LOD.bHasNormals = true;
+					}
+					else
+					{
+						LOD.bHasNormals = false;
 					}
 
 					if (Primitive.Tangents.Num() > 0)
@@ -422,7 +431,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						Triangle.TangentX[1] = Primitive.Tangents[Primitive.Indices[i - 1]];
 						Triangle.TangentX[2] = Primitive.Tangents[Primitive.Indices[i]];
 #endif
-						LOD.bHasTangents = true;
 					}
 					else
 					{
@@ -605,6 +613,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 	for (FglTFRuntimeSkeletalMeshLOD& LOD : SkeletalMeshContext->LODs)
 	{
+		LOD.bHasTangents = true;
+		LOD.bHasNormals = true;
+
 		FSkeletalMeshLODRenderData* LodRenderData = new FSkeletalMeshLODRenderData();
 		int32 LODIndex = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData.Add(LodRenderData);
 
@@ -683,7 +694,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 					ModelVertex.TangentZ = Primitive.Normals[Index];
 #endif
-					LOD.bHasNormals = true;
 				}
 				else
 				{
@@ -697,7 +707,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 					ModelVertex.TangentX = Primitive.Tangents[Index];
 #endif
-					LOD.bHasTangents = true;
 				}
 				else
 				{
@@ -796,6 +805,24 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			{
 				MeshSection.BoneMap.Add(BoneIndex);
 			}
+		}
+
+		if (SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Always)
+		{
+			LOD.bHasNormals = false;
+		}
+		else if (SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Never)
+		{
+			LOD.bHasNormals = true;
+		}
+
+		if (SkeletalMeshContext->SkeletalMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Always)
+		{
+			LOD.bHasTangents = false;
+		}
+		else if (SkeletalMeshContext->SkeletalMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Never)
+		{
+			LOD.bHasTangents = true;
 		}
 
 		if ((!LOD.bHasTangents || !LOD.bHasNormals) && TotalVertexIndex % 3 == 0)
@@ -982,12 +1009,29 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		SkeletalMeshContext->SkeletalMesh->SaveLODImportedData(LODIndex, SkeletalMeshContext->LODs[LODIndex].ImportData);
 #endif
 		// LOD tuning
+		if (SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Always)
+		{
+			SkeletalMeshContext->LODs[LODIndex].bHasNormals = false;
+		}
+		else if (SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Never)
+		{
+			SkeletalMeshContext->LODs[LODIndex].bHasNormals = true;
+		}
+
+		if (SkeletalMeshContext->SkeletalMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Always)
+		{
+			SkeletalMeshContext->LODs[LODIndex].bHasTangents = false;
+		}
+		else if (SkeletalMeshContext->SkeletalMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Never)
+		{
+			SkeletalMeshContext->LODs[LODIndex].bHasTangents = true;
+		}
 
 		FSkeletalMeshLODInfo& LODInfo = SkeletalMeshContext->SkeletalMesh->AddLODInfo();
 		LODInfo.ReductionSettings.NumOfTrianglesPercentage = 1.0f;
 		LODInfo.ReductionSettings.NumOfVertPercentage = 1.0f;
 		LODInfo.ReductionSettings.MaxDeviationPercentage = 0.0f;
-		LODInfo.BuildSettings.bRecomputeNormals = false; // do not force normals regeneration to avoid inconsistencies between editor and runtime
+		LODInfo.BuildSettings.bRecomputeNormals = !SkeletalMeshContext->LODs[LODIndex].bHasNormals;
 		LODInfo.BuildSettings.bRecomputeTangents = !SkeletalMeshContext->LODs[LODIndex].bHasTangents;
 		LODInfo.BuildSettings.bUseFullPrecisionUVs = SkeletalMeshContext->SkeletalMeshConfig.bUseHighPrecisionUVs;
 		LODInfo.LODHysteresis = 0.02f;
