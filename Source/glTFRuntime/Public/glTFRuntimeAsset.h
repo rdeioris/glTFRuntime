@@ -157,6 +157,8 @@ public:
 	FORCEINLINE bool LoadFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig) { return LoadFromData(Data.GetData(), Data.Num(), LoaderConfig); }
 	FORCEINLINE bool LoadFromData(const TArray64<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig) { return LoadFromData(Data.GetData(), Data.Num(), LoaderConfig); }
 
+	bool SetParser(TSharedRef<FglTFRuntimeParser> InParser);
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MaterialsMap;
 

@@ -37,6 +37,9 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Clipboard", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
 	static bool glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, FString& ClipboardContent, const FglTFRuntimeConfig& LoaderConfig);
 
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Filename Async", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
+	static void glTFLoadAssetFromFilenameAsync(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed);
+
 	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (DisplayName = "Make glTFRuntime PathItem Array from JSONPath String"), Category = "glTFRuntime")
 	static TArray<FglTFRuntimePathItem> glTFRuntimePathItemArrayFromJSONPath(const FString& JSONPath);
 };

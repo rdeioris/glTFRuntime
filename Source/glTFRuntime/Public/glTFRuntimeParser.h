@@ -1657,6 +1657,7 @@ public:
 
 	bool GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 protected:
+	void LoadAndFillBaseMaterials();
 	TSharedRef<FJsonObject> Root;
 
 	TMap<int32, UStaticMesh*> StaticMeshesCache;

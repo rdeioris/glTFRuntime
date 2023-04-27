@@ -339,10 +339,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 	return Parser;
 }
 
-FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
+void FglTFRuntimeParser::LoadAndFillBaseMaterials()
 {
-	bAllNodesCached = false;
-
 	UMaterialInterface* OpaqueMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeBase"));
 	if (OpaqueMaterial)
 	{
@@ -474,6 +472,25 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSided, ClearCoatTwoSidedMaterial);
 		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, ClearCoatTwoSidedMaterial);
 		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, ClearCoatTwoSidedMaterial);
+	}
+}
+
+
+FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
+{
+	bAllNodesCached = false;
+
+	if (IsInGameThread())
+	{
+		LoadAndFillBaseMaterials();
+	}
+	else
+	{
+		FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this]()
+			{
+				LoadAndFillBaseMaterials();
+			}, TStatId(), nullptr, ENamedThreads::GameThread);
+		FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 	}
 
 	JsonObject->TryGetStringArrayField("extensionsUsed", ExtensionsUsed);
