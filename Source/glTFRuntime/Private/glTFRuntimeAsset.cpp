@@ -40,6 +40,28 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString& Filename, const FglTFRun
 	return Parser != nullptr;
 }
 
+bool UglTFRuntimeAsset::SetParser(TSharedRef<FglTFRuntimeParser> InParser)
+{
+	// asset already loaded ?
+	if (Parser)
+	{
+		return false;
+	}
+
+	Parser = InParser;
+	if (Parser)
+	{
+		FScriptDelegate Delegate;
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnErrorProxy));
+		Parser->OnError.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnStaticMeshCreatedProxy));
+		Parser->OnStaticMeshCreated.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnSkeletalMeshCreatedProxy));
+		Parser->OnSkeletalMeshCreated.Add(Delegate);
+	}
+	return Parser != nullptr;
+}
+
 bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
 	// asset already loaded ?

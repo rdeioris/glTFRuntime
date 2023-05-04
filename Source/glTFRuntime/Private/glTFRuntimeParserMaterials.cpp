@@ -229,6 +229,23 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				RuntimeMaterial.BaseSpecularFactor = 1;
 			}
 		}
+
+		// KHR_materials_clearcoat
+		const TSharedPtr<FJsonObject>* JsonMaterialClearCoat;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_clearcoat", JsonMaterialClearCoat))
+		{
+			if (!(*JsonMaterialClearCoat)->TryGetNumberField("clearcoatFactor", RuntimeMaterial.ClearCoatFactor))
+			{
+				RuntimeMaterial.ClearCoatFactor = 0;
+			}
+
+			if (!(*JsonMaterialClearCoat)->TryGetNumberField("clearcoatRoughnessFactor", RuntimeMaterial.ClearCoatRoughnessFactor))
+			{
+				RuntimeMaterial.ClearCoatRoughnessFactor = 0;
+			}
+
+			RuntimeMaterial.bKHR_materials_clearcoat = true;
+		}
 	}
 
 	if (IsInGameThread())
@@ -382,6 +399,14 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	}
 
+	if (RuntimeMaterial.bKHR_materials_clearcoat)
+	{
+		if (ClearCoatMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = ClearCoatMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
 		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[RuntimeMaterial.MaterialType];
@@ -520,6 +545,9 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	Material->SetScalarParameterValue("AlphaMask", RuntimeMaterial.bMasked ? 1.0f : 0.0f);
 
 	ApplyMaterialFloatFactor(RuntimeMaterial.bHasIOR, "ior", RuntimeMaterial.IOR);
+
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatFactor", RuntimeMaterial.ClearCoatFactor);
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatRoughnessFactor", RuntimeMaterial.ClearCoatRoughnessFactor);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ParamsMultiplier)
 	{

@@ -830,6 +830,12 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bAddVirtualBones;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeNormalsGenerationStrategy NormalsGenerationStrategy;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeTangentsGenerationStrategy TangentsGenerationStrategy;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -850,6 +856,8 @@ struct FglTFRuntimeSkeletalMeshConfig
 		bUseHighPrecisionUVs = false;
 		PhysicsAssetTemplate = nullptr;
 		bAddVirtualBones = false;
+		NormalsGenerationStrategy = EglTFRuntimeNormalsGenerationStrategy::IfMissing;
+		TangentsGenerationStrategy = EglTFRuntimeTangentsGenerationStrategy::IfMissing;
 	}
 };
 
@@ -1299,6 +1307,10 @@ struct FglTFRuntimeMaterial
 	bool bHasIOR;
 	double IOR;
 
+	bool bKHR_materials_clearcoat;
+	double ClearCoatFactor;
+	double ClearCoatRoughnessFactor;
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -1330,6 +1342,7 @@ struct FglTFRuntimeMaterial
 		bKHR_materials_unlit = false;
 		bHasIOR = false;
 		IOR = 1;
+		bKHR_materials_clearcoat = false;
 	}
 };
 
@@ -1644,6 +1657,7 @@ public:
 
 	bool GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 protected:
+	void LoadAndFillBaseMaterials();
 	TSharedRef<FJsonObject> Root;
 
 	TMap<int32, UStaticMesh*> StaticMeshesCache;
@@ -1733,6 +1747,7 @@ protected:
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SpecularGlossinessMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UnlitMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> TransmissionMaterialsMap;
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> ClearCoatMaterialsMap;
 
 	TArray<FString> Errors;
 
