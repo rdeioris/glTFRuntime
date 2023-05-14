@@ -2434,7 +2434,6 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfKeys")));
 	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
 
-	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
 	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
