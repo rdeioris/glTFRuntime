@@ -2034,22 +2034,31 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+		FAnimationCurveIdentifier CurveId(SmartName, ERawCurveTrackTypes::RCT_Float);
+		AnimSequence->GetController().AddCurve(CurveId);
+		FRichCurve RichCurve;
+#else
 		FAnimationCurveData& RawCurveData = const_cast<FAnimationCurveData&>(AnimSequence->GetDataModel()->GetCurveData());
 		int32 NewCurveIndex = RawCurveData.FloatCurves.Add(FFloatCurve(SmartName, 0));
 		FFloatCurve* NewCurve = &RawCurveData.FloatCurves[NewCurveIndex];
+		FRichCurve& RichCurve = NewCurve->FloatCurve;
+#endif
 #else
 		FRawCurveTracks& CurveTracks = const_cast<FRawCurveTracks&>(AnimSequence->GetCurveData());
 		int32 NewCurveIndex = CurveTracks.FloatCurves.Add(FFloatCurve(SmartName, 0));
 		FFloatCurve* NewCurve = &CurveTracks.FloatCurves[NewCurveIndex];
+		FRichCurve& RichCurve = NewCurve->FloatCurve;
 #endif
 #else
 		AnimSequence->RawCurveData.AddCurveData(SmartName);
 		FFloatCurve* NewCurve = (FFloatCurve*)AnimSequence->RawCurveData.GetCurveData(SmartName.UID, ERawCurveTrackTypes::RCT_Float);
+		FRichCurve& RichCurve = NewCurve->FloatCurve;
 #endif
 
 		for (TPair<float, float>& CurvePair : Pair.Value)
 		{
-			FKeyHandle NewKeyHandle = NewCurve->FloatCurve.AddKey(CurvePair.Key, CurvePair.Value, false);
+			FKeyHandle NewKeyHandle = RichCurve.AddKey(CurvePair.Key, CurvePair.Value, false);
 
 			ERichCurveInterpMode NewInterpMode = RCIM_Linear;
 			ERichCurveTangentMode NewTangentMode = RCTM_Auto;
@@ -2060,9 +2069,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			float LeaveTangentWeight = 0.f;
 			float ArriveTangentWeight = 0.f;
 
-			NewCurve->FloatCurve.SetKeyInterpMode(NewKeyHandle, NewInterpMode);
-			NewCurve->FloatCurve.SetKeyTangentMode(NewKeyHandle, NewTangentMode);
-			NewCurve->FloatCurve.SetKeyTangentWeightMode(NewKeyHandle, NewTangentWeightMode);
+			RichCurve.SetKeyInterpMode(NewKeyHandle, NewInterpMode);
+			RichCurve.SetKeyTangentMode(NewKeyHandle, NewTangentMode);
+			RichCurve.SetKeyTangentWeightMode(NewKeyHandle, NewTangentWeightMode);
 		}
 
 		AnimSequence->GetSkeleton()->AccumulateCurveMetaData(Pair.Key, false, true);
@@ -2070,6 +2079,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #if !WITH_EDITOR
 		AnimSequence->CompressedData.CompressedCurveNames.Add(SmartName);
 		const_cast<FCurveMetaData*>(AnimSequence->GetSkeleton()->GetCurveMetaData(SmartName.UID))->Type.bMorphtarget = true;
+#else
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+		AnimSequence->GetController().SetCurveKeys(CurveId, RichCurve.GetConstRefOfKeys());
+#endif
 #endif
 
 		bHasTracks = true;
@@ -2461,23 +2474,31 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+		FAnimationCurveIdentifier CurveId(SmartName, ERawCurveTrackTypes::RCT_Float);
+		AnimSequence->GetController().AddCurve(CurveId);
+		FRichCurve RichCurve;
+#else
 		FAnimationCurveData& RawCurveData = const_cast<FAnimationCurveData&>(AnimSequence->GetDataModel()->GetCurveData());
 		int32 NewCurveIndex = RawCurveData.FloatCurves.Add(FFloatCurve(SmartName, 0));
 		FFloatCurve* NewCurve = &RawCurveData.FloatCurves[NewCurveIndex];
+		FRichCurve& RichCurve = NewCurve->FloatCurve;
+#endif
 #else
 		FRawCurveTracks& CurveTracks = const_cast<FRawCurveTracks&>(AnimSequence->GetCurveData());
 		int32 NewCurveIndex = CurveTracks.FloatCurves.Add(FFloatCurve(SmartName, 0));
 		FFloatCurve* NewCurve = &CurveTracks.FloatCurves[NewCurveIndex];
+		FRichCurve& RichCurve = NewCurve->FloatCurve;
 #endif
 #else
 		AnimSequence->RawCurveData.AddCurveData(SmartName);
 		FFloatCurve* NewCurve = (FFloatCurve*)AnimSequence->RawCurveData.GetCurveData(SmartName.UID, ERawCurveTrackTypes::RCT_Float);
-
+		FRichCurve& RichCurve = NewCurve->FloatCurve;
 #endif
 
 		for (TPair<float, float>& CurvePair : Pair.Value)
 		{
-			FKeyHandle NewKeyHandle = NewCurve->FloatCurve.AddKey(CurvePair.Key, CurvePair.Value, false);
+			FKeyHandle NewKeyHandle = RichCurve.AddKey(CurvePair.Key, CurvePair.Value, false);
 
 			ERichCurveInterpMode NewInterpMode = RCIM_Linear;
 			ERichCurveTangentMode NewTangentMode = RCTM_Auto;
@@ -2488,9 +2509,9 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 			float LeaveTangentWeight = 0.f;
 			float ArriveTangentWeight = 0.f;
 
-			NewCurve->FloatCurve.SetKeyInterpMode(NewKeyHandle, NewInterpMode);
-			NewCurve->FloatCurve.SetKeyTangentMode(NewKeyHandle, NewTangentMode);
-			NewCurve->FloatCurve.SetKeyTangentWeightMode(NewKeyHandle, NewTangentWeightMode);
+			RichCurve.SetKeyInterpMode(NewKeyHandle, NewInterpMode);
+			RichCurve.SetKeyTangentMode(NewKeyHandle, NewTangentMode);
+			RichCurve.SetKeyTangentWeightMode(NewKeyHandle, NewTangentWeightMode);
 		}
 
 		AnimSequence->GetSkeleton()->AccumulateCurveMetaData(Pair.Key, false, true);
@@ -2498,6 +2519,10 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 #if !WITH_EDITOR
 		AnimSequence->CompressedData.CompressedCurveNames.Add(SmartName);
 		const_cast<FCurveMetaData*>(AnimSequence->GetSkeleton()->GetCurveMetaData(SmartName.UID))->Type.bMorphtarget = true;
+#else
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+		AnimSequence->GetController().SetCurveKeys(CurveId, RichCurve.GetConstRefOfKeys());
+#endif
 #endif
 	}
 
