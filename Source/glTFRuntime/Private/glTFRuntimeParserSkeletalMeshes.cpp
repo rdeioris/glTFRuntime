@@ -36,6 +36,14 @@
 #include "UObject/SavePackage.h"
 #endif
 
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+#define BONE_INFLUENCE_TYPE uint16
+#define MAX_BONE_INFLUENCE_WEIGHT 0xffff
+#else
+#define BONE_INFLUENCE_TYPE uint8
+#define MAX_BONE_INFLUENCE_WEIGHT 0xff
+#endif
+
 struct FglTFRuntimeSkeletalMeshContextFinalizer
 {
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext;
@@ -272,6 +280,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 	TMap<int32, int32> MainBonesCache;
 	int32 MatIndex = 0;
+
+	SkeletalMeshContext->SkeletalMesh->NeverStream = true;
 
 	SkeletalMeshContext->SkeletalMesh->ResetLODInfo();
 
@@ -763,11 +773,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 									BonesCacheInUse.Add(Joints[j], BoneIndex);
 								}
 
-								uint8 QuantizedWeight = FMath::Clamp((uint8)(Weights[j] * ((double)0xFF)), (uint8)0x00, (uint8)0xFF);
+								BONE_INFLUENCE_TYPE QuantizedWeight = FMath::Clamp((BONE_INFLUENCE_TYPE)(Weights[j] * ((double)MAX_BONE_INFLUENCE_WEIGHT)), (BONE_INFLUENCE_TYPE)0x00, (BONE_INFLUENCE_TYPE)MAX_BONE_INFLUENCE_WEIGHT);
 
-								if (QuantizedWeight + TotalWeight > 255)
+								if (QuantizedWeight + TotalWeight > MAX_BONE_INFLUENCE_WEIGHT)
 								{
-									QuantizedWeight = 255 - TotalWeight;
+									QuantizedWeight = MAX_BONE_INFLUENCE_WEIGHT - TotalWeight;
 								}
 
 								InWeights[TotalVertexIndex].InfluenceWeights[JointsIndex * 4 + j] = QuantizedWeight;
@@ -784,16 +794,16 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					}
 
 					// fix weight
-					if (TotalWeight < 255)
+					if (TotalWeight < MAX_BONE_INFLUENCE_WEIGHT)
 					{
-						InWeights[TotalVertexIndex].InfluenceWeights[0] += 255 - TotalWeight;
+						InWeights[TotalVertexIndex].InfluenceWeights[0] += MAX_BONE_INFLUENCE_WEIGHT - TotalWeight;
 					}
 				}
 				else
 				{
 					for (int32 j = 0; j < MeshSection.MaxBoneInfluences; j++)
 					{
-						InWeights[TotalVertexIndex].InfluenceWeights[j] = j == 0 ? 0xFF : 0;
+						InWeights[TotalVertexIndex].InfluenceWeights[j] = j == 0 ? MAX_BONE_INFLUENCE_WEIGHT : 0;
 						InWeights[TotalVertexIndex].InfluenceBones[j] = 0;
 					}
 				}
@@ -1185,7 +1195,10 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			TArray<FSkeletalMaterial>& SkeletalMaterials = SkeletalMeshContext->SkeletalMesh->Materials;
 #endif
 			int32 NewMatIndex = SkeletalMaterials.Add(SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[MatIndex].Material);
+			
+		
 			SkeletalMaterials[NewMatIndex].UVChannelData.bInitialized = true;
+			
 			SkeletalMaterials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[MatIndex].MaterialName)));
 		}
 #if WITH_EDITOR
@@ -1205,7 +1218,6 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #if WITH_EDITOR
 	SkeletalMeshContext->SkeletalMesh->Build();
 #endif
-
 	SkeletalMeshContext->SkeletalMesh->CalculateInvRefMatrices();
 
 	if (SkeletalMeshContext->SkeletalMeshConfig.bShiftBoundsByRootBone)
@@ -1414,6 +1426,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 	}
 #endif
+
 
 	return SkeletalMeshContext->SkeletalMesh;
 }
