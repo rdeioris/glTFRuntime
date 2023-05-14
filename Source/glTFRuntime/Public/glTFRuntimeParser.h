@@ -1,4 +1,4 @@
-// Copyright 2020-2022, Roberto De Ioris.
+// Copyright 2020-2023, Roberto De Ioris.
 
 #pragma once
 
@@ -157,6 +157,9 @@ struct FglTFRuntimeConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bAsBlob;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString PrefixForUnnamedNodes;
+
 	FglTFRuntimeConfig()
 	{
 		TransformBaseType = EglTFRuntimeTransformBaseType::Default;
@@ -169,6 +172,7 @@ struct FglTFRuntimeConfig
 		ArchiveAutoEntryPointExtensions = ".glb .gltf .json .js";
 		RuntimeContextObject = nullptr;
 		bAsBlob = false;
+		PrefixForUnnamedNodes = "node";
 	}
 
 	FMatrix GetMatrix() const
@@ -2006,4 +2010,6 @@ protected:
 
 	TMap<int64, TMap<FString, FglTFRuntimeBlob>> AdditionalBufferViewsCache;
 	TArray<TArray64<uint8>> AdditionalBufferViewsData;
+
+	FString DefaultPrefixForUnnamedNodes;
 };

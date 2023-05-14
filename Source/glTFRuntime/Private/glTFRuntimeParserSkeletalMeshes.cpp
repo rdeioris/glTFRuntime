@@ -801,6 +801,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				}
 				else
 				{
+					// reset it to be meaningful
+					MeshSection.MaxBoneInfluences = 1;
 					for (int32 j = 0; j < MeshSection.MaxBoneInfluences; j++)
 					{
 						InWeights[TotalVertexIndex].InfluenceWeights[j] = j == 0 ? MAX_BONE_INFLUENCE_WEIGHT : 0;
@@ -1195,10 +1197,10 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			TArray<FSkeletalMaterial>& SkeletalMaterials = SkeletalMeshContext->SkeletalMesh->Materials;
 #endif
 			int32 NewMatIndex = SkeletalMaterials.Add(SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[MatIndex].Material);
-			
-		
+
+
 			SkeletalMaterials[NewMatIndex].UVChannelData.bInitialized = true;
-			
+
 			SkeletalMaterials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[MatIndex].MaterialName)));
 		}
 #if WITH_EDITOR
@@ -1785,10 +1787,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 #endif
 
-}
+		}
 	}
 #else
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
 	AnimSequence->GetController().OpenBracket(FText::FromString("glTFRuntime"), false);
 	AnimSequence->GetController().InitializeModel();
 #endif
@@ -1950,16 +1952,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 
 #if WITH_EDITOR
-#if ENGINE_MAJOR_VERSION > 4
-#if ENGINE_MINOR_VERSION > 1
-		if (!AnimSequence->GetController().AddBoneCurve(BoneName, false))
-		{
-			UE_LOG(LogTemp, Error, TEXT("Unable to add bone frames!"));
-		}
-		if (!AnimSequence->GetController().SetBoneTrackKeys(BoneName, Pair.Value.PosKeys, Pair.Value.RotKeys, Pair.Value.ScaleKeys, false))
-		{
-			UE_LOG(LogTemp, Error, TEXT("Unable to add keys!"));
-		}
+#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MINOR_VERSION >= 2
+		AnimSequence->GetController().AddBoneCurve(BoneName, false);
+		AnimSequence->GetController().SetBoneTrackKeys(BoneName, Pair.Value.PosKeys, Pair.Value.RotKeys, Pair.Value.ScaleKeys, false);
 #else
 		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
 		FBoneAnimationTrack BoneTrack;
@@ -2004,12 +2000,17 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 					}
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
+#if ENGINE_MINOR_VERSION >= 2
+					AnimSequence->GetController().AddBoneCurve(*BoneName, false);
+					AnimSequence->GetController().SetBoneTrackKeys(*BoneName, NewTrack.PosKeys, NewTrack.RotKeys, NewTrack.ScaleKeys, false);
+#else
 					TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
 					FBoneAnimationTrack BoneTrack;
 					BoneTrack.Name = *BoneName;
 					BoneTrack.BoneTreeIndex = BoneIndex;
 					BoneTrack.InternalTrackData = NewTrack;
 					BoneTracks.Add(BoneTrack);
+#endif
 #else
 					AnimSequence->AddNewRawTrack(*BoneName, &NewTrack);
 #endif
@@ -2081,17 +2082,14 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	}
 
 #if WITH_EDITOR
-#if ENGINE_MAJOR_VERSION > 4
-	// hack for calling GenerateTransientData()
-#if ENGINE_MINOR_VERSION > 1
+#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MINOR_VERSION >= 2
 	AnimSequence->GetController().SetFrameRate(FrameRate, false);
 	AnimSequence->GetController().SetNumberOfFrames(NumFrames);
 	AnimSequence->GetController().NotifyPopulated();
 	AnimSequence->GetController().CloseBracket(false);
-	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
-	AnimSequence->PostEditChange();
-	AnimSequence->MarkPackageDirty();
 #else
+	// hack for calling GenerateTransientData()
 	AnimSequence->GetDataModel()->PostDuplicate(false);
 #endif
 #else
@@ -2131,17 +2129,18 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	AnimSequence->SetPreviewMesh(SkeletalMesh);
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
+	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
+#if ENGINE_MINOR_VERSION < 2
 	FIntProperty* IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfFrames")));
 	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
 	FFloatProperty* FloatProperty = CastField<FFloatProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("PlayLength")));
 	FloatProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), Duration);
 	IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfKeys")));
 	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
-
-	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
 	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
+#endif
 #else
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #if ENGINE_MINOR_VERSION >= 2
@@ -2182,7 +2181,12 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 #endif
 
 		}
-}
+	}
+#else
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+	AnimSequence->GetController().OpenBracket(FText::FromString("glTFRuntime"), false);
+	AnimSequence->GetController().InitializeModel();
+#endif
 #endif
 
 	int64 RootBoneIndex = INDEX_NONE;
@@ -2267,12 +2271,17 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 		const int32 BoneIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(*Pair.Key);
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
+#if ENGINE_MINOR_VERSION >= 2
+		AnimSequence->GetController().AddBoneCurve(*(Pair.Key), false);
+		AnimSequence->GetController().SetBoneTrackKeys(*(Pair.Key), Pair.Value.PosKeys, Pair.Value.RotKeys, Pair.Value.ScaleKeys, false);
+#else
 		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
 		FBoneAnimationTrack BoneTrack;
 		BoneTrack.Name = *Pair.Key;
 		BoneTrack.BoneTreeIndex = BoneIndex;
 		BoneTrack.InternalTrackData = Pair.Value;
 		BoneTracks.Add(BoneTrack);
+#endif
 #else
 		AnimSequence->AddNewRawTrack(*Pair.Key, const_cast<FRawAnimSequenceTrack*>(&Pair.Value));
 #endif
@@ -2282,11 +2291,14 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 	}
 
 #if WITH_EDITOR
-#if ENGINE_MAJOR_VERSION > 4
-	// hack for calling GenerateTransientData()
-#if ENGINE_MINOR_VERSION > 1
-	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
+#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MINOR_VERSION >= 2
+	AnimSequence->GetController().SetFrameRate(FrameRate, false);
+	AnimSequence->GetController().SetNumberOfFrames(NumFrames);
+	AnimSequence->GetController().NotifyPopulated();
+	AnimSequence->GetController().CloseBracket(false);
 #else
+	// hack for calling GenerateTransientData()
 	AnimSequence->GetDataModel()->PostDuplicate(false);
 #endif
 #else
@@ -2400,6 +2412,8 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	AnimSequence->SetPreviewMesh(SkeletalMesh);
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
+	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
+#if ENGINE_MINOR_VERSION < 2
 	FIntProperty* IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfFrames")));
 	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
 	FFloatProperty* FloatProperty = CastField<FFloatProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("PlayLength")));
@@ -2411,6 +2425,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
+#endif
 #else
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #if ENGINE_MINOR_VERSION >= 2
@@ -2427,6 +2442,12 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 #endif
 	AnimSequence->bEnableRootMotion = SkeletalAnimationConfig.bRootMotion;
 	AnimSequence->RootMotionRootLock = SkeletalAnimationConfig.RootMotionRootLock;
+
+
+#if WITH_EDITOR && ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+	AnimSequence->GetController().OpenBracket(FText::FromString("glTFRuntime"), false);
+	AnimSequence->GetController().InitializeModel();
+#endif
 
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
@@ -2481,11 +2502,14 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	}
 
 #if WITH_EDITOR
-#if ENGINE_MAJOR_VERSION > 4
-	// hack for calling GenerateTransientData()
-#if ENGINE_MINOR_VERSION > 1
-	AnimSequence->GetDataModelInterface().GetObject()->PostDuplicate(false);
+#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MINOR_VERSION >= 2
+	AnimSequence->GetController().SetFrameRate(FrameRate, false);
+	AnimSequence->GetController().SetNumberOfFrames(NumFrames);
+	AnimSequence->GetController().NotifyPopulated();
+	AnimSequence->GetController().CloseBracket(false);
 #else
+	// hack for calling GenerateTransientData()
 	AnimSequence->GetDataModel()->PostDuplicate(false);
 #endif
 #else

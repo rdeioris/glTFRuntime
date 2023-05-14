@@ -271,7 +271,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 				Parser->BaseDirectory = LoaderConfig.OverrideBaseDirectory;
 			}
 		}
-
+		Parser->DefaultPrefixForUnnamedNodes = LoaderConfig.PrefixForUnnamedNodes;
 		Parser->ZipFile = InZipFile;
 	}
 
@@ -1076,7 +1076,7 @@ bool FglTFRuntimeParser::FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* Js
 bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node)
 {
 	Node.Index = Index;
-	Node.Name = GetJsonObjectString(JsonNodeObject, "name", FString::FromInt(Node.Index));
+	Node.Name = GetJsonObjectString(JsonNodeObject, "name", DefaultPrefixForUnnamedNodes + FString::FromInt(Node.Index));
 
 	Node.MeshIndex = GetJsonObjectIndex(JsonNodeObject, "mesh", INDEX_NONE);
 
