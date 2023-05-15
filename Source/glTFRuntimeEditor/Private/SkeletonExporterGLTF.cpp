@@ -2,6 +2,7 @@
 
 
 #include "SkeletonExporterGLTF.h"
+#include "Misc/Base64.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 

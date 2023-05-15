@@ -24,6 +24,9 @@
 #endif
 #endif
 #include "Engine/SkeletalMeshSocket.h"
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
+#include "Engine/SkinnedAssetCommon.h"
+#endif
 #include "glTFAnimBoneCompressionCodec.h"
 #include "glTFAnimCurveCompressionCodec.h"
 #include "Model.h"

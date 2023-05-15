@@ -5,6 +5,9 @@
 #include "Serialization/JsonSerializer.h"
 #include "Animation/Skeleton.h"
 #include "Materials/Material.h"
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
+#include "MaterialDomain.h"
+#endif
 #include "Misc/Base64.h"
 #include "Misc/Compression.h"
 #include "Interfaces/IPluginManager.h"

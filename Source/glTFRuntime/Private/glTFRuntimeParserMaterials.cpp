@@ -6,6 +6,9 @@
 #include "ImageUtils.h"
 #include "Misc/FileHelper.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
+#include "MaterialDomain.h"
+#endif
 #include "Math/UnrealMathUtility.h"
 #include "Modules/ModuleManager.h"
 
