@@ -7,6 +7,7 @@
 #include "Dom/JsonObject.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/Texture.h"
 #include "Camera/CameraComponent.h"
 #include "Components/AudioComponent.h"
 #include "glTFRuntimeAnimationCurve.h"
