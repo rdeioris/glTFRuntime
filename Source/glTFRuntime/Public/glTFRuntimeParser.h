@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "EngineMinimal.h"
 #include "CoreMinimal.h"
 #include "Dom/JsonValue.h"
 #include "Dom/JsonObject.h"
@@ -15,6 +14,7 @@
 #include "Components/AudioComponent.h"
 #include "glTFRuntimeAnimationCurve.h"
 #include "ProceduralMeshComponent.h"
+#include "UObject/StructOnScope.h"
 #if WITH_EDITOR
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
