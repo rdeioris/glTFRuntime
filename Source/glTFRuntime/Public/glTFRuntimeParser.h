@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "EngineMinimal.h"
 #include "CoreMinimal.h"
 #include "Dom/JsonValue.h"
 #include "Dom/JsonObject.h"
