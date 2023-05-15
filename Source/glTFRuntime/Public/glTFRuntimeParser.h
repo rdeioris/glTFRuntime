@@ -14,7 +14,7 @@
 #include "Components/AudioComponent.h"
 #include "glTFRuntimeAnimationCurve.h"
 #include "ProceduralMeshComponent.h"
-#include "UObject/StructOnScope.h"
+#include "UObject/Package.h"
 #if WITH_EDITOR
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
