@@ -2,6 +2,7 @@
 
 
 #include "glTFAnimBoneCompressionCodec.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 void UglTFAnimBoneCompressionCodec::DecompressBone(FAnimSequenceDecompressionContext& DecompContext, int32 TrackIndex, FTransform& OutAtom) const
 {
