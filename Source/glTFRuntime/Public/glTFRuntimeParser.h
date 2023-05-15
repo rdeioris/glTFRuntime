@@ -8,6 +8,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/Texture.h"
+#include "Engine/DataAsset.h"
+#include "Animation/AnimEnums.h"
 #include "Camera/CameraComponent.h"
 #include "Components/AudioComponent.h"
 #include "glTFRuntimeAnimationCurve.h"
