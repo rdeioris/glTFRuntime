@@ -10,6 +10,7 @@
 #include "Editor/EditorEngine.h"
 #endif
 #include "PhysicsEngine/BodySetup.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 FglTFRuntimeStaticMeshContext::FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig) :
 	Parser(InParser),
