@@ -1116,7 +1116,7 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 	FglTFRuntimeSkeletalMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : Parser(InParser), SkeletalMeshConfig(InSkeletalMeshConfig)
 	{
 		EObjectFlags Flags = RF_Public;
-		UObject* Outer = InSkeletalMeshConfig.Outer ? InSkeletalMeshConfig.Outer : GetTransientPackage();
+		UObject* Outer = InSkeletalMeshConfig.Outer ? InSkeletalMeshConfig.Outer : Cast<UObject>(GetTransientPackage());
 #if WITH_EDITOR
 		if (!InSkeletalMeshConfig.SaveToPackage.IsEmpty())
 		{
