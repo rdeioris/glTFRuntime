@@ -1565,7 +1565,7 @@ public:
 	bool GetBooleanFromExtras(const FString& Key, bool& Value) const;
 
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
-	ULightComponent* LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor, const FglTFRuntimeLightConfig& LightConfig);
+	class ULightComponent* LoadPunctualLight(const int32 PunctualLightIndex, AActor* Actor, const FglTFRuntimeLightConfig& LightConfig);
 
 	TArray<FString> ExtensionsUsed;
 	TArray<FString> ExtensionsRequired;
