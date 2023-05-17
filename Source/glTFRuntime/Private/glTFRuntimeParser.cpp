@@ -1,13 +1,18 @@
-// Copyright 2020-2022, Roberto De Ioris.
+// Copyright 2020-2023, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Engine/Texture2D.h"
 #include "Misc/FileHelper.h"
 #include "Serialization/JsonSerializer.h"
 #include "Animation/Skeleton.h"
 #include "Materials/Material.h"
+#include "MaterialDomain.h"
 #include "Misc/Base64.h"
 #include "Misc/Compression.h"
+#include "Misc/Paths.h"
 #include "Interfaces/IPluginManager.h"
+#include "RenderMath.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 

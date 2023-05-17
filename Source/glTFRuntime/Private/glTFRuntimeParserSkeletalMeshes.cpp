@@ -1,6 +1,7 @@
 // Copyright 2020-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Runtime/Launch/Resources/Version.h"
 #if ENGINE_MAJOR_VERSION > 4
 #include "Animation/AnimData/AnimDataModel.h"
 #include "Animation/AnimData/IAnimationDataController.h"
@@ -24,6 +25,7 @@
 #endif
 #endif
 #include "Engine/SkeletalMeshSocket.h"
+#include "Engine/SkinnedAssetCommon.h"
 #include "glTFAnimBoneCompressionCodec.h"
 #include "glTFAnimCurveCompressionCodec.h"
 #include "Model.h"

@@ -1,13 +1,18 @@
-// Copyright 2020-2022, Roberto De Ioris.
+// Copyright 2020-2023, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Engine/Texture2D.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
 #include "Misc/FileHelper.h"
+#include "MaterialDomain.h"
+#include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Math/UnrealMathUtility.h"
 #include "Modules/ModuleManager.h"
+#include "Runtime/Launch/Resources/Version.h"
+#include "TextureResource.h"
 
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)

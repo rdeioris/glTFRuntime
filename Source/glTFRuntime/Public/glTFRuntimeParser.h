@@ -3,18 +3,24 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Animation/AnimEnums.h"
+#include "Animation/Skeleton.h"
 #include "Dom/JsonValue.h"
 #include "Dom/JsonObject.h"
+#include "Engine/DataAsset.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/Texture.h"
 #include "Camera/CameraComponent.h"
 #include "Components/AudioComponent.h"
+#include "Components/LightComponent.h"
 #include "glTFRuntimeAnimationCurve.h"
 #include "ProceduralMeshComponent.h"
 #if WITH_EDITOR
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
 #include "Serialization/ArrayReader.h"
+#include "UObject/Package.h"
 #include "glTFRuntimeParser.generated.h"
 
 GLTFRUNTIME_API DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
