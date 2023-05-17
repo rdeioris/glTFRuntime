@@ -7,7 +7,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Animation/Skeleton.h"
 #include "Materials/Material.h"
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
 #include "MaterialDomain.h"
 #else
 #include "MaterialShared.h"
@@ -16,7 +16,7 @@
 #include "Misc/Compression.h"
 #include "Misc/Paths.h"
 #include "Interfaces/IPluginManager.h"
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
 #include "RenderMath.h"
 #else
 #include "RenderUtils.h"
