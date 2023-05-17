@@ -1,18 +1,26 @@
 // Copyright 2020-2023, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Engine/Texture2D.h"
 #include "Misc/FileHelper.h"
 #include "Serialization/JsonSerializer.h"
 #include "Animation/Skeleton.h"
 #include "Materials/Material.h"
+#if ENGINE_MAJOR_VERSION >= 5
 #include "MaterialDomain.h"
+#else
+#include "MaterialShared.h"
+#endif
 #include "Misc/Base64.h"
 #include "Misc/Compression.h"
 #include "Misc/Paths.h"
 #include "Interfaces/IPluginManager.h"
+#if ENGINE_MAJOR_VERSION >= 5
 #include "RenderMath.h"
-#include "Runtime/Launch/Resources/Version.h"
+#else
+#include "RenderUtils.h"
+#endif
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 

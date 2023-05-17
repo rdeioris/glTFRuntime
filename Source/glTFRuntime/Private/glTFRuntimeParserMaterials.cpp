@@ -1,17 +1,21 @@
 // Copyright 2020-2023, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Engine/Texture2D.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
 #include "Misc/FileHelper.h"
+#if ENGINE_MAJOR_VERSION >= 5
 #include "MaterialDomain.h"
+#else
+#include "MaterialShared.h"
+#endif
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Math/UnrealMathUtility.h"
 #include "Modules/ModuleManager.h"
-#include "Runtime/Launch/Resources/Version.h"
 #include "TextureResource.h"
 
 
