@@ -7,7 +7,7 @@
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
 #include "Misc/FileHelper.h"
-#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 #include "MaterialDomain.h"
 #else
 #include "MaterialShared.h"

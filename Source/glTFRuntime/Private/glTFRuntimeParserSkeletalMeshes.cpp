@@ -25,7 +25,7 @@
 #endif
 #endif
 #include "Engine/SkeletalMeshSocket.h"
-#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 #include "Engine/SkinnedAssetCommon.h"
 #else
 #include "Engine/SkeletalMesh.h"
