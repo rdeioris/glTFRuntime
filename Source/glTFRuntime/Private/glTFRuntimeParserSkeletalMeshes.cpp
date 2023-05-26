@@ -291,6 +291,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 	SkeletalMeshContext->SkeletalMesh->ResetLODInfo();
 
+	const float TangentsDirection = SkeletalMeshContext->SkeletalMeshConfig.bReverseTangents ? -1 : 1;
+
 #if WITH_EDITOR
 
 	FSkeletalMeshModel* ImportedResource = SkeletalMeshContext->SkeletalMesh->GetImportedModel();
@@ -436,8 +438,13 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						LOD.bHasNormals = false;
 					}
 
+					float TangentXW[3] = { 1,1,1 };
 					if (Primitive.Tangents.Num() > 0)
 					{
+						TangentXW[0] = Primitive.Tangents[Primitive.Indices[i - 2]].W;
+						TangentXW[1] = Primitive.Tangents[Primitive.Indices[i - 1]].W;
+						TangentXW[2] = Primitive.Tangents[Primitive.Indices[i]].W;
+
 #if ENGINE_MAJOR_VERSION > 4
 						Triangle.TangentX[0] = FVector3f(FVector(Primitive.Tangents[Primitive.Indices[i - 2]]));
 						Triangle.TangentX[1] = FVector3f(FVector(Primitive.Tangents[Primitive.Indices[i - 1]]));
@@ -453,6 +460,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						LOD.bHasTangents = false;
 					}
 
+					Triangle.TangentY[0] = FVector3f(ComputeTangentYWithW(FVector(Triangle.TangentZ[0]), FVector(Triangle.TangentX[0]), TangentXW[0] * TangentsDirection));
+					Triangle.TangentY[1] = FVector3f(ComputeTangentYWithW(FVector(Triangle.TangentZ[1]), FVector(Triangle.TangentX[1]), TangentXW[1] * TangentsDirection));
+					Triangle.TangentY[2] = FVector3f(ComputeTangentYWithW(FVector(Triangle.TangentZ[2]), FVector(Triangle.TangentX[2]), TangentXW[2] * TangentsDirection));
 					Triangle.MatIndex = MatIndex;
 
 					Triangles.Add(Triangle);
@@ -545,7 +555,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 						MorphTargetPositions.Add(Primitive.Positions[PointIndex] + MorphTarget.Positions[PointIndex]);
 #endif
-					}
+						}
 
 					if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreEmptyMorphTargets && bSkip)
 					{
@@ -613,9 +623,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					}
 
 					MorphTargetIndex++;
-				}
+					}
 				PointsBase += Primitive.Positions.Num();
-			}
+				}
 
 			LOD.ImportData.MorphTargetModifiedPoints = MorphTargetModifiedPoints;
 			LOD.ImportData.MorphTargets = MorphTargetsData;
@@ -692,6 +702,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				int32 Index = Primitive.Indices[VertexIndex];
 				FModelVertex ModelVertex;
 
+				float TangentXW = 1;
+
 #if ENGINE_MAJOR_VERSION > 4
 				ModelVertex.Position = FVector3f(Primitive.Positions[Index]);
 				SkeletalMeshContext->BoundingBox += FVector(ModelVertex.Position) * SkeletalMeshContext->SkeletalMeshConfig.BoundsScale;
@@ -719,10 +731,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				if (Index < Primitive.Tangents.Num())
 				{
 #if ENGINE_MAJOR_VERSION > 4
+					TangentXW = Primitive.Tangents[Index].W;
 					ModelVertex.TangentX = FVector4f(Primitive.Tangents[Index]);
 #else
 					ModelVertex.TangentX = Primitive.Tangents[Index];
 #endif
+
 				}
 				else
 				{
@@ -749,8 +763,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					LOD.bHasUV = false;
 				}
 
+				FVector3f TangentY = FVector3f(ComputeTangentYWithW(FVector(ModelVertex.TangentZ), FVector(ModelVertex.TangentX), TangentXW * TangentsDirection));
+
 				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
-				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, ModelVertex.GetTangentY(), ModelVertex.TangentZ);
+				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, TangentY, ModelVertex.TangentZ);
 				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
 
 				TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : MainBoneMap;
@@ -845,13 +861,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 		if ((!LOD.bHasTangents || !LOD.bHasNormals) && TotalVertexIndex % 3 == 0)
 		{
-			auto GetTangentY = [](FVector4 Normal, FVector TangentX)
-			{
-				FVector TanX = TangentX;
-				FVector TanZ = Normal;
-
-				return (TanZ ^ TanX) * Normal.W;
-			};
 
 			//normals with NaNs are incorrectly handled on Android
 			auto FixVectorIfNan = [](FVector& Tangent, int32 Index)
@@ -931,18 +940,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					FVector TriangleTangentY = ((DeltaPosition0 * DeltaUV1.X) - (DeltaPosition1 * DeltaUV0.X)) * Factor;
 
 					FVector TangentX0 = TriangleTangentX - (TangentZ0 * FVector::DotProduct(TangentZ0, TriangleTangentX));
-					FVector CrossX0 = FVector::CrossProduct(TangentZ0, TangentX0);
-					TangentX0 *= (FVector::DotProduct(CrossX0, TriangleTangentY) < 0) ? -1.0f : 1.0f;
 					TangentX0.Normalize();
 
 					FVector TangentX1 = TriangleTangentX - (TangentZ1 * FVector::DotProduct(TangentZ1, TriangleTangentX));
-					FVector CrossX1 = FVector::CrossProduct(TangentZ1, TangentX1);
-					TangentX1 *= (FVector::DotProduct(CrossX1, TriangleTangentY) < 0) ? -1.0f : 1.0f;
 					TangentX1.Normalize();
 
 					FVector TangentX2 = TriangleTangentX - (TangentZ2 * FVector::DotProduct(TangentZ2, TriangleTangentX));
-					FVector CrossX2 = FVector::CrossProduct(TangentZ2, TangentX2);
-					TangentX2 *= (FVector::DotProduct(CrossX2, TriangleTangentY) < 0) ? -1.0f : 1.0f;
 					TangentX2.Normalize();
 
 #if PLATFORM_ANDROID
@@ -951,9 +954,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					FixVectorIfNan(TangentX2, 0);
 #endif
 
-					FVector TangentY0 = GetTangentY(TangentZ0, TangentX0);
-					FVector TangentY1 = GetTangentY(TangentZ1, TangentX1);
-					FVector TangentY2 = GetTangentY(TangentZ2, TangentX2);
+					FVector TangentY0 = ComputeTangentY(TangentZ0, TangentX0) * TangentsDirection;
+					FVector TangentY1 = ComputeTangentY(TangentZ1, TangentX1) * TangentsDirection;
+					FVector TangentY2 = ComputeTangentY(TangentZ2, TangentX2) * TangentsDirection;
 #if PLATFORM_ANDROID
 					FixVectorIfNan(TangentY0, 1);
 					FixVectorIfNan(TangentY1, 1);
@@ -962,13 +965,13 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 
 #if ENGINE_MAJOR_VERSION > 4
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, FVector3f(TangentX0), FVector3f(GetTangentY(TangentZ0, TangentX0)), FVector3f(FVector(TangentZ0)));
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, FVector3f(TangentX1), FVector3f(GetTangentY(TangentZ1, TangentX1)), FVector3f(FVector(TangentZ1)));
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, FVector3f(TangentX2), FVector3f(GetTangentY(TangentZ2, TangentX2)), FVector3f(FVector(TangentZ2)));
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, FVector3f(TangentX0), FVector3f(TangentY0), FVector3f(FVector(TangentZ0)));
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, FVector3f(TangentX1), FVector3f(TangentY1), FVector3f(FVector(TangentZ1)));
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, FVector3f(TangentX2), FVector3f(TangentY2), FVector3f(FVector(TangentZ2)));
 #else
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, TangentX0, GetTangentY(TangentZ0, TangentX0), TangentZ0);
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, TangentX1, GetTangentY(TangentZ1, TangentX1), TangentZ1);
-					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, TangentX2, GetTangentY(TangentZ2, TangentX2), TangentZ2);
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, TangentX0, TangentY0, TangentZ0);
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, TangentX1, TangentY1, TangentZ1);
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, TangentX2, TangentY2, TangentZ2);
 #endif
 				}
 				else if (!LOD.bHasNormals) // if we are here we need to reapply normals
@@ -1008,10 +1011,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
 		}
 #endif
-	}
+			}
 
 	return SkeletalMeshContext->SkeletalMesh;
-}
+		}
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
@@ -1270,7 +1273,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #else
 			SkeletalMeshContext->SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMeshContext->SkeletalMesh);
 #endif
-		}
+}
 	}
 	else
 	{
@@ -1281,7 +1284,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #else
 			SkeletalMeshContext->SkeletalMesh->Skeleton = SkeletonsCache[SkeletalMeshContext->SkinIndex];
 #endif
-		}
+	}
 		else
 		{
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
@@ -1358,7 +1361,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 						NewBodySetup->AggGeom = SourceBodySetup->AggGeom;
 						PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
 					}
-				}
+			}
 				for (UPhysicsConstraintTemplate* ConstraintTemplate : PhysicsAssetTemplate->ConstraintSetup)
 				{
 					UPhysicsConstraintTemplate* NewConstraint = NewObject<UPhysicsConstraintTemplate>(PhysicsAsset, NAME_None, RF_Public);
@@ -1366,7 +1369,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					NewConstraint->ProfileHandles = ConstraintTemplate->ProfileHandles;
 					PhysicsAsset->ConstraintSetup.Add(NewConstraint);
 				}
-			}
+		}
 			for (const TPair<FString, FglTFRuntimePhysicsBody>& PhysicsBody : SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies)
 			{
 				if (PhysicsBody.Key.IsEmpty())
@@ -1437,7 +1440,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 
 	return SkeletalMeshContext->SkeletalMesh;
-}
+	}
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
@@ -1793,7 +1796,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 #endif
 
-		}
+}
 	}
 #else
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
@@ -1827,8 +1830,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.PosKeys.Add(BoneTransform.GetLocation());
 #endif
-			}
 		}
+	}
 		else if (Pair.Value.PosKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1857,7 +1860,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.RotKeys.Add(BoneTransform.GetRotation());
 #endif
-			}
+		}
 		}
 		else if (Pair.Value.RotKeys.Num() < NumFrames)
 		{
@@ -1886,7 +1889,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.ScaleKeys.Add(BoneTransform.GetScale3D());
 #endif
-			}
+		}
 		}
 		else if (Pair.Value.ScaleKeys.Num() < NumFrames)
 		{
@@ -2199,7 +2202,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 #endif
 
-		}
+}
 	}
 #else
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
