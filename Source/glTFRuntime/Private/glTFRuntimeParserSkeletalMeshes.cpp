@@ -460,9 +460,15 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						LOD.bHasTangents = false;
 					}
 
+#if ENGINE_MAJOR_VERSION > 4
 					Triangle.TangentY[0] = FVector3f(ComputeTangentYWithW(FVector(Triangle.TangentZ[0]), FVector(Triangle.TangentX[0]), TangentXW[0] * TangentsDirection));
 					Triangle.TangentY[1] = FVector3f(ComputeTangentYWithW(FVector(Triangle.TangentZ[1]), FVector(Triangle.TangentX[1]), TangentXW[1] * TangentsDirection));
 					Triangle.TangentY[2] = FVector3f(ComputeTangentYWithW(FVector(Triangle.TangentZ[2]), FVector(Triangle.TangentX[2]), TangentXW[2] * TangentsDirection));
+#else
+					Triangle.TangentY[0] = ComputeTangentYWithW(Triangle.TangentZ[0], Triangle.TangentX[0], TangentXW[0] * TangentsDirection);
+					Triangle.TangentY[1] = ComputeTangentYWithW(Triangle.TangentZ[1], Triangle.TangentX[1], TangentXW[1] * TangentsDirection);
+					Triangle.TangentY[2] = ComputeTangentYWithW(Triangle.TangentZ[2], Triangle.TangentX[2], TangentXW[2] * TangentsDirection);
+#endif
 					Triangle.MatIndex = MatIndex;
 
 					Triangles.Add(Triangle);
@@ -483,7 +489,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			SkeletalMeshContext->BoundingBox += Points[PointIndex] * SkeletalMeshContext->SkeletalMeshConfig.BoundsScale;
 #endif
 			PointToRawMap.Add(PointIndex);
-		}
+	}
 
 		if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreSkin || SkeletalMeshContext->SkinIndex <= INDEX_NONE)
 		{
@@ -549,13 +555,13 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						if (!MorphTarget.Positions[PointIndex].IsNearlyZero())
 						{
 							bSkip = false;
-						}
+					}
 #if ENGINE_MAJOR_VERSION > 4
 						MorphTargetPositions.Add(FVector3f(Primitive.Positions[PointIndex] + MorphTarget.Positions[PointIndex]));
 #else
 						MorphTargetPositions.Add(Primitive.Positions[PointIndex] + MorphTarget.Positions[PointIndex]);
 #endif
-						}
+			}
 
 					if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreEmptyMorphTargets && bSkip)
 					{
@@ -623,9 +629,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					}
 
 					MorphTargetIndex++;
-					}
+		}
 				PointsBase += Primitive.Positions.Num();
-				}
+			}
 
 			LOD.ImportData.MorphTargetModifiedPoints = MorphTargetModifiedPoints;
 			LOD.ImportData.MorphTargets = MorphTargetsData;
@@ -1011,10 +1017,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
 		}
 #endif
-			}
+		}
 
 	return SkeletalMeshContext->SkeletalMesh;
-		}
+}
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
@@ -1273,7 +1279,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #else
 			SkeletalMeshContext->SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMeshContext->SkeletalMesh);
 #endif
-}
+		}
 	}
 	else
 	{
@@ -1284,7 +1290,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #else
 			SkeletalMeshContext->SkeletalMesh->Skeleton = SkeletonsCache[SkeletalMeshContext->SkinIndex];
 #endif
-	}
+		}
 		else
 		{
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
@@ -1361,7 +1367,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 						NewBodySetup->AggGeom = SourceBodySetup->AggGeom;
 						PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
 					}
-			}
+				}
 				for (UPhysicsConstraintTemplate* ConstraintTemplate : PhysicsAssetTemplate->ConstraintSetup)
 				{
 					UPhysicsConstraintTemplate* NewConstraint = NewObject<UPhysicsConstraintTemplate>(PhysicsAsset, NAME_None, RF_Public);
@@ -1369,7 +1375,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					NewConstraint->ProfileHandles = ConstraintTemplate->ProfileHandles;
 					PhysicsAsset->ConstraintSetup.Add(NewConstraint);
 				}
-		}
+			}
 			for (const TPair<FString, FglTFRuntimePhysicsBody>& PhysicsBody : SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies)
 			{
 				if (PhysicsBody.Key.IsEmpty())
@@ -1434,8 +1440,8 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			{
 				FAssetRegistryModule::AssetCreated(SkeletalMeshContext->SkeletalMesh);
 			}
-		}
 	}
+		}
 #endif
 
 
@@ -1796,7 +1802,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 #endif
 
-}
+		}
 	}
 #else
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
@@ -1830,8 +1836,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.PosKeys.Add(BoneTransform.GetLocation());
 #endif
+			}
 		}
-	}
 		else if (Pair.Value.PosKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1860,7 +1866,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.RotKeys.Add(BoneTransform.GetRotation());
 #endif
-		}
+			}
 		}
 		else if (Pair.Value.RotKeys.Num() < NumFrames)
 		{
@@ -1889,7 +1895,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 				Pair.Value.ScaleKeys.Add(BoneTransform.GetScale3D());
 #endif
-		}
+			}
 		}
 		else if (Pair.Value.ScaleKeys.Num() < NumFrames)
 		{
@@ -1947,8 +1953,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #else
 					Pair.Value.ScaleKeys[FrameIndex] = FrameTransform.GetScale3D();
 #endif
-				}
 			}
+		}
 
 			if (SkeletalAnimationConfig.bRemoveRootMotion)
 			{
@@ -1957,7 +1963,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 					Pair.Value.PosKeys[FrameIndex] = Pair.Value.PosKeys[0];
 				}
 			}
-		}
+	}
 
 
 #if WITH_EDITOR
@@ -1980,7 +1986,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
 #endif
 		bHasTracks = true;
-	}
+}
 
 	if (SkeletalAnimationConfig.bFillAllCurves)
 	{
@@ -2095,7 +2101,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 		bHasTracks = true;
-	}
+		}
 
 	if (!bHasTracks)
 	{
@@ -2130,7 +2136,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 	return AnimSequence;
-}
+	}
 
 UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * SkeletalMesh, const int32 SkinIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
@@ -2202,7 +2208,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
 #endif
 
-}
+		}
 	}
 #else
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
@@ -2284,7 +2290,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 #endif
 
 		Tracks.Add(TrackName, Track);
-	}
+		}
 
 	OnCreatedPoseTracks.Broadcast(AsShared(), Tracks);
 
@@ -2337,7 +2343,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * Skele
 #endif
 
 	return AnimSequence;
-}
+	}
 
 UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh * SkeletalMesh, const TArray<FglTFRuntimePathItem>&BonesPath, const TArray<FglTFRuntimePathItem>&MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
@@ -2562,7 +2568,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 #endif
 
 	return AnimSequence;
-}
+		}
 
 FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const float T1, const FVector4 Value0, const FVector4 OutTangent, const FVector4 Value1, const FVector4 InTangent)
 {
@@ -2641,7 +2647,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(RetargetParentIndex);
 			}
 		}
-	}
+			}
 
 	auto RetargetQuat = [&](const FQuat LocalAnimQuat, const FQuat WorldPoseQuat, const FQuat WorldParentPoseQuat, const FQuat WorldRetargetPoseQuat, const FQuat WorldRetargetParentPoseQuat) -> FQuat
 	{
@@ -2801,8 +2807,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 				Track.RotKeys.Add(AnimQuat);
 #endif
+				}
 			}
-		}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
@@ -2895,8 +2901,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 				Track.PosKeys.Add(AnimLocation);
 #endif
+				}
 			}
-		}
 		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
@@ -2955,11 +2961,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-	};
+		};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
-}
+		}
 
 
 bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & NodeName, int32 & SkinIndex, const TArray<FString>&ExcludeNodes, FglTFRuntimeMeshLOD & RuntimeLOD, const FglTFRuntimeMaterialsConfig & MaterialsConfig, const FglTFRuntimeSkeletonConfig & SkeletonConfig)
