@@ -5,14 +5,13 @@
 #include "Serialization/JsonSerializer.h"
 #include "Animation/Skeleton.h"
 #include "Materials/Material.h"
-// #include "Runtime/Launch/Resources/Version.h"
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
 #include "MaterialDomain.h"
+#include "RenderMath.h"
 #endif
 #include "Misc/Base64.h"
 #include "Misc/Compression.h"
 #include "Misc/Paths.h"
-#include "RenderMath.h"
 #include "Engine/Texture2D.h"
 #include "Interfaces/IPluginManager.h"
 
