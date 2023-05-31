@@ -558,6 +558,15 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatFactor", RuntimeMaterial.ClearCoatFactor);
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatRoughnessFactor", RuntimeMaterial.ClearCoatRoughnessFactor);
 
+	for (const TPair<FString, float>& Pair : MaterialsConfig.ScalarParamsOverrides)
+	{
+		float ScalarValue = 0;
+		if (Material->GetScalarParameterValue(*Pair.Key, ScalarValue))
+		{
+			Material->SetScalarParameterValue(*Pair.Key, Pair.Value);
+		}
+	}
+
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ParamsMultiplier)
 	{
 		float ScalarValue = 0;

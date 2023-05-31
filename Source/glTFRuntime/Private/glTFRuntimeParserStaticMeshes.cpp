@@ -111,7 +111,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 	int32 LODIndex = 0;
 
-	const float TangentsDirection = StaticMeshConfig.bReverseTangents ? 1 : -1;
+	const float TangentsDirection = StaticMeshConfig.bReverseTangents ? -1 : 1;
 
 	// this is used for inheriting materials while in multi LOD mode
 	TMap<int32, int32> SectionMaterialMap;
