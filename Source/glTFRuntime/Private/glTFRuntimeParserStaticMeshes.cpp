@@ -3,14 +3,15 @@
 #include "glTFRuntimeParser.h"
 #include "Async/Async.h"
 #include "MeshDescription.h"
+#include "StaticMeshResources.h"
 #include "StaticMeshAttributes.h"
 #include "StaticMeshOperations.h"
+#include "Engine/World.h"
 #include "Engine/StaticMeshSocket.h"
 #if WITH_EDITOR
 #include "Editor/EditorEngine.h"
 #endif
 #include "PhysicsEngine/BodySetup.h"
-#include "Runtime/Launch/Resources/Version.h"
 
 FglTFRuntimeStaticMeshContext::FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig) :
 	Parser(InParser),

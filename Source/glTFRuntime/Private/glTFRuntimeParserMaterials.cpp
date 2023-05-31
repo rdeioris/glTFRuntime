@@ -5,14 +5,15 @@
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
 #include "Misc/FileHelper.h"
+#include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
 #include "MaterialDomain.h"
 #endif
 #include "Math/UnrealMathUtility.h"
 #include "Modules/ModuleManager.h"
-#include "Runtime/Launch/Resources/Version.h"
-
+#include "Engine/Texture2D.h"
+#include "TextureResource.h"
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {

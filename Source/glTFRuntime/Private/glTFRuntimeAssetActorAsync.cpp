@@ -3,6 +3,7 @@
 
 #include "glTFRuntimeAssetActorAsync.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 
 // Sets default values

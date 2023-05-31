@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Dom/JsonValue.h"
 #include "Dom/JsonObject.h"
 #include "Engine/StaticMesh.h"

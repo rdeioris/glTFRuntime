@@ -1,6 +1,7 @@
 // Copyright 2020-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Animation/Skeleton.h"
 #if ENGINE_MAJOR_VERSION > 4
 #include "Animation/AnimData/AnimDataModel.h"
 #include "Animation/AnimData/IAnimationDataController.h"
