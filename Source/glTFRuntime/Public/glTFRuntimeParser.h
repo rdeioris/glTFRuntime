@@ -2020,6 +2020,7 @@ protected:
 
 	TArray64<uint8> ZeroBuffer;
 	TMap<int32, TArray64<uint8>> SparseAccessorsCache;
+	TMap<int32, int64> SparseAccessorsStridesCache;
 
 	TMap<int64, TMap<FString, FglTFRuntimeBlob>> AdditionalBufferViewsCache;
 	TArray<TArray64<uint8>> AdditionalBufferViewsData;
