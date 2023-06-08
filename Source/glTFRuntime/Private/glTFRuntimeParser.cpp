@@ -3079,6 +3079,7 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 
 	if (SparseAccessorsCache.Contains(Index))
 	{
+		Stride = SparseAccessorsStridesCache[Index];
 		Blob.Data = SparseAccessorsCache[Index].GetData();
 		Blob.Num = SparseAccessorsCache[Index].Num();
 		return true;
@@ -3199,6 +3200,7 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 	Stride = SparseBufferViewValuesStride;
 
 	SparseAccessorsCache.Add(Index);
+	SparseAccessorsStridesCache.Add(Index, Stride);
 	TArray64<uint8>& SparseData = SparseAccessorsCache[Index];
 	SparseData.Append(Blob.Data, Blob.Num);
 
