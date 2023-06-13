@@ -525,6 +525,14 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 			}
 		}
 	}
+
+	if (ExtensionsRequired.Contains("KHR_draco_mesh_compression"))
+	{
+		if (!FModuleManager::Get().IsModuleLoaded(TEXT("glTFRuntimeDraco")))
+		{
+			UE_LOG(LogGLTFRuntime, Warning, TEXT("KHR_draco_mesh_compression required but glTFRuntimeDraco module is not loaded"));
+		}
+	}
 }
 
 bool FglTFRuntimeParser::LoadNodes()
