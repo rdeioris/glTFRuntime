@@ -684,8 +684,10 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		return nullptr;
 	}
 
-	int64 ImageIndex;
-	if (!JsonTextureObject->TryGetNumberField("source", ImageIndex))
+	int64 ImageIndex = INDEX_NONE;
+	OnTextureImageIndex.Broadcast(AsShared(), JsonTextureObject.ToSharedRef(), ImageIndex);
+
+	if (ImageIndex <= INDEX_NONE && !JsonTextureObject->TryGetNumberField("source", ImageIndex))
 	{
 		return nullptr;
 	}

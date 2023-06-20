@@ -1433,6 +1433,7 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnPreLoadedPrimitive, TShared
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedPrimitive, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, FglTFRuntimePrimitive&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedRefSkeleton, TSharedRef<FglTFRuntimeParser>, TSharedPtr<FJsonObject>, FReferenceSkeletonModifier&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnCreatedPoseTracks, TSharedRef<FglTFRuntimeParser>, TMap<FString, FRawAnimSequenceTrack>&);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnTextureImageIndex, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, int64&);
 DECLARE_MULTICAST_DELEGATE_SixParams(FglTFRuntimeOnTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, TArray64<uint8>&, int32&, int32&, TArray64<uint8>&);
 DECLARE_MULTICAST_DELEGATE_FiveParams(FglTFRuntimeOnLoadedTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, const int32, const int32, FColor*);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnFinalizedStaticMesh, TSharedRef<FglTFRuntimeParser>, UStaticMesh*, const FglTFRuntimeStaticMeshConfig&);
@@ -1604,6 +1605,7 @@ public:
 	static FglTFRuntimeOnLoadedPrimitive OnLoadedPrimitive;
 	static FglTFRuntimeOnLoadedRefSkeleton OnLoadedRefSkeleton;
 	static FglTFRuntimeOnCreatedPoseTracks OnCreatedPoseTracks;
+	static FglTFRuntimeOnTextureImageIndex OnTextureImageIndex;
 	static FglTFRuntimeOnTexturePixels OnTexturePixels;
 	static FglTFRuntimeOnLoadedTexturePixels OnLoadedTexturePixels;
 	static FglTFRuntimeOnFinalizedStaticMesh OnFinalizedStaticMesh;
