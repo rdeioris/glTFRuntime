@@ -716,7 +716,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		return nullptr;
 	}
 
-	OnTextureMips.Broadcast(AsShared(), JsonTextureObject.ToSharedRef(), CompressedBytes, Mips);
+	OnTextureMips.Broadcast(AsShared(), TextureIndex, JsonTextureObject.ToSharedRef(), JsonImageObject.ToSharedRef(), CompressedBytes, Mips);
 
 	// if no Mips have been generated, load it as a plain image and (eventually) generate them
 	if (Mips.Num() == 0)
