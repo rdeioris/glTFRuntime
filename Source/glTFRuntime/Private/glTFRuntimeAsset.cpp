@@ -636,6 +636,96 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRunt
 	return nullptr;
 }
 
+UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int32 ImageIndexXN, const int32 ImageIndexYP, const int32 ImageIndexYN, const int32 ImageIndexZP, const int32 ImageIndexZN, const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	TArray64<uint8> UncompressedBytes[6];
+	int32 Width = 0;
+	int32 Height = 0;
+	int32 CurrentWidth = 0;
+	int32 CurrentHeight = 0;
+	if (!Parser->LoadImage(ImageIndexXP, UncompressedBytes[0], Width, Height, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width <= 0 || Height <= 0)
+	{
+		return nullptr;
+	}
+
+	CurrentWidth = Width;
+	CurrentHeight = Height;
+
+	if (!Parser->LoadImage(ImageIndexXN, UncompressedBytes[1], Width, Height, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width != CurrentWidth || Height != CurrentHeight)
+	{
+		return nullptr;
+	}
+
+	if (!Parser->LoadImage(ImageIndexYP, UncompressedBytes[2], Width, Height, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width != CurrentWidth || Height != CurrentHeight)
+	{
+		return nullptr;
+	}
+
+	if (!Parser->LoadImage(ImageIndexYN, UncompressedBytes[3], Width, Height, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width != CurrentWidth || Height != CurrentHeight)
+	{
+		return nullptr;
+	}
+
+	if (!Parser->LoadImage(ImageIndexZP, UncompressedBytes[4], Width, Height, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width != CurrentWidth || Height != CurrentHeight)
+	{
+		return nullptr;
+	}
+
+	if (!Parser->LoadImage(ImageIndexZN, UncompressedBytes[5], Width, Height, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width != CurrentWidth || Height != CurrentHeight)
+	{
+		return nullptr;
+	}
+
+
+	FglTFRuntimeMipMap MipXP(-1, Width, Height, UncompressedBytes[0]);
+	FglTFRuntimeMipMap MipXN(-1, Width, Height, UncompressedBytes[1]);
+	FglTFRuntimeMipMap MipYP(-1, Width, Height, UncompressedBytes[2]);
+	FglTFRuntimeMipMap MipYN(-1, Width, Height, UncompressedBytes[3]);
+	FglTFRuntimeMipMap MipZP(-1, Width, Height, UncompressedBytes[4]);
+	FglTFRuntimeMipMap MipZN(-1, Width, Height, UncompressedBytes[5]);
+
+
+	TArray<FglTFRuntimeMipMap> MipsXP = { MipXP };
+	TArray<FglTFRuntimeMipMap> MipsXN = { MipXN };
+	TArray<FglTFRuntimeMipMap> MipsYP = { MipYP };
+	TArray<FglTFRuntimeMipMap> MipsYN = { MipYN };
+	TArray<FglTFRuntimeMipMap> MipsZP = { MipZP };
+	TArray<FglTFRuntimeMipMap> MipsZN = { MipZN };
+	return Parser->BuildTextureCube(this, MipsXP, MipsXN, MipsYP, MipsYN, MipsZP, MipsZN, ImagesConfig, FglTFRuntimeTextureSampler());
+
+}
+
 UTexture2D* UglTFRuntimeAsset::LoadImageFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);

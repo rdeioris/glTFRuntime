@@ -949,3 +949,84 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 
 	return Material;
 }
+
+UTextureCube* FglTFRuntimeParser::BuildTextureCube(UObject* Outer, const TArray<FglTFRuntimeMipMap>& MipsXP, const TArray<FglTFRuntimeMipMap>& MipsXN, const TArray<FglTFRuntimeMipMap>& MipsYP, const TArray<FglTFRuntimeMipMap>& MipsYN, const TArray<FglTFRuntimeMipMap>& MipsZP, const TArray<FglTFRuntimeMipMap>& MipsZN, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler)
+{
+	UTextureCube* Texture = NewObject<UTextureCube>(Outer, NAME_None, RF_Public);
+	FTexturePlatformData* PlatformData = new FTexturePlatformData();
+	PlatformData->SizeX = MipsXP[0].Width;
+	PlatformData->SizeY = MipsXP[0].Height;
+	PlatformData->PixelFormat = MipsXP[0].PixelFormat;
+	PlatformData->SetIsCubemap(true);
+	PlatformData->SetNumSlices(6);
+
+#if ENGINE_MAJOR_VERSION > 4
+	Texture->SetPlatformData(PlatformData);
+#else
+	Texture->PlatformData = PlatformData;
+#endif
+
+	Texture->NeverStream = true;
+
+
+	for (int32 MipIndex = 0; MipIndex < MipsXP.Num(); MipIndex++)
+	{
+		const FglTFRuntimeMipMap& MipMap = MipsXP[MipIndex];
+		FTexture2DMipMap* Mip = new FTexture2DMipMap();
+		PlatformData->Mips.Add(Mip);
+		Mip->SizeX = MipMap.Width;
+		Mip->SizeY = MipMap.Height;
+
+#if !WITH_EDITOR
+#if !NO_LOGGING
+		ELogVerbosity::Type CurrentLogSerializationVerbosity = LogSerialization.GetVerbosity();
+		bool bResetLogVerbosity = false;
+		if (CurrentLogSerializationVerbosity >= ELogVerbosity::Warning)
+		{
+			LogSerialization.SetVerbosity(ELogVerbosity::Error);
+			bResetLogVerbosity = true;
+		}
+#endif
+#endif
+
+		Mip->BulkData.Lock(LOCK_READ_WRITE);
+
+#if !WITH_EDITOR
+#if !NO_LOGGING
+		if (bResetLogVerbosity)
+		{
+			LogSerialization.SetVerbosity(CurrentLogSerializationVerbosity);
+		}
+#endif
+#endif
+		void* Data = Mip->BulkData.Realloc(MipMap.Pixels.Num() * 6);
+		FMemory::Memcpy(Data, MipMap.Pixels.GetData(), MipMap.Pixels.Num());
+
+		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num()), MipsXN[MipIndex].Pixels.GetData(), MipsXN[MipIndex].Pixels.Num());
+		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 2), MipsYP[MipIndex].Pixels.GetData(), MipsYP[MipIndex].Pixels.Num());
+		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 3), MipsYN[MipIndex].Pixels.GetData(), MipsYN[MipIndex].Pixels.Num());
+		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 4), MipsZP[MipIndex].Pixels.GetData(), MipsZP[MipIndex].Pixels.Num());
+		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 5), MipsZN[MipIndex].Pixels.GetData(), MipsZN[MipIndex].Pixels.Num());
+
+		Mip->BulkData.Unlock();
+	}
+
+
+	Texture->CompressionSettings = ImagesConfig.Compression;
+	Texture->LODGroup = ImagesConfig.Group;
+	Texture->SRGB = ImagesConfig.bSRGB;
+
+	if (Sampler.MinFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MinFilter;
+	}
+
+	if (Sampler.MagFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MagFilter;
+	}
+
+	Texture->UpdateResource();
+
+	return Texture;
+}

@@ -11,6 +11,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/Texture.h"
+#include "Engine/Texture2D.h"
+#include "Engine/TextureCube.h"
 #include "Camera/CameraComponent.h"
 #include "Components/AudioComponent.h"
 #include "Components/LightComponent.h"
@@ -1226,6 +1228,32 @@ struct FglTFRuntimeMipMap
 		Height = 0;
 		PixelFormat = EPixelFormat::PF_B8G8R8A8;
 	}
+
+	FglTFRuntimeMipMap(const int32 InTextureIndex, const EPixelFormat InPixelFormat, const int32 InWidth, const int32 InHeight) : 
+		TextureIndex(InTextureIndex),
+		Width(InWidth),
+		Height(InHeight),
+		PixelFormat(InPixelFormat)
+	{
+	}
+
+	FglTFRuntimeMipMap(const int32 InTextureIndex, const EPixelFormat InPixelFormat, const int32 InWidth, const int32 InHeight, const TArray64<uint8>& InPixels) :
+		TextureIndex(InTextureIndex),
+		Pixels(InPixels),
+		Width(InWidth),
+		Height(InHeight),
+		PixelFormat(InPixelFormat)
+	{
+	}
+
+	FglTFRuntimeMipMap(const int32 InTextureIndex, const int32 InWidth, const int32 InHeight, const TArray64<uint8>& InPixels) :
+		TextureIndex(InTextureIndex),
+		Pixels(InPixels),
+		Width(InWidth),
+		Height(InHeight)
+	{
+		PixelFormat = EPixelFormat::PF_B8G8R8A8;
+	}
 };
 
 struct FglTFRuntimeTextureTransform
@@ -1587,6 +1615,7 @@ public:
 	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig);
 	bool LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig);
 	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
+	UTextureCube* BuildTextureCube(UObject* Outer, const TArray<FglTFRuntimeMipMap>& MipsXP, const TArray<FglTFRuntimeMipMap>& MipsXN, const TArray<FglTFRuntimeMipMap>& MipsYP, const TArray<FglTFRuntimeMipMap>& MipsYN, const TArray<FglTFRuntimeMipMap>& MipsZP, const TArray<FglTFRuntimeMipMap>& MipsZN, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 
 	TArray<FString> MaterialsVariants;
 
