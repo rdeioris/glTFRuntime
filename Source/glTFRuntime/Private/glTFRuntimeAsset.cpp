@@ -879,3 +879,27 @@ bool UglTFRuntimeAsset::GetNodeExtensionIndex(const int32 NodeIndex, const FStri
 	Index = Parser->GetJsonExtensionObjectIndex(NodeObject.ToSharedRef(), ExtensionName, FieldName, INDEX_NONE);
 	return Index > INDEX_NONE;
 }
+
+void UglTFRuntimeAsset::AddUsedExtension(const FString& ExtensionName)
+{
+	GLTF_CHECK_PARSER_VOID();
+
+	Parser->ExtensionsUsed.Add(ExtensionName);
+}
+
+void UglTFRuntimeAsset::AddRequiredExtension(const FString& ExtensionName)
+{
+	GLTF_CHECK_PARSER_VOID();
+
+	Parser->ExtensionsRequired.Add(ExtensionName);
+}
+
+void UglTFRuntimeAsset::AddUsedExtensions(const TArray<FString>& ExtensionsNames)
+{
+	Parser->ExtensionsUsed.Append(ExtensionsNames);
+}
+
+void UglTFRuntimeAsset::AddRequiredExtensions(const TArray<FString>& ExtensionsNames)
+{
+	Parser->ExtensionsRequired.Append(ExtensionsNames);
+}

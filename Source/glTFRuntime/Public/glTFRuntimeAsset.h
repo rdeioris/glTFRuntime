@@ -260,6 +260,17 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "SkeletalAnimationConfig", AutoCreateRefTerm = "BonesPath,MorphTargetsPath,SkeletalAnimationConfig"), Category = "glTFRuntime")
 	UAnimSequence* CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem>& BonesPath, const TArray<FglTFRuntimePathItem>& MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	void AddUsedExtension(const FString& ExtensionName);
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	void AddRequiredExtension(const FString& ExtensionName);
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	void AddUsedExtensions(const TArray<FString>& ExtensionsNames);
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	void AddRequiredExtensions(const TArray<FString>& ExtensionsNames);
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	
