@@ -384,6 +384,9 @@ struct FglTFRuntimeImagesConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bVerticalFlip;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bForceHDR;
+
 	FglTFRuntimeImagesConfig()
 	{
 		Compression = TextureCompressionSettings::TC_Default;
@@ -392,6 +395,7 @@ struct FglTFRuntimeImagesConfig
 		MaxWidth = 0;
 		MaxHeight = 0;
 		bVerticalFlip = false;
+		bForceHDR = false;
 	}
 };
 

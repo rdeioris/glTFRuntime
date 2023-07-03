@@ -624,6 +624,16 @@ bool FglTFRuntimeParser::LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJs
 				return false;
 			}
 
+			ERGBFormat RGBFormat = ERGBFormat::BGRA;
+			int32 BitDepth = 8;
+
+			if (ImageFormat == EImageFormat::EXR)
+			{
+				RGBFormat = ERGBFormat::RGBAF;
+				BitDepth = 16;
+				PixelFormat = EPixelFormat::PF_FloatRGBA;
+			}
+
 			TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
 			if (!ImageWrapper.IsValid())
 			{
@@ -636,10 +646,15 @@ bool FglTFRuntimeParser::LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJs
 				return false;
 			}
 
-			if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
+			if (!ImageWrapper->GetRaw(ImagesConfig.bForceHDR ? ERGBFormat::RGBAF : RGBFormat, ImagesConfig.bForceHDR ? 16 : BitDepth, UncompressedBytes))
 			{
 				AddError("LoadImageFromBlob()", "Unable to get raw image data");
 				return false;
+			}
+
+			if (ImagesConfig.bForceHDR)
+			{
+				PixelFormat = EPixelFormat::PF_FloatRGBA;
 			}
 
 			Width = ImageWrapper->GetWidth();
