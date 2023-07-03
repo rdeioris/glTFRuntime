@@ -12,6 +12,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/Texture.h"
 #include "Engine/Texture2D.h"
+#include "Engine/Texture2DArray.h"
 #include "Engine/TextureCube.h"
 #include "Camera/CameraComponent.h"
 #include "Components/AudioComponent.h"
@@ -31,6 +32,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeError, const FString, E
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnStaticMeshCreated, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnSkeletalMeshCreated, USkeletalMesh*, SkeletalMesh);
+
+#define GLTFRUNTIME_IMAGE_API_1
 
 /*
 * Credits for giving me the idea for the blob structure
@@ -378,6 +381,9 @@ struct FglTFRuntimeImagesConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	int32 MaxHeight;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bVerticalFlip;
+
 	FglTFRuntimeImagesConfig()
 	{
 		Compression = TextureCompressionSettings::TC_Default;
@@ -385,6 +391,7 @@ struct FglTFRuntimeImagesConfig
 		bSRGB = false;
 		MaxWidth = 0;
 		MaxHeight = 0;
+		bVerticalFlip = false;
 	}
 };
 
@@ -400,6 +407,9 @@ struct FglTFRuntimeTextureSampler
 	TEnumAsByte<TextureAddress> TileY;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<TextureAddress> TileZ;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TEnumAsByte<TextureFilter> MinFilter;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -409,6 +419,7 @@ struct FglTFRuntimeTextureSampler
 	{
 		TileX = TextureAddress::TA_Wrap;
 		TileY = TextureAddress::TA_Wrap;
+		TileZ = TextureAddress::TA_Wrap;
 		MinFilter = TextureFilter::TF_Default;
 		MagFilter = TextureFilter::TF_Default;;
 	}
@@ -470,6 +481,9 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, float> ScalarParamsOverrides;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bLoadMipMaps;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -480,6 +494,7 @@ struct FglTFRuntimeMaterialsConfig
 		bMaterialsOverrideMapInjectParams = false;
 		bSkipLoad = false;
 		VertexColorOnlyMaterial = nullptr;
+		bLoadMipMaps = false;
 	}
 };
 
@@ -1456,6 +1471,21 @@ struct FglTFRuntimeAudioConfig
 	}
 };
 
+class FglTFRuntimeDDS
+{
+public:
+	FglTFRuntimeDDS() = delete;
+	FglTFRuntimeDDS(const FglTFRuntimeDDS&) = delete;
+	FglTFRuntimeDDS& operator=(const FglTFRuntimeDDS&) = delete;
+
+	FglTFRuntimeDDS(const TArray64<uint8>& InData);
+	void LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const int32 MaxMip, const FglTFRuntimeImagesConfig& ImagesConfig);
+
+	static bool IsDDS(const TArray64<uint8>& Data);
+protected:
+	const TArray64<uint8>& Data;
+};
+
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeStaticMeshAsync, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
 
@@ -1464,8 +1494,8 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedPrimitive, TSharedRef
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedRefSkeleton, TSharedRef<FglTFRuntimeParser>, TSharedPtr<FJsonObject>, FReferenceSkeletonModifier&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnCreatedPoseTracks, TSharedRef<FglTFRuntimeParser>, TMap<FString, FRawAnimSequenceTrack>&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnTextureImageIndex, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, int64&);
-DECLARE_MULTICAST_DELEGATE_SixParams(FglTFRuntimeOnTextureMips, TSharedRef<FglTFRuntimeParser>, const int32, TSharedRef<FJsonObject>, TSharedRef<FJsonObject>, TArray64<uint8>&, TArray<FglTFRuntimeMipMap>&);
-DECLARE_MULTICAST_DELEGATE_SixParams(FglTFRuntimeOnTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, TArray64<uint8>&, int32&, int32&, TArray64<uint8>&);
+DECLARE_MULTICAST_DELEGATE_SevenParams(FglTFRuntimeOnTextureMips, TSharedRef<FglTFRuntimeParser>, const int32, TSharedRef<FJsonObject>, TSharedRef<FJsonObject>, TArray64<uint8>&, TArray<FglTFRuntimeMipMap>&, const FglTFRuntimeImagesConfig&);
+DECLARE_MULTICAST_DELEGATE_EightParams(FglTFRuntimeOnTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, TArray64<uint8>&, int32&, int32&, EPixelFormat&, TArray64<uint8>&, const FglTFRuntimeImagesConfig&);
 DECLARE_MULTICAST_DELEGATE_FiveParams(FglTFRuntimeOnLoadedTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, const int32, const int32, FColor*);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnFinalizedStaticMesh, TSharedRef<FglTFRuntimeParser>, UStaticMesh*, const FglTFRuntimeStaticMeshConfig&);
 
@@ -1612,10 +1642,11 @@ public:
 	TArray<FString> ExtensionsRequired;
 
 	bool LoadImageBytes(const int32 ImageIndex, TSharedPtr<FJsonObject>& JsonImageObject, TArray64<uint8>& Bytes);
-	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig);
-	bool LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig);
+	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig);
+	bool LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig);
 	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
-	UTextureCube* BuildTextureCube(UObject* Outer, const TArray<FglTFRuntimeMipMap>& MipsXP, const TArray<FglTFRuntimeMipMap>& MipsXN, const TArray<FglTFRuntimeMipMap>& MipsYP, const TArray<FglTFRuntimeMipMap>& MipsYN, const TArray<FglTFRuntimeMipMap>& MipsZP, const TArray<FglTFRuntimeMipMap>& MipsZN, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
+	UTextureCube* BuildTextureCube(UObject* Outer, const TArray<FglTFRuntimeMipMap>& MipsXP, const TArray<FglTFRuntimeMipMap>& MipsXN, const TArray<FglTFRuntimeMipMap>& MipsYP, const TArray<FglTFRuntimeMipMap>& MipsYN, const TArray<FglTFRuntimeMipMap>& MipsZP, const TArray<FglTFRuntimeMipMap>& MipsZN, const bool bAutoRotate, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
+	UTexture2DArray* BuildTextureArray(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips,const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 
 	TArray<FString> MaterialsVariants;
 

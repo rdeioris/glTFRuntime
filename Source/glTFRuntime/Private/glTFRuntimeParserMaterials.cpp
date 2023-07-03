@@ -280,6 +280,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler)
 {
+	if (Mips.Num() == 0)
+	{
+		return nullptr;
+	}
+
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
 	FTexturePlatformData* PlatformData = new FTexturePlatformData();
 	PlatformData->SizeX = Mips[0].Width;
@@ -584,44 +589,75 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	return Material;
 }
 
-bool FglTFRuntimeParser::LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig)
+bool FglTFRuntimeParser::LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
-	OnTexturePixels.Broadcast(AsShared(), JsonImageObject, Blob, Width, Height, UncompressedBytes);
+	OnTexturePixels.Broadcast(AsShared(), JsonImageObject, Blob, Width, Height, PixelFormat, UncompressedBytes, ImagesConfig);
 
-	if (UncompressedBytes.Num() > 0)
+	if (UncompressedBytes.Num() == 0)
 	{
-		return true;
+
+		PixelFormat = EPixelFormat::PF_B8G8R8A8;
+
+		// check for DDS first
+		if (FglTFRuntimeDDS::IsDDS(Blob))
+		{
+			FglTFRuntimeDDS DDS(Blob);
+			TArray<FglTFRuntimeMipMap> DDSMips;
+			DDS.LoadMips(-1, DDSMips, 1, ImagesConfig);
+			if (DDSMips.Num() > 0)
+			{
+				UncompressedBytes = DDSMips[0].Pixels;
+				PixelFormat = DDSMips[0].PixelFormat;
+				Width = DDSMips[0].Width;
+				Height = DDSMips[0].Height;
+			}
+		}
+
+		if (UncompressedBytes.Num() == 0)
+		{
+			IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
+
+			EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Blob.GetData(), Blob.Num());
+			if (ImageFormat == EImageFormat::Invalid)
+			{
+				AddError("LoadImageFromBlob()", "Unable to detect image format");
+				return false;
+			}
+
+			TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
+			if (!ImageWrapper.IsValid())
+			{
+				AddError("LoadImageFromBlob()", "Unable to create ImageWrapper");
+				return false;
+			}
+			if (!ImageWrapper->SetCompressed(Blob.GetData(), Blob.Num()))
+			{
+				AddError("LoadImageFromBlob()", "Unable to parse image data");
+				return false;
+			}
+
+			if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
+			{
+				AddError("LoadImageFromBlob()", "Unable to get raw image data");
+				return false;
+			}
+
+			Width = ImageWrapper->GetWidth();
+			Height = ImageWrapper->GetHeight();
+		}
 	}
 
-	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
-
-	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Blob.GetData(), Blob.Num());
-	if (ImageFormat == EImageFormat::Invalid)
+	if (ImagesConfig.bVerticalFlip && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
 	{
-		AddError("LoadImageFromBlob()", "Unable to detect image format");
-		return false;
+		TArray<uint8> Flipped;
+		const int64 Pitch = Width * GPixelFormats[PixelFormat].BlockBytes;
+		Flipped.AddUninitialized(Pitch * Height);
+		for (int32 ImageY = 0; ImageY < Height; ImageY++)
+		{
+			FMemory::Memcpy(Flipped.GetData() + (Pitch * (Height - 1 - ImageY)), UncompressedBytes.GetData() + Pitch * ImageY, Pitch);
+		}
+		UncompressedBytes = Flipped;
 	}
-
-	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
-	if (!ImageWrapper.IsValid())
-	{
-		AddError("LoadImageFromBlob()", "Unable to create ImageWrapper");
-		return false;
-	}
-	if (!ImageWrapper->SetCompressed(Blob.GetData(), Blob.Num()))
-	{
-		AddError("LoadImageFromBlob()", "Unable to parse image data");
-		return false;
-	}
-
-	if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
-	{
-		AddError("LoadImageFromBlob()", "Unable to get raw image data");
-		return false;
-	}
-
-	Width = ImageWrapper->GetWidth();
-	Height = ImageWrapper->GetHeight();
 
 	return true;
 }
@@ -646,7 +682,7 @@ bool FglTFRuntimeParser::LoadImageBytes(const int32 ImageIndex, TSharedPtr<FJson
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig)
+bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	TSharedPtr<FJsonObject> JsonImageObject;
 	TArray64<uint8> Bytes;
@@ -655,7 +691,7 @@ bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& Unco
 		return false;
 	}
 
-	return LoadImageFromBlob(Bytes, JsonImageObject.ToSharedRef(), UncompressedBytes, Width, Height, ImagesConfig);
+	return LoadImageFromBlob(Bytes, JsonImageObject.ToSharedRef(), UncompressedBytes, Width, Height, PixelFormat, ImagesConfig);
 }
 
 UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig, FglTFRuntimeTextureSampler& Sampler)
@@ -716,7 +752,19 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		return nullptr;
 	}
 
-	OnTextureMips.Broadcast(AsShared(), TextureIndex, JsonTextureObject.ToSharedRef(), JsonImageObject.ToSharedRef(), CompressedBytes, Mips);
+	if (MaterialsConfig.bLoadMipMaps)
+	{
+		OnTextureMips.Broadcast(AsShared(), TextureIndex, JsonTextureObject.ToSharedRef(), JsonImageObject.ToSharedRef(), CompressedBytes, Mips, MaterialsConfig.ImagesConfig);
+		// if no Mips have been loaded, attempt parsing a DDS asset
+		if (Mips.Num() == 0)
+		{
+			if (FglTFRuntimeDDS::IsDDS(CompressedBytes))
+			{
+				FglTFRuntimeDDS DDS(CompressedBytes);
+				DDS.LoadMips(TextureIndex, Mips, 0, MaterialsConfig.ImagesConfig);
+			}
+		}
+	}
 
 	// if no Mips have been generated, load it as a plain image and (eventually) generate them
 	if (Mips.Num() == 0)
@@ -724,14 +772,13 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		TArray64<uint8> UncompressedBytes;
 		int32 Width = 0;
 		int32 Height = 0;
-		if (!LoadImageFromBlob(CompressedBytes, JsonImageObject.ToSharedRef(), UncompressedBytes, Width, Height, MaterialsConfig.ImagesConfig))
+		EPixelFormat PixelFormat;
+		if (!LoadImageFromBlob(CompressedBytes, JsonImageObject.ToSharedRef(), UncompressedBytes, Width, Height, PixelFormat, MaterialsConfig.ImagesConfig))
 		{
 			return nullptr;
 		}
 
 		OnLoadedTexturePixels.Broadcast(AsShared(), JsonTextureObject.ToSharedRef(), Width, Height, reinterpret_cast<FColor*>(UncompressedBytes.GetData()));
-
-		constexpr EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
 
 		if (Width > 0 && Height > 0 &&
 			(Width % GPixelFormats[PixelFormat].BlockSizeX) == 0 &&
@@ -739,7 +786,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		{
 
 			// limit image size
-			if (MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0)
+			if ((MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0) && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
 			{
 				const int32 NewWidth = MaterialsConfig.ImagesConfig.MaxWidth > 0 ? MaterialsConfig.ImagesConfig.MaxWidth : Width;
 				const int32 NewHeight = MaterialsConfig.ImagesConfig.MaxHeight > 0 ? MaterialsConfig.ImagesConfig.MaxHeight : Height;
@@ -760,7 +807,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 
 			TArray64<FColor> UncompressedColors;
 
-			if (MaterialsConfig.bGeneratesMipMaps && FMath::IsPowerOfTwo(Width) && FMath::IsPowerOfTwo(Height))
+			if (MaterialsConfig.bGeneratesMipMaps && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1 && FMath::IsPowerOfTwo(Width) && FMath::IsPowerOfTwo(Height))
 			{
 				NumOfMips = FMath::FloorLog2(FMath::Max(Width, Height)) + 1;
 
@@ -950,7 +997,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 	return Material;
 }
 
-UTextureCube* FglTFRuntimeParser::BuildTextureCube(UObject* Outer, const TArray<FglTFRuntimeMipMap>& MipsXP, const TArray<FglTFRuntimeMipMap>& MipsXN, const TArray<FglTFRuntimeMipMap>& MipsYP, const TArray<FglTFRuntimeMipMap>& MipsYN, const TArray<FglTFRuntimeMipMap>& MipsZP, const TArray<FglTFRuntimeMipMap>& MipsZN, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler)
+UTextureCube* FglTFRuntimeParser::BuildTextureCube(UObject* Outer, const TArray<FglTFRuntimeMipMap>& MipsXP, const TArray<FglTFRuntimeMipMap>& MipsXN, const TArray<FglTFRuntimeMipMap>& MipsYP, const TArray<FglTFRuntimeMipMap>& MipsYN, const TArray<FglTFRuntimeMipMap>& MipsZP, const TArray<FglTFRuntimeMipMap>& MipsZN, const bool bAutoRotate, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler)
 {
 	UTextureCube* Texture = NewObject<UTextureCube>(Outer, NAME_None, RF_Public);
 	FTexturePlatformData* PlatformData = new FTexturePlatformData();
@@ -1000,13 +1047,51 @@ UTextureCube* FglTFRuntimeParser::BuildTextureCube(UObject* Outer, const TArray<
 #endif
 #endif
 		void* Data = Mip->BulkData.Realloc(MipMap.Pixels.Num() * 6);
-		FMemory::Memcpy(Data, MipMap.Pixels.GetData(), MipMap.Pixels.Num());
+		if (bAutoRotate)
+		{
+			const int32 BlockBytes = GPixelFormats[PlatformData->PixelFormat].BlockBytes;
+			const int32 Pitch = MipMap.Width * BlockBytes;
+			for (int32 Row = 0; Row < MipMap.Height; Row++)
+			{
+				for (int32 Column = 0; Column < MipMap.Width; Column++)
+				{
+					int32 SourceOffset = Row * Pitch + (Column * BlockBytes);
+					// X+
+					int32 DestinationOffset = (MipMap.Height - 1 - Column) * Pitch + (Row * BlockBytes);
+					for (int32 ByteOffset = 0; ByteOffset < BlockBytes; ByteOffset++)
+					{
+						reinterpret_cast<uint8*>(Data)[(MipMap.Pixels.Num() * 0) + DestinationOffset + ByteOffset] = MipsXP[MipIndex].Pixels.GetData()[SourceOffset + ByteOffset];
+					}
+					// X-
+					DestinationOffset = Column * Pitch + ((MipMap.Width - 1 - Row) * BlockBytes);
+					for (int32 ByteOffset = 0; ByteOffset < BlockBytes; ByteOffset++)
+					{
+						reinterpret_cast<uint8*>(Data)[(MipMap.Pixels.Num() * 1) + DestinationOffset + ByteOffset] = MipsXN[MipIndex].Pixels.GetData()[SourceOffset + ByteOffset];
+					}
+					// Y+
+					DestinationOffset = (MipMap.Height - 1 - Row) * Pitch + ((MipMap.Width - 1 - Column) * BlockBytes);
+					for (int32 ByteOffset = 0; ByteOffset < BlockBytes; ByteOffset++)
+					{
+						reinterpret_cast<uint8*>(Data)[(MipMap.Pixels.Num() * 2) + DestinationOffset + ByteOffset] = MipsZN[MipIndex].Pixels.GetData()[SourceOffset + ByteOffset];
+					}
+					// Z-
+					DestinationOffset = (MipMap.Height - 1 - Row) * Pitch + ((MipMap.Width - 1 - Column) * BlockBytes);
+					for (int32 ByteOffset = 0; ByteOffset < BlockBytes; ByteOffset++)
+					{
+						reinterpret_cast<uint8*>(Data)[(MipMap.Pixels.Num() * 5) + DestinationOffset + ByteOffset] = MipsYN[MipIndex].Pixels.GetData()[SourceOffset + ByteOffset];
+					}
+				}
+			}
+		}
+		else
+		{
+			FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 0), MipsZN[MipIndex].Pixels.GetData(), MipsZN[MipIndex].Pixels.Num());
+			FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 1), MipsZP[MipIndex].Pixels.GetData(), MipsZP[MipIndex].Pixels.Num());
+		}
 
-		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num()), MipsXN[MipIndex].Pixels.GetData(), MipsXN[MipIndex].Pixels.Num());
-		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 2), MipsYP[MipIndex].Pixels.GetData(), MipsYP[MipIndex].Pixels.Num());
-		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 3), MipsYN[MipIndex].Pixels.GetData(), MipsYN[MipIndex].Pixels.Num());
-		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 4), MipsZP[MipIndex].Pixels.GetData(), MipsZP[MipIndex].Pixels.Num());
-		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 5), MipsZN[MipIndex].Pixels.GetData(), MipsZN[MipIndex].Pixels.Num());
+		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 3), MipsZP[MipIndex].Pixels.GetData(), MipsXN[MipIndex].Pixels.Num());
+		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 4), MipsYP[MipIndex].Pixels.GetData(), MipsYP[MipIndex].Pixels.Num());
+
 
 		Mip->BulkData.Unlock();
 	}
@@ -1029,4 +1114,235 @@ UTextureCube* FglTFRuntimeParser::BuildTextureCube(UObject* Outer, const TArray<
 	Texture->UpdateResource();
 
 	return Texture;
+}
+
+UTexture2DArray* FglTFRuntimeParser::BuildTextureArray(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler)
+{
+	if (Mips.Num() == 0)
+	{
+		return nullptr;
+	}
+
+	UTexture2DArray* Texture = NewObject<UTexture2DArray>(Outer, NAME_None, RF_Public);
+	FTexturePlatformData* PlatformData = new FTexturePlatformData();
+	PlatformData->SizeX = Mips[0].Width;
+	PlatformData->SizeY = Mips[0].Height;
+	PlatformData->PixelFormat = Mips[0].PixelFormat;
+	PlatformData->SetNumSlices(Mips.Num());
+
+#if ENGINE_MAJOR_VERSION > 4
+	Texture->SetPlatformData(PlatformData);
+#else
+	Texture->PlatformData = PlatformData;
+#endif
+
+	Texture->NeverStream = true;
+
+	const FglTFRuntimeMipMap& MipMap = Mips[0];
+	FTexture2DMipMap* Mip = new FTexture2DMipMap();
+	PlatformData->Mips.Add(Mip);
+	Mip->SizeX = MipMap.Width;
+	Mip->SizeY = MipMap.Height;
+	Mip->SizeZ = Mips.Num();
+
+#if !WITH_EDITOR
+#if !NO_LOGGING
+	ELogVerbosity::Type CurrentLogSerializationVerbosity = LogSerialization.GetVerbosity();
+	bool bResetLogVerbosity = false;
+	if (CurrentLogSerializationVerbosity >= ELogVerbosity::Warning)
+	{
+		LogSerialization.SetVerbosity(ELogVerbosity::Error);
+		bResetLogVerbosity = true;
+	}
+#endif
+#endif
+
+	Mip->BulkData.Lock(LOCK_READ_WRITE);
+
+#if !WITH_EDITOR
+#if !NO_LOGGING
+	if (bResetLogVerbosity)
+	{
+		LogSerialization.SetVerbosity(CurrentLogSerializationVerbosity);
+	}
+#endif
+#endif
+	void* Data = Mip->BulkData.Realloc(MipMap.Pixels.Num() * Mips.Num());
+	for (int32 MipIndex = 0; MipIndex < Mips.Num(); MipIndex++)
+	{
+		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * MipIndex), Mips[MipIndex].Pixels.GetData(), Mips[MipIndex].Pixels.Num());
+	}
+
+	Mip->BulkData.Unlock();
+
+	Texture->CompressionSettings = ImagesConfig.Compression;
+	Texture->LODGroup = ImagesConfig.Group;
+	Texture->SRGB = ImagesConfig.bSRGB;
+
+	if (Sampler.MinFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MinFilter;
+	}
+
+	if (Sampler.MagFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MagFilter;
+	}
+
+	Texture->AddressX = Sampler.TileX;
+	Texture->AddressY = Sampler.TileY;
+	Texture->AddressZ = Sampler.TileZ;
+	Texture->UpdateResource();
+
+	return Texture;
+}
+
+FglTFRuntimeDDS::FglTFRuntimeDDS(const TArray64<uint8>& InData) : Data(InData)
+{
+
+}
+
+bool FglTFRuntimeDDS::IsDDS(const TArray64<uint8>& Data)
+{
+	// Magic + DDS_HEADER
+	const uint32* Ptr32 = reinterpret_cast<const uint32*>(Data.GetData());
+	return Data.Num() > (4 + 124) && Data[0] == 'D' && Data[1] == 'D' && Data[2] == 'S' && Data[3] == ' ' && Ptr32[1] == 124 && Ptr32[19] == 32;
+}
+
+void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const int32 MaxMip, const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	constexpr uint32 DDSD_MIPMAPCOUNT = 0x20000;
+	constexpr uint32 DDPF_FOURCC = 0x4;
+	constexpr uint32 DDPF_ALPHAPIXELS = 0x1;
+	constexpr uint32 DDSCAPS2_CUBEMAP = 0x200;
+
+	const uint32* Ptr32 = reinterpret_cast<const uint32*>(Data.GetData());
+	const uint32 Width = Ptr32[4];
+	const uint32 Height = Ptr32[3];
+	const uint32 Flags = Ptr32[2];
+
+	int32 NumberOfMips = 1;
+	if (Flags & DDSD_MIPMAPCOUNT)
+	{
+		NumberOfMips = Ptr32[7];
+	}
+
+	// nothing to load
+	if (NumberOfMips <= 0 || Width == 0 || Height == 0)
+	{
+		return;
+	}
+
+	if (MaxMip > 0)
+	{
+		NumberOfMips = FMath::Min(NumberOfMips, MaxMip);
+	}
+
+	EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
+	int64 PixelsOffset = 128;
+	int32 NumberOfSlices = 1;
+
+	// cubemap ?
+	if (Ptr32[28] & DDSCAPS2_CUBEMAP)
+	{
+		NumberOfSlices = 6;
+	}
+
+	// compressed?
+	if (Ptr32[20] & DDPF_FOURCC)
+	{
+		// DXT1
+		if (Ptr32[21] == 0x31545844)
+		{
+			PixelFormat = EPixelFormat::PF_DXT1;
+		}
+		else if (Ptr32[21] == 0x33545844)
+		{
+			PixelFormat = EPixelFormat::PF_DXT3;
+		}
+		else if (Ptr32[21] == 0x35545844)
+		{
+			PixelFormat = EPixelFormat::PF_DXT5;
+		}
+		else if (Ptr32[21] == 111)
+		{
+			PixelFormat = EPixelFormat::PF_R16F;
+		}
+		else if (Ptr32[21] == 112)
+		{
+			PixelFormat = EPixelFormat::PF_G16R16F;
+		}
+		else if (Ptr32[21] == 113)
+		{
+			PixelFormat = EPixelFormat::PF_FloatRGBA;
+		}
+		else if (Ptr32[21] == 0x30315844)
+		{
+			if (Data.Num() <= (4 + 124 + 20))
+			{
+				return;
+			}
+			PixelsOffset += 20;
+			constexpr uint32 DXGIFormatBC7 = 98;
+			constexpr uint32 DXGIFormatBGRA8 = 87;
+			// DDS_HEADER_DXT10
+			uint32 DXGIFormat = Ptr32[32];
+			if (DXGIFormat == DXGIFormatBC7)
+			{
+				PixelFormat = EPixelFormat::PF_BC7;
+			}
+			else if (DXGIFormat == DXGIFormatBGRA8)
+			{
+				PixelFormat = EPixelFormat::PF_B8G8R8A8;
+			}
+			else
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Unknown DDS DXGI PixelFormat: %u"), DXGIFormat);
+				return;
+			}
+
+			if (Ptr32[35] > 0)
+			{
+				// we multiply as we may have a cube here
+				NumberOfSlices *= Ptr32[35];
+			}
+		}
+		else
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unknown DDS FourCC PixelFormat: %u"), Ptr32[21]);
+			return;
+		}
+	}
+	else
+	{
+		if (!(Ptr32[18] % DDPF_ALPHAPIXELS))
+		{
+			UE_LOG(LogGLTFRuntime, Warning, TEXT("DDS Uncompressed PixelFormat without Alpha is not supported"));
+			return;
+		}
+	}
+
+	int32 MipWidth = Width;
+	int32 MipHeight = Height;
+
+	for (int32 MipIndex = 0; MipIndex < NumberOfMips; MipIndex++)
+	{
+		const int64 BlockX = GPixelFormats[PixelFormat].BlockSizeX;
+		const int64 BlockY = GPixelFormats[PixelFormat].BlockSizeY;
+		const int64 MipWidthAligned = FMath::Max(((MipWidth / BlockX) + ((MipWidth % BlockX) != 0 ? 1 : 0)) * BlockX, BlockX);
+		const int64 MipHeightAligned = FMath::Max(((MipHeight / BlockY) + ((MipHeight % BlockY) != 0 ? 1 : 0)) * BlockY, BlockY);
+		const int64 MipSize = ((MipWidthAligned * GPixelFormats[PixelFormat].BlockBytes * MipHeightAligned) / (BlockX * BlockY)) * NumberOfSlices;
+		if (PixelsOffset + MipSize > Data.Num())
+		{
+			return;
+		}
+		FglTFRuntimeMipMap MipMap(TextureIndex, PixelFormat, MipWidth, MipHeight);
+		MipMap.Pixels.AddUninitialized(MipSize);
+		FMemory::Memcpy(MipMap.Pixels.GetData(), Data.GetData() + PixelsOffset, MipSize);
+
+		Mips.Add(MoveTemp(MipMap));
+		PixelsOffset += MipSize;
+		MipWidth = FMath::Max(MipWidth / 2, 1);
+		MipHeight = FMath::Max(MipHeight / 2, 1);
+	}
 }

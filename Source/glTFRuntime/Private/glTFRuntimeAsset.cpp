@@ -618,7 +618,8 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRunt
 	TArray64<uint8> UncompressedBytes;
 	int32 Width = 0;
 	int32 Height = 0;
-	if (!Parser->LoadImage(ImageIndex, UncompressedBytes, Width, Height, ImagesConfig))
+	EPixelFormat PixelFormat;
+	if (!Parser->LoadImage(ImageIndex, UncompressedBytes, Width, Height, PixelFormat, ImagesConfig))
 	{
 		return nullptr;
 	}
@@ -629,6 +630,7 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRunt
 		Mip.Pixels = UncompressedBytes;
 		Mip.Width = Width;
 		Mip.Height = Height;
+		Mip.PixelFormat = PixelFormat;
 		TArray<FglTFRuntimeMipMap> Mips = { Mip };
 		return Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
 	}
@@ -636,15 +638,16 @@ UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRunt
 	return nullptr;
 }
 
-UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int32 ImageIndexXN, const int32 ImageIndexYP, const int32 ImageIndexYN, const int32 ImageIndexZP, const int32 ImageIndexZN, const FglTFRuntimeImagesConfig& ImagesConfig)
+UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int32 ImageIndexXN, const int32 ImageIndexYP, const int32 ImageIndexYN, const int32 ImageIndexZP, const int32 ImageIndexZN, const bool bAutoRotate, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
 	TArray64<uint8> UncompressedBytes[6];
 	int32 Width = 0;
 	int32 Height = 0;
+	EPixelFormat PixelFormat;
 	int32 CurrentWidth = 0;
 	int32 CurrentHeight = 0;
-	if (!Parser->LoadImage(ImageIndexXP, UncompressedBytes[0], Width, Height, ImagesConfig))
+	if (!Parser->LoadImage(ImageIndexXP, UncompressedBytes[0], Width, Height, PixelFormat, ImagesConfig))
 	{
 		return nullptr;
 	}
@@ -657,7 +660,7 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int
 	CurrentWidth = Width;
 	CurrentHeight = Height;
 
-	if (!Parser->LoadImage(ImageIndexXN, UncompressedBytes[1], Width, Height, ImagesConfig))
+	if (!Parser->LoadImage(ImageIndexXN, UncompressedBytes[1], Width, Height, PixelFormat, ImagesConfig))
 	{
 		return nullptr;
 	}
@@ -667,7 +670,7 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int
 		return nullptr;
 	}
 
-	if (!Parser->LoadImage(ImageIndexYP, UncompressedBytes[2], Width, Height, ImagesConfig))
+	if (!Parser->LoadImage(ImageIndexYP, UncompressedBytes[2], Width, Height, PixelFormat, ImagesConfig))
 	{
 		return nullptr;
 	}
@@ -677,7 +680,7 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int
 		return nullptr;
 	}
 
-	if (!Parser->LoadImage(ImageIndexYN, UncompressedBytes[3], Width, Height, ImagesConfig))
+	if (!Parser->LoadImage(ImageIndexYN, UncompressedBytes[3], Width, Height, PixelFormat, ImagesConfig))
 	{
 		return nullptr;
 	}
@@ -687,7 +690,7 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int
 		return nullptr;
 	}
 
-	if (!Parser->LoadImage(ImageIndexZP, UncompressedBytes[4], Width, Height, ImagesConfig))
+	if (!Parser->LoadImage(ImageIndexZP, UncompressedBytes[4], Width, Height, PixelFormat, ImagesConfig))
 	{
 		return nullptr;
 	}
@@ -697,7 +700,7 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int
 		return nullptr;
 	}
 
-	if (!Parser->LoadImage(ImageIndexZN, UncompressedBytes[5], Width, Height, ImagesConfig))
+	if (!Parser->LoadImage(ImageIndexZN, UncompressedBytes[5], Width, Height, PixelFormat, ImagesConfig))
 	{
 		return nullptr;
 	}
@@ -722,8 +725,27 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMap(const int32 ImageIndexXP, const int
 	TArray<FglTFRuntimeMipMap> MipsYN = { MipYN };
 	TArray<FglTFRuntimeMipMap> MipsZP = { MipZP };
 	TArray<FglTFRuntimeMipMap> MipsZN = { MipZN };
-	return Parser->BuildTextureCube(this, MipsXP, MipsXN, MipsYP, MipsYN, MipsZP, MipsZN, ImagesConfig, FglTFRuntimeTextureSampler());
+	return Parser->BuildTextureCube(this, MipsXP, MipsXN, MipsYP, MipsYN, MipsZP, MipsZN, bAutoRotate, ImagesConfig, FglTFRuntimeTextureSampler());
+}
 
+UTexture2DArray* UglTFRuntimeAsset::LoadImageArray(const TArray<int32>& ImageIndices, const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	TArray<FglTFRuntimeMipMap> Mips;
+
+	for (const int32 ImageIndex : ImageIndices)
+	{
+		FglTFRuntimeMipMap MipMap(-1);
+		if (!Parser->LoadImage(ImageIndex, MipMap.Pixels, MipMap.Width, MipMap.Height, MipMap.PixelFormat, ImagesConfig))
+		{
+			return nullptr;
+		}
+
+		Mips.Add(MipMap);
+	}
+
+	return Parser->BuildTextureArray(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
 }
 
 UTexture2D* UglTFRuntimeAsset::LoadImageFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig)
@@ -732,7 +754,8 @@ UTexture2D* UglTFRuntimeAsset::LoadImageFromBlob(const FglTFRuntimeImagesConfig&
 	TArray64<uint8> UncompressedBytes;
 	int32 Width = 0;
 	int32 Height = 0;
-	if (!Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, ImagesConfig))
+	EPixelFormat PixelFormat;
+	if (!Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, PixelFormat, ImagesConfig))
 	{
 		return nullptr;
 	}
@@ -743,8 +766,257 @@ UTexture2D* UglTFRuntimeAsset::LoadImageFromBlob(const FglTFRuntimeImagesConfig&
 		Mip.Pixels = UncompressedBytes;
 		Mip.Width = Width;
 		Mip.Height = Height;
+		Mip.PixelFormat = PixelFormat;
 		TArray<FglTFRuntimeMipMap> Mips = { Mip };
 		return Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
+	}
+
+	return nullptr;
+}
+
+UTexture2DArray* UglTFRuntimeAsset::LoadImageArrayFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	TArray64<uint8> UncompressedBytes;
+	int32 Width = 0;
+	int32 Height = 0;
+	EPixelFormat PixelFormat;
+	if (!Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, PixelFormat, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width > 0 && Height > 0)
+	{
+		int64 ImageSize = GPixelFormats[PixelFormat].Get2DImageSizeInBytes(Width, Height);
+		int32 NumberOfSlices = UncompressedBytes.Num() / ImageSize;
+		TArray<FglTFRuntimeMipMap> Mips;
+
+		for (int32 Slice = 0; Slice < NumberOfSlices; Slice++)
+		{
+			FglTFRuntimeMipMap Mip(-1);
+			Mip.Pixels.Append(UncompressedBytes.GetData() + (ImageSize * Slice), ImageSize);
+			Mip.Width = Width;
+			Mip.Height = Height;
+			Mip.PixelFormat = PixelFormat;
+
+			Mips.Add(MoveTemp(Mip));
+		}
+
+		return Parser->BuildTextureArray(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
+	}
+
+	return nullptr;
+}
+
+UTexture2D* UglTFRuntimeAsset::LoadMipsFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	TArray<FglTFRuntimeMipMap> Mips;
+	FglTFRuntimeParser::OnTextureMips.Broadcast(Parser.ToSharedRef(), -1, MakeShared<FJsonObject>(), MakeShared<FJsonObject>(), Parser->GetBlob(), Mips, ImagesConfig);
+	// if no Mips have been loaded, attempt parsing a DDS asset
+	if (Mips.Num() == 0)
+	{
+		if (FglTFRuntimeDDS::IsDDS(Parser->GetBlob()))
+		{
+			FglTFRuntimeDDS DDS(Parser->GetBlob());
+			DDS.LoadMips(-1, Mips, 0, ImagesConfig);
+		}
+	}
+
+	return Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
+}
+
+UTextureCube* UglTFRuntimeAsset::LoadCubeMapFromBlob(const bool bSpherical, const bool bAutoRotate, const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	TArray64<uint8> UncompressedBytes;
+	int32 Width = 0;
+	int32 Height = 0;
+	EPixelFormat PixelFormat;
+
+	if (!Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, PixelFormat, ImagesConfig))
+	{
+		return nullptr;
+	}
+
+	if (Width > 0 && Height > 0)
+	{
+		TArray<FglTFRuntimeMipMap> MipsXP;
+		TArray<FglTFRuntimeMipMap> MipsXN;
+		TArray<FglTFRuntimeMipMap> MipsYP;
+		TArray<FglTFRuntimeMipMap> MipsYN;
+		TArray<FglTFRuntimeMipMap> MipsZP;
+		TArray<FglTFRuntimeMipMap> MipsZN;
+
+		if (bSpherical)
+		{
+			const int32 Resolution = Height;
+			auto GetCubemapFace = [Resolution, Width, Height, PixelFormat](const TArray64<uint8>& Pixels, const FVector3f Start, const FVector3f Right, const FVector3f Up, TArray64<uint8>& OutPixels)
+			{
+				const int64 Pitch = Resolution * GPixelFormats[PixelFormat].BlockBytes;
+				OutPixels.AddUninitialized(Pitch * Resolution);
+
+				for (int32 PixelY = 0; PixelY < Resolution; PixelY++)
+				{
+					for (int32 PixelX = 0; PixelX < Resolution; PixelX++)
+					{
+						const int64 Offset = PixelY * Pitch + (PixelX * GPixelFormats[PixelFormat].BlockBytes);
+
+						float PX = Start.X + (PixelX * 2 + 0.5) / Resolution * Right.X + (PixelY * 2 + 0.5) / Resolution * Up.X;
+						float PY = Start.Y + (PixelX * 2 + 0.5) / Resolution * Right.Y + (PixelY * 2 + 0.5) / Resolution * Up.Y;
+						float PZ = Start.Z + (PixelX * 2 + 0.5) / Resolution * Right.Z + (PixelY * 2 + 0.5) / Resolution * Up.Z;
+
+						float Azimuth = FMath::Atan2(PX, -PZ) + PI;
+						float Elevation = FMath::Atan(PY / FMath::Sqrt(PX * PX + PZ * PZ)) + PI / 2;
+
+						float X1 = (Azimuth / PI / 2) * Width;
+						float Y1 = (Elevation / PI) * Height;
+
+						float IX;
+						float FX = FMath::Modf(X1 - 0.5, &IX);
+
+						float IY;
+						float FY = FMath::Modf(Y1 - 0.5, &IY);
+
+						int32 X2 = static_cast<int32>(IX);
+						int32 Y2 = static_cast<int32>(IY);
+						int32 X3 = 0;
+						int32 Y3 = 0;
+
+						if (FX < 0)
+						{
+							X3 = Width - 1;
+						}
+						else if (X2 == Width - 1)
+						{
+							X3 = 0;
+						}
+						else
+						{
+							X3 = X2 + 1;
+						}
+
+						if (FY < 0)
+						{
+							Y3 = Height - 1;
+						}
+						else if (Y2 == Height - 1)
+						{
+							Y3 = 0;
+						}
+						else
+						{
+							Y3 = Y2 + 1;
+						}
+
+						FX = FMath::Abs(FX);
+						FY = FMath::Abs(FY);
+
+						if (PixelFormat == EPixelFormat::PF_FloatRGB)
+						{
+							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
+							const int64 Offset00 = Y2 * (Width * 3) + (X2 * 3);
+							const FVector3f Color00 = FVector3f(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2]);
+							const int64 Offset10 = Y2 * (Width * 3) + (X3 * 3);
+							const FVector3f Color10 = FVector3f(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2]);
+
+							const int64 Offset01 = Y3 * (Width * 3) + (X2 * 3);
+							const FVector3f Color01 = FVector3f(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2]);
+							const int64 Offset11 = Y3 * (Width * 3) + (X3 * 3);
+							const FVector3f Color11 = FVector3f(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2]);
+
+							FVector3f Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
+
+							FFloat16Color Color16 = Color;
+
+
+							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 3);
+						}
+						else if (PixelFormat == EPixelFormat::PF_FloatRGBA)
+						{
+							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
+							const int64 Offset00 = Y2 * (Width * 4) + (X2 * 4);
+							const FVector4f Color00 = FVector4f(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2], Colors[Offset00 + 3]);
+							const int64 Offset10 = Y2 * (Width * 4) + (X3 * 4);
+							const FVector4f Color10 = FVector4f(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2], Colors[Offset10 + 3]);
+
+							const int64 Offset01 = Y3 * (Width * 4) + (X2 * 4);
+							const FVector4f Color01 = FVector4f(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2], Colors[Offset01 + 3]);
+							const int64 Offset11 = Y3 * (Width * 4) + (X3 * 4);
+							const FVector4f Color11 = FVector4f(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2], Colors[Offset11 + 3]);
+
+							FVector4f Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
+
+							FFloat16Color Color16 = Color;
+
+							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 4);
+						}
+						else
+						{
+
+						}
+					}
+				}
+			};
+
+			FglTFRuntimeMipMap MipXP(-1, PixelFormat, Resolution, Resolution);
+			GetCubemapFace(UncompressedBytes, { 1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, MipXP.Pixels);
+			MipsXP.Add(MoveTemp(MipXP));
+
+			FglTFRuntimeMipMap MipXN(-1, PixelFormat, Resolution, Resolution);
+			GetCubemapFace(UncompressedBytes, { -1.0f, -1.0f, 1.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f, 0.0f }, MipXN.Pixels);
+			MipsXN.Add(MoveTemp(MipXN));
+
+			FglTFRuntimeMipMap MipYP(-1, PixelFormat, Resolution, Resolution);
+			GetCubemapFace(UncompressedBytes, { -1.0f, -1.0f, 1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, MipYP.Pixels);
+			MipsYP.Add(MoveTemp(MipYP));
+
+			FglTFRuntimeMipMap MipYN(-1, PixelFormat, Resolution, Resolution);
+			GetCubemapFace(UncompressedBytes, { -1.0f, 1.0f, -1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, MipYN.Pixels);
+			MipsYN.Add(MoveTemp(MipYN));
+
+			FglTFRuntimeMipMap MipZP(-1, PixelFormat, Resolution, Resolution);
+			GetCubemapFace(UncompressedBytes, { -1.0f, -1.0f, -1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, MipZP.Pixels);
+			MipsZP.Add(MoveTemp(MipZP));
+
+			FglTFRuntimeMipMap MipZN(-1, PixelFormat, Resolution, Resolution);
+			GetCubemapFace(UncompressedBytes, { 1.0f, -1.0f, 1.0f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, MipZN.Pixels);
+			MipsZN.Add(MoveTemp(MipZN));
+		}
+		else
+		{
+			int64 ImageSize = GPixelFormats[PixelFormat].Get2DImageSizeInBytes(Width, Height);
+			int32 NumberOfSlices = UncompressedBytes.Num() / ImageSize;
+			if (NumberOfSlices != 6)
+			{
+				Parser->AddError("LoadCubeMapFromBlob", "Expected 6 slices in the texture");
+				return nullptr;
+			}
+
+			FglTFRuntimeMipMap MipXP(-1, PixelFormat, Width, Height);
+			MipXP.Pixels.Append(UncompressedBytes.GetData() + (ImageSize * 0), ImageSize);
+			MipsXP.Add(MoveTemp(MipXP));
+			FglTFRuntimeMipMap MipXN(-1, PixelFormat, Width, Height);
+			MipXN.Pixels.Append(UncompressedBytes.GetData() + (ImageSize * 1), ImageSize);
+			MipsXN.Add(MoveTemp(MipXN));
+
+			FglTFRuntimeMipMap MipYP(-1, PixelFormat, Width, Height);
+			MipYP.Pixels.Append(UncompressedBytes.GetData() + (ImageSize * 2), ImageSize);
+			MipsYP.Add(MoveTemp(MipYP));
+			FglTFRuntimeMipMap MipYN(-1, PixelFormat, Width, Height);
+			MipYN.Pixels.Append(UncompressedBytes.GetData() + (ImageSize * 3), ImageSize);
+			MipsYN.Add(MoveTemp(MipYN));
+
+			FglTFRuntimeMipMap MipZP(-1, PixelFormat, Width, Height);
+			MipZP.Pixels.Append(UncompressedBytes.GetData() + (ImageSize * 4), ImageSize);
+			MipsZP.Add(MoveTemp(MipZP));
+			FglTFRuntimeMipMap MipZN(-1, PixelFormat, Width, Height);
+			MipZN.Pixels.Append(UncompressedBytes.GetData() + (ImageSize * 5), ImageSize);
+			MipsZN.Add(MoveTemp(MipZN));
+		}
+
+		return Parser->BuildTextureCube(this, MipsXP, MipsXN, MipsYP, MipsYN, MipsZP, MipsZN, bSpherical ? true : bAutoRotate, ImagesConfig, FglTFRuntimeTextureSampler());
 	}
 
 	return nullptr;

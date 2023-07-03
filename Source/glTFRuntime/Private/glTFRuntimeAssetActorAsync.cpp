@@ -16,6 +16,7 @@ AglTFRuntimeAssetActorAsync::AglTFRuntimeAssetActorAsync()
 	RootComponent = AssetRoot;
 
 	bShowWhileLoading = true;
+	bStaticMeshesAsSkeletal = false;
 }
 
 // Called when the game starts or when spawned
@@ -79,7 +80,7 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 	}
 	else
 	{
-		if (Node.SkinIndex < 0)
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
 		{
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
