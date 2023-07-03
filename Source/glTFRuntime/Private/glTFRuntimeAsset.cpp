@@ -928,7 +928,7 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMapFromBlob(const bool bSpherical, cons
 
 							FVector3f Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
 
-							FFloat16Color Color16 = Color;
+							FFloat16Color Color16 = FLinearColor(Color);
 
 
 							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 3);
@@ -948,7 +948,7 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMapFromBlob(const bool bSpherical, cons
 
 							FVector4f Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
 
-							FFloat16Color Color16 = Color;
+							FFloat16Color Color16 = FLinearColor(Color);
 
 							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 4);
 						}
