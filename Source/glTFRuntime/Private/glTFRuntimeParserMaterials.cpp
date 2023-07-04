@@ -876,6 +876,8 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		}
 	}
 
+	OnTextureFilterMips.Broadcast(AsShared(), Mips, MaterialsConfig.ImagesConfig);
+
 	int64 SamplerIndex;
 	if (JsonTextureObject->TryGetNumberField("sampler", SamplerIndex))
 	{
@@ -1100,8 +1102,10 @@ UTextureCube* FglTFRuntimeParser::BuildTextureCube(UObject* Outer, const TArray<
 		}
 		else
 		{
-			FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 0), MipsZN[MipIndex].Pixels.GetData(), MipsZN[MipIndex].Pixels.Num());
-			FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 1), MipsZP[MipIndex].Pixels.GetData(), MipsZP[MipIndex].Pixels.Num());
+			FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 0), MipsXP[MipIndex].Pixels.GetData(), MipsXP[MipIndex].Pixels.Num());
+			FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 1), MipsXN[MipIndex].Pixels.GetData(), MipsXN[MipIndex].Pixels.Num());
+			FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 2), MipsZN[MipIndex].Pixels.GetData(), MipsZN[MipIndex].Pixels.Num());
+			FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 5), MipsYN[MipIndex].Pixels.GetData(), MipsYN[MipIndex].Pixels.Num());
 		}
 
 		FMemory::Memcpy(reinterpret_cast<uint8*>(Data) + (MipMap.Pixels.Num() * 3), MipsZP[MipIndex].Pixels.GetData(), MipsXN[MipIndex].Pixels.Num());

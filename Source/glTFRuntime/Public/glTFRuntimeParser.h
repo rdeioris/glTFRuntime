@@ -387,6 +387,9 @@ struct FglTFRuntimeImagesConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bForceHDR;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bCompressMips;
+
 	FglTFRuntimeImagesConfig()
 	{
 		Compression = TextureCompressionSettings::TC_Default;
@@ -396,6 +399,7 @@ struct FglTFRuntimeImagesConfig
 		MaxHeight = 0;
 		bVerticalFlip = false;
 		bForceHDR = false;
+		bCompressMips = false;
 	}
 };
 
@@ -1273,6 +1277,11 @@ struct FglTFRuntimeMipMap
 	{
 		PixelFormat = EPixelFormat::PF_B8G8R8A8;
 	}
+
+	bool IsCompressed() const
+	{
+		return !(GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1);
+	}
 };
 
 struct FglTFRuntimeTextureTransform
@@ -1499,6 +1508,7 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedRefSkeleton, TSharedR
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnCreatedPoseTracks, TSharedRef<FglTFRuntimeParser>, TMap<FString, FRawAnimSequenceTrack>&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnTextureImageIndex, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, int64&);
 DECLARE_MULTICAST_DELEGATE_SevenParams(FglTFRuntimeOnTextureMips, TSharedRef<FglTFRuntimeParser>, const int32, TSharedRef<FJsonObject>, TSharedRef<FJsonObject>, TArray64<uint8>&, TArray<FglTFRuntimeMipMap>&, const FglTFRuntimeImagesConfig&);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnTextureFilterMips, TSharedRef<FglTFRuntimeParser>, TArray<FglTFRuntimeMipMap>&, const FglTFRuntimeImagesConfig&);
 DECLARE_MULTICAST_DELEGATE_EightParams(FglTFRuntimeOnTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, TArray64<uint8>&, int32&, int32&, EPixelFormat&, TArray64<uint8>&, const FglTFRuntimeImagesConfig&);
 DECLARE_MULTICAST_DELEGATE_FiveParams(FglTFRuntimeOnLoadedTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, const int32, const int32, FColor*);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnFinalizedStaticMesh, TSharedRef<FglTFRuntimeParser>, UStaticMesh*, const FglTFRuntimeStaticMeshConfig&);
@@ -1675,6 +1685,7 @@ public:
 	static FglTFRuntimeOnCreatedPoseTracks OnCreatedPoseTracks;
 	static FglTFRuntimeOnTextureImageIndex OnTextureImageIndex;
 	static FglTFRuntimeOnTextureMips OnTextureMips;
+	static FglTFRuntimeOnTextureFilterMips OnTextureFilterMips;
 	static FglTFRuntimeOnTexturePixels OnTexturePixels;
 	static FglTFRuntimeOnLoadedTexturePixels OnLoadedTexturePixels;
 	static FglTFRuntimeOnFinalizedStaticMesh OnFinalizedStaticMesh;
