@@ -788,7 +788,13 @@ UTexture2DArray* UglTFRuntimeAsset::LoadImageArrayFromBlob(const FglTFRuntimeIma
 
 	if (Width > 0 && Height > 0)
 	{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 		int64 ImageSize = GPixelFormats[PixelFormat].Get2DImageSizeInBytes(Width, Height);
+#else
+		const int64 BlockWidth = (Width + GPixelFormats[PixelFormat].BlockSizeX - 1) / GPixelFormats[PixelFormat].BlockSizeX;
+		const int64 BlockHeight = (Width + GPixelFormats[PixelFormat].BlockSizeY - 1) / GPixelFormats[PixelFormat].BlockSizeY;
+		int64 ImageSize = BlockWidth * BlockHeight * GPixelFormats[PixelFormat].BlockBytes;
+#endif
 		int32 NumberOfSlices = UncompressedBytes.Num() / ImageSize;
 		TArray<FglTFRuntimeMipMap> Mips;
 
@@ -852,7 +858,11 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMapFromBlob(const bool bSpherical, cons
 		if (bSpherical)
 		{
 			const int32 Resolution = Height;
+#if ENGINE_MAJOR_VERSION >= 5
 			auto GetCubemapFace = [Resolution, Width, Height, PixelFormat](const TArray64<uint8>& Pixels, const FVector3f Start, const FVector3f Right, const FVector3f Up, TArray64<uint8>& OutPixels)
+#else
+			auto GetCubemapFace = [Resolution, Width, Height, PixelFormat](const TArray64<uint8>& Pixels, const FVector Start, const FVector Right, const FVector Up, TArray64<uint8>& OutPixels)
+#endif
 			{
 				const int64 Pitch = Resolution * GPixelFormats[PixelFormat].BlockBytes;
 				OutPixels.AddUninitialized(Pitch * Resolution);
@@ -913,6 +923,7 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMapFromBlob(const bool bSpherical, cons
 						FX = FMath::Abs(FX);
 						FY = FMath::Abs(FY);
 
+#if ENGINE_MAJOR_VERSION >= 5
 						if (PixelFormat == EPixelFormat::PF_FloatRGB)
 						{
 							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
@@ -952,6 +963,48 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMapFromBlob(const bool bSpherical, cons
 
 							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 4);
 						}
+
+#else
+						if (PixelFormat == EPixelFormat::PF_FloatRGB)
+						{
+							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
+							const int64 Offset00 = Y2 * (Width * 3) + (X2 * 3);
+							const FVector Color00 = FVector(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2]);
+							const int64 Offset10 = Y2 * (Width * 3) + (X3 * 3);
+							const FVector Color10 = FVector(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2]);
+
+							const int64 Offset01 = Y3 * (Width * 3) + (X2 * 3);
+							const FVector Color01 = FVector(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2]);
+							const int64 Offset11 = Y3 * (Width * 3) + (X3 * 3);
+							const FVector Color11 = FVector(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2]);
+
+							FVector Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
+
+							FFloat16Color Color16 = FLinearColor(Color);
+
+
+							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 3);
+						}
+						else if (PixelFormat == EPixelFormat::PF_FloatRGBA)
+						{
+							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
+							const int64 Offset00 = Y2 * (Width * 4) + (X2 * 4);
+							const FVector4 Color00 = FVector4(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2], Colors[Offset00 + 3]);
+							const int64 Offset10 = Y2 * (Width * 4) + (X3 * 4);
+							const FVector4 Color10 = FVector4(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2], Colors[Offset10 + 3]);
+
+							const int64 Offset01 = Y3 * (Width * 4) + (X2 * 4);
+							const FVector4 Color01 = FVector4(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2], Colors[Offset01 + 3]);
+							const int64 Offset11 = Y3 * (Width * 4) + (X3 * 4);
+							const FVector4 Color11 = FVector4(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2], Colors[Offset11 + 3]);
+
+							FVector4 Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
+
+							FFloat16Color Color16 = FLinearColor(Color);
+
+							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 4);
+						}
+#endif
 						else
 						{
 
@@ -986,7 +1039,13 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMapFromBlob(const bool bSpherical, cons
 		}
 		else
 		{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 			int64 ImageSize = GPixelFormats[PixelFormat].Get2DImageSizeInBytes(Width, Height);
+#else
+			const int64 BlockWidth = (Width + GPixelFormats[PixelFormat].BlockSizeX - 1) / GPixelFormats[PixelFormat].BlockSizeX;
+			const int64 BlockHeight = (Width + GPixelFormats[PixelFormat].BlockSizeY - 1) / GPixelFormats[PixelFormat].BlockSizeY;
+			int64 ImageSize = BlockWidth * BlockHeight * GPixelFormats[PixelFormat].BlockBytes;
+#endif
 			int32 NumberOfSlices = UncompressedBytes.Num() / ImageSize;
 			if (NumberOfSlices != 6)
 			{
