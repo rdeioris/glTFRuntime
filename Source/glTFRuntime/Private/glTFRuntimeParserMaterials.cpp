@@ -1155,7 +1155,7 @@ UTexture2DArray* FglTFRuntimeParser::BuildTextureArray(UObject* Outer, const TAr
 	PlatformData->PixelFormat = Mips[0].PixelFormat;
 	PlatformData->SetNumSlices(Mips.Num());
 
-#if ENGINE_MAJOR_VERSION > 4
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 	Texture->SetPlatformData(PlatformData);
 #else
 	Texture->PlatformData = PlatformData;
