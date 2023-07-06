@@ -1329,6 +1329,7 @@ void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipM
 			PixelsOffset += 20;
 			constexpr uint32 DXGIFormatBC7 = 98;
 			constexpr uint32 DXGIFormatBGRA8 = 87;
+			constexpr uint32 DXGIFormatBC5 = 83;
 			// DDS_HEADER_DXT10
 			uint32 DXGIFormat = Ptr32[32];
 			if (DXGIFormat == DXGIFormatBC7)
@@ -1338,6 +1339,10 @@ void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipM
 			else if (DXGIFormat == DXGIFormatBGRA8)
 			{
 				PixelFormat = EPixelFormat::PF_B8G8R8A8;
+			}
+			else if (DXGIFormat == DXGIFormatBC5)
+			{
+				PixelFormat = EPixelFormat::PF_BC5;
 			}
 			else
 			{
