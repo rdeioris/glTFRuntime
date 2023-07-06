@@ -1297,7 +1297,7 @@ struct FglTFRuntimeMipMap
 class FglTFRuntimeTextureMipDataProvider : public FTextureMipDataProvider
 {
 public:
-#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 	FglTFRuntimeTextureMipDataProvider(const UTexture* Texture, ETickState InTickState, ETickThread InTickThread) : FTextureMipDataProvider(Texture, InTickState, InTickThread)
 #else
 	FglTFRuntimeTextureMipDataProvider(ETickState InTickState, ETickThread InTickThread) : FTextureMipDataProvider(InTickState, InTickThread)
@@ -1340,12 +1340,16 @@ class UglTFRuntimeTextureMipDataProviderFactory : public UTextureMipDataProvider
 	GENERATED_BODY()
 
 public:
-#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 	virtual FTextureMipDataProvider* AllocateMipDataProvider(UTexture* Asset) { return new FglTFRuntimeTextureMipDataProvider(Asset, FTextureMipDataProvider::ETickState::Init, FTextureMipDataProvider::ETickThread::Async); }
-	virtual bool WillProvideMipDataWithoutDisk() const override { return true; }
 #else
 	virtual FTextureMipDataProvider* AllocateMipDataProvider() { return new FglTFRuntimeTextureMipDataProvider(FTextureMipDataProvider::ETickState::Init, FTextureMipDataProvider::ETickThread::Async); }
 #endif
+
+#if ENGINE_MAJOR_VERSION >= 5
+	virtual bool WillProvideMipDataWithoutDisk() const override { return true; }
+#endif
+
 };
 
 struct FglTFRuntimeTextureTransform

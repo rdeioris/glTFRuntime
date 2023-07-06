@@ -1398,12 +1398,12 @@ void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipM
 
 int32 FglTFRuntimeTextureMipDataProvider::GetMips(const FTextureUpdateContext& Context, int32 StartingMipIndex, const FTextureMipInfoArray& MipInfos, const FTextureUpdateSyncOptions& SyncOptions)
 {
-#if ENGINE_MAJOR_VERSION == 4
+#if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION < 27
 	const int32 CurrentFirstLODIdx = Context.CurrentFirstMipIndex;
 #endif
 	for (int32 MipIndex = StartingMipIndex; MipIndex < CurrentFirstLODIdx; MipIndex++)
 	{
-#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 		const FTexture2DMipMap& MipMap = *Context.MipsView[MipIndex];
 #else
 		// pretty brutal (we are always assuming UTexture2D), but should be safe
