@@ -478,16 +478,26 @@ void FglTFRuntimeParser::LoadAndFillBaseMaterials()
 	if (ClearCoatMaterial)
 	{
 		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Opaque, ClearCoatMaterial);
-		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, ClearCoatMaterial);
-		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Translucent, ClearCoatMaterial);
+	}
+
+	UMaterialInterface* ClearCoatTranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeBaseTranslucent_Inst"));
+	if (ClearCoatTranslucentMaterial)
+	{
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, ClearCoatTranslucentMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Translucent, ClearCoatTranslucentMaterial);
 	}
 
 	UMaterialInterface* ClearCoatTwoSidedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeTwoSided_Inst"));
 	if (ClearCoatTwoSidedMaterial)
 	{
 		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSided, ClearCoatTwoSidedMaterial);
-		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, ClearCoatTwoSidedMaterial);
-		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, ClearCoatTwoSidedMaterial);
+	}
+
+	UMaterialInterface* ClearCoatTwoSidedTranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeTwoSidedTranslucent_Inst"));
+	if (ClearCoatTwoSidedTranslucentMaterial)
+	{
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, ClearCoatTwoSidedTranslucentMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, ClearCoatTwoSidedTranslucentMaterial);
 	}
 }
 

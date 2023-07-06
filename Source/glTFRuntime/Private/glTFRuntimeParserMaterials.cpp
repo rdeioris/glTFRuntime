@@ -407,14 +407,6 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	}
 
-	if (RuntimeMaterial.bKHR_materials_transmission)
-	{
-		if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
-		{
-			BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
-		}
-	}
-
 	if (RuntimeMaterial.bKHR_materials_unlit)
 	{
 		if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
@@ -431,6 +423,15 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	}
 
+	// NOTE: ensure to have transmission as the last check given its incompatibility with other materials like clearcoat
+	if (RuntimeMaterial.bKHR_materials_transmission)
+	{
+		if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+	
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
 		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[RuntimeMaterial.MaterialType];
@@ -1165,7 +1166,7 @@ UTexture2DArray* FglTFRuntimeParser::BuildTextureArray(UObject* Outer, const TAr
 	PlatformData->PixelFormat = Mips[0].PixelFormat;
 	PlatformData->SetNumSlices(Mips.Num());
 
-#if ENGINE_MAJOR_VERSION > 4
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 	Texture->SetPlatformData(PlatformData);
 #else
 	Texture->PlatformData = PlatformData;
