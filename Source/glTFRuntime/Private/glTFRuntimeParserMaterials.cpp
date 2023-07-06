@@ -1398,9 +1398,17 @@ void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipM
 
 int32 FglTFRuntimeTextureMipDataProvider::GetMips(const FTextureUpdateContext& Context, int32 StartingMipIndex, const FTextureMipInfoArray& MipInfos, const FTextureUpdateSyncOptions& SyncOptions)
 {
+#if ENGINE_MAJOR_VERSION == 4
+	const int32 CurrentFirstLODIdx = Context.CurrentFirstMipIndex;
+#endif
 	for (int32 MipIndex = StartingMipIndex; MipIndex < CurrentFirstLODIdx; MipIndex++)
 	{
+#if ENGINE_MAJOR_VERSION >= 5
 		const FTexture2DMipMap& MipMap = *Context.MipsView[MipIndex];
+#else
+		// pretty brutal (we are always assuming UTexture2D), but should be safe
+		const FTexture2DMipMap& MipMap = Cast<UTexture2D>(Context.Texture)->PlatformData->Mips[MipIndex];
+#endif
 		FByteBulkData* ByteBulkData = const_cast<FByteBulkData*>(&MipMap.BulkData);
 
 		const FTextureMipInfo& MipInfo = MipInfos[MipIndex];
