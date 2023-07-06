@@ -397,14 +397,6 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	}
 
-	if (RuntimeMaterial.bKHR_materials_transmission)
-	{
-		if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
-		{
-			BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
-		}
-	}
-
 	if (RuntimeMaterial.bKHR_materials_unlit)
 	{
 		if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
@@ -421,6 +413,15 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	}
 
+	// NOTE: ensure to have transmission as the last check given its incompatibility with other materials like clearcoat
+	if (RuntimeMaterial.bKHR_materials_transmission)
+	{
+		if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+	
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
 		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[RuntimeMaterial.MaterialType];
