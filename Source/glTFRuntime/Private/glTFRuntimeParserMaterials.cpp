@@ -359,6 +359,7 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	Texture->UpdateResource();
 
+
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
 
 	return Texture;
@@ -1395,7 +1396,7 @@ int32 FglTFRuntimeTextureMipDataProvider::GetMips(const FTextureUpdateContext& C
 			ByteBulkData->GetCopy(&Dest, false);
 		}
 	}
-	UE_LOG(LogTemp, Error, TEXT("GetMips() %d %d %d %d"), StartingMipIndex, MipInfos.Num(), CurrentFirstLODIdx, PendingFirstLODIdx);
+
 	AdvanceTo(ETickState::CleanUp, ETickThread::Async);
 	return CurrentFirstLODIdx;
 }

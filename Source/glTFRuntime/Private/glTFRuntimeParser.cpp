@@ -480,7 +480,7 @@ void FglTFRuntimeParser::LoadAndFillBaseMaterials()
 		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Opaque, ClearCoatMaterial);
 	}
 
-	UMaterialInterface* ClearCoatTranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeBaseTranslucent_Inst"));
+	UMaterialInterface* ClearCoatTranslucentMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeTranslucent_Inst"));
 	if (ClearCoatTranslucentMaterial)
 	{
 		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, ClearCoatTranslucentMaterial);
