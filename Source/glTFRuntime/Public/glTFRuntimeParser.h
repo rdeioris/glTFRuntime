@@ -14,6 +14,7 @@
 #include "Engine/Texture2D.h"
 #include "Engine/Texture2DArray.h"
 #include "Engine/TextureCube.h"
+#include "Engine/TextureMipDataProviderFactory.h"
 #include "Camera/CameraComponent.h"
 #include "Components/AudioComponent.h"
 #include "Components/LightComponent.h"
@@ -23,6 +24,7 @@
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
 #include "Serialization/ArrayReader.h"
+#include "Streaming/TextureMipDataProvider.h"
 #include "UObject/Package.h"
 #include "glTFRuntimeParser.generated.h"
 
@@ -390,6 +392,12 @@ struct FglTFRuntimeImagesConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bCompressMips;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bStreaming;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 LODBias;
+
 	FglTFRuntimeImagesConfig()
 	{
 		Compression = TextureCompressionSettings::TC_Default;
@@ -400,6 +408,8 @@ struct FglTFRuntimeImagesConfig
 		bVerticalFlip = false;
 		bForceHDR = false;
 		bCompressMips = false;
+		bStreaming = false;
+		LODBias = 0;
 	}
 };
 
@@ -1282,6 +1292,52 @@ struct FglTFRuntimeMipMap
 	{
 		return !(GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1);
 	}
+};
+
+class FglTFRuntimeTextureMipDataProvider : public FTextureMipDataProvider
+{
+public:
+	FglTFRuntimeTextureMipDataProvider(const UTexture* Texture, ETickState InTickState, ETickThread InTickThread) : FTextureMipDataProvider(Texture, InTickState, InTickThread)
+	{
+	}
+
+	void Init(const FTextureUpdateContext& Context, const FTextureUpdateSyncOptions& SyncOptions)
+	{
+		AdvanceTo(ETickState::GetMips, ETickThread::Async);
+	}
+
+	int32 GetMips(const FTextureUpdateContext& Context, int32 StartingMipIndex, const FTextureMipInfoArray& MipInfos, const FTextureUpdateSyncOptions& SyncOptions);
+
+	bool PollMips(const FTextureUpdateSyncOptions& SyncOptions)
+	{
+		AdvanceTo(ETickState::Done, ETickThread::None);
+		return true;
+	}
+
+	void CleanUp(const FTextureUpdateSyncOptions& SyncOptions)
+	{
+		AdvanceTo(ETickState::Done, ETickThread::None);
+	}
+
+	void Cancel(const FTextureUpdateSyncOptions& SyncOptions)
+	{
+	}
+
+	virtual ETickThread GetCancelThread() const
+	{
+		return ETickThread::None;
+	}
+
+};
+
+UCLASS()
+class UglTFRuntimeTextureMipDataProviderFactory : public UTextureMipDataProviderFactory
+{
+	GENERATED_BODY()
+
+public:
+	virtual FTextureMipDataProvider* AllocateMipDataProvider(UTexture* Asset) { return new FglTFRuntimeTextureMipDataProvider(Asset, FTextureMipDataProvider::ETickState::Init, FTextureMipDataProvider::ETickThread::Async); }
+	virtual bool WillProvideMipDataWithoutDisk() const override { return true; }
 };
 
 struct FglTFRuntimeTextureTransform

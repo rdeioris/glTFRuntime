@@ -297,7 +297,13 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	Texture->PlatformData = PlatformData;
 #endif
 
-	Texture->NeverStream = true;
+	Texture->LODBias = (ImagesConfig.LODBias >= 0 && ImagesConfig.LODBias < (Mips.Num() - 1)) ? ImagesConfig.LODBias : 0;
+	Texture->NeverStream = !ImagesConfig.bStreaming;
+
+	if (ImagesConfig.bStreaming)
+	{
+		Texture->AddAssetUserData(NewObject<UglTFRuntimeTextureMipDataProviderFactory>());
+	}
 
 	for (const FglTFRuntimeMipMap& MipMap : Mips)
 	{
@@ -333,6 +339,7 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 		Mip->BulkData.Unlock();
 	}
 
+
 	Texture->CompressionSettings = ImagesConfig.Compression;
 	Texture->LODGroup = ImagesConfig.Group;
 	Texture->SRGB = ImagesConfig.bSRGB;
@@ -351,6 +358,9 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	Texture->AddressY = Sampler.TileY;
 
 	Texture->UpdateResource();
+
+
+	UE_LOG(LogTemp, Error, TEXT("Streaming %d %d %d %d %p"), Texture->NeverStream, Texture->IsFullyStreamedIn(), Texture->GetStreamingIndex(), Texture->HasPendingInitOrStreaming(), Texture->GetResource()->GetTextureRHI().GetReference());
 
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
 
@@ -1370,4 +1380,24 @@ void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipM
 		MipWidth = FMath::Max(MipWidth / 2, 1);
 		MipHeight = FMath::Max(MipHeight / 2, 1);
 	}
+}
+
+int32 FglTFRuntimeTextureMipDataProvider::GetMips(const FTextureUpdateContext& Context, int32 StartingMipIndex, const FTextureMipInfoArray& MipInfos, const FTextureUpdateSyncOptions& SyncOptions)
+{
+	for (int32 MipIndex = StartingMipIndex; MipIndex < CurrentFirstLODIdx; MipIndex++)
+	{
+		const FTexture2DMipMap& MipMap = *Context.MipsView[MipIndex];
+		FByteBulkData* ByteBulkData = const_cast<FByteBulkData*>(&MipMap.BulkData);
+
+		const FTextureMipInfo& MipInfo = MipInfos[MipIndex];
+		void* Dest = MipInfo.DestData;
+
+		if (ByteBulkData->GetBulkDataSize() > 0)
+		{
+			ByteBulkData->GetCopy(&Dest, false);
+		}
+	}
+	UE_LOG(LogTemp, Error, TEXT("GetMips() %d %d %d %d"), StartingMipIndex, MipInfos.Num(), CurrentFirstLODIdx, PendingFirstLODIdx);
+	AdvanceTo(ETickState::CleanUp, ETickThread::Async);
+	return CurrentFirstLODIdx;
 }
