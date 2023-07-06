@@ -359,9 +359,6 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	Texture->UpdateResource();
 
-
-	UE_LOG(LogTemp, Error, TEXT("Streaming %d %d %d %d %p"), Texture->NeverStream, Texture->IsFullyStreamedIn(), Texture->GetStreamingIndex(), Texture->HasPendingInitOrStreaming(), Texture->GetResource()->GetTextureRHI().GetReference());
-
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
 
 	return Texture;
@@ -431,7 +428,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
 		}
 	}
-	
+
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
 		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[RuntimeMaterial.MaterialType];
