@@ -784,6 +784,24 @@ struct FglTFRuntimeCapsule
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimeSphere
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector Center;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float Radius;
+
+	FglTFRuntimeSphere()
+	{
+		Center = FVector::ZeroVector;
+		Radius = 0;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimePhysicsBody
 {
 	GENERATED_BODY()
@@ -801,7 +819,7 @@ struct FglTFRuntimePhysicsBody
 	TArray<FglTFRuntimeCapsule> CapsuleCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TArray<FSphere> SphereCollisions;
+	TArray<FglTFRuntimeSphere> SphereCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FBox> BoxCollisions;

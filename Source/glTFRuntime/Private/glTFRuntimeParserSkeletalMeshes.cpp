@@ -1,4 +1,4 @@
-// Copyright 2020-2022, Roberto De Ioris.
+// Copyright 2020-2023, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
 #include "Runtime/Launch/Resources/Version.h"
@@ -830,7 +830,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #if ENGINE_MAJOR_VERSION > 4
 					MorphTargetLODModel.NumVertices = MorphTargetLODModel.Vertices.Num();
 #endif
-					}
+				}
 
 				if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreEmptyMorphTargets && bSkip)
 				{
@@ -884,7 +884,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 						MorphTargetName = FString::Printf(TEXT("%s_%d"), *MorphTargetName, MorphTargetIndex);
 						bAddMorphTarget = true;
 					}
-					}
+				}
 				else
 				{
 					bAddMorphTarget = true;
@@ -904,9 +904,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 				}
 
 				MorphTargetIndex++;
-				}
+			}
 			BaseIndex += Primitive.Indices.Num();
-					}
+		}
 
 		for (int32 MatIndex = 0; MatIndex < SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives.Num(); MatIndex++)
 		{
@@ -924,16 +924,24 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 			SkeletalMaterials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[MatIndex].MaterialName)));
 		}
-				}
+	}
 
 #if WITH_EDITOR
 	SkeletalMeshContext->SkeletalMesh->SetLODSettings(NewObject<USkeletalMeshLODSettings>());
 
+#if ENGINE_MAJOR_VERSION >= 5
 	SkeletalMeshContext->SkeletalMesh->GetLODSettings()->SetLODSettingsFromMesh(SkeletalMeshContext->SkeletalMesh);
+#else
+	SkeletalMeshContext->SkeletalMesh->LODSettings->SetLODSettingsFromMesh(SkeletalMeshContext->SkeletalMesh);
+#endif
 
 	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
 	{
+#if ENGINE_MAJOR_VERSION >= 5
 		const FSkeletalMeshLODGroupSettings& SkeletalMeshLODGroupSettings = SkeletalMeshContext->SkeletalMesh->GetLODSettings()->GetSettingsForLODLevel(LODIndex);
+#else
+		const FSkeletalMeshLODGroupSettings& SkeletalMeshLODGroupSettings = SkeletalMeshContext->SkeletalMesh->LODSettings->GetSettingsForLODLevel(LODIndex);
+#endif
 
 		SkeletalMeshContext->SkeletalMesh->GetLODInfo(LODIndex)->BuildGUID = SkeletalMeshContext->SkeletalMesh->GetLODInfo(LODIndex)->ComputeDeriveDataCacheKey(&SkeletalMeshLODGroupSettings);
 		ImportedResource->LODModels[LODIndex].BuildStringID = ImportedResource->LODModels[LODIndex].GetLODModelDeriveDataKey();
@@ -977,7 +985,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalMeshContext->SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMeshContext->SkeletalMesh);
 #endif
 		}
-		}
+	}
 	else
 	{
 		if (CanReadFromCache(SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CacheMode) && SkeletonsCache.Contains(SkeletalMeshContext->SkinIndex))
@@ -1031,7 +1039,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalMeshContext->SkeletalMesh->Skeleton->Sockets.Add(SkeletalSocket);
 #endif
 		}
-		}
+	}
 
 	if (bHasMorphTargets)
 	{
@@ -1061,8 +1069,8 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 						NewBodySetup->bConsiderForBounds = SourceBodySetup->bConsiderForBounds;
 						NewBodySetup->AggGeom = SourceBodySetup->AggGeom;
 						PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
+					}
 				}
-			}
 				for (UPhysicsConstraintTemplate* ConstraintTemplate : PhysicsAssetTemplate->ConstraintSetup)
 				{
 					UPhysicsConstraintTemplate* NewConstraint = NewObject<UPhysicsConstraintTemplate>(PhysicsAsset, NAME_None, RF_Public);
@@ -1070,7 +1078,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					NewConstraint->ProfileHandles = ConstraintTemplate->ProfileHandles;
 					PhysicsAsset->ConstraintSetup.Add(NewConstraint);
 				}
-		}
+			}
 			for (const TPair<FString, FglTFRuntimePhysicsBody>& PhysicsBody : SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies)
 			{
 				if (PhysicsBody.Key.IsEmpty())
@@ -1093,11 +1101,11 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					NewBodySetup->AggGeom.SphylElems.Add(Capsule);
 				}
 
-				for (const FSphere& SphereCollision : PhysicsBody.Value.SphereCollisions)
+				for (const FglTFRuntimeSphere& SphereCollision : PhysicsBody.Value.SphereCollisions)
 				{
 					FKSphereElem Sphere;
 					Sphere.Center = SphereCollision.Center;
-					Sphere.Radius = SphereCollision.W;
+					Sphere.Radius = SphereCollision.Radius;
 					NewBodySetup->AggGeom.SphereElems.Add(Sphere);
 				}
 
@@ -1132,7 +1140,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	OnSkeletalMeshCreated.Broadcast(SkeletalMeshContext->SkeletalMesh);
 
 	return SkeletalMeshContext->SkeletalMesh;
-			}
+}
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
@@ -1523,7 +1531,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 				Pair.Value.PosKeys.Add(BoneTransform.GetLocation());
 #endif
 			}
-			}
+		}
 		else if (Pair.Value.PosKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1553,7 +1561,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 				Pair.Value.RotKeys.Add(BoneTransform.GetRotation());
 #endif
 			}
-			}
+		}
 		else if (Pair.Value.RotKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1582,7 +1590,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 				Pair.Value.ScaleKeys.Add(BoneTransform.GetScale3D());
 #endif
 			}
-			}
+		}
 		else if (Pair.Value.ScaleKeys.Num() < NumFrames)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1640,7 +1648,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 					Pair.Value.ScaleKeys[FrameIndex] = FrameTransform.GetScale3D();
 #endif
 				}
-				}
+			}
 
 			if (SkeletalAnimationConfig.bRemoveRootMotion)
 			{
@@ -1649,7 +1657,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 					Pair.Value.PosKeys[FrameIndex] = Pair.Value.PosKeys[0];
 				}
 			}
-			}
+		}
 
 
 #if WITH_EDITOR
@@ -1672,7 +1680,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
 #endif
 		bHasTracks = true;
-		}
+	}
 
 	if (SkeletalAnimationConfig.bFillAllCurves)
 	{
@@ -1719,9 +1727,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 					CompressionCodec->Tracks[BoneIndex] = NewTrack;
 #endif
 				}
-					}
-				}
 			}
+		}
+	}
 
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
@@ -1822,7 +1830,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 #endif
 
 	return AnimSequence;
-		}
+}
 
 UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const int32 SkinIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
@@ -2029,7 +2037,7 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh* Skelet
 #endif
 
 	return AnimSequence;
-	}
+}
 
 UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem>& BonesPath, const TArray<FglTFRuntimePathItem>& MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
@@ -2494,7 +2502,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.RotKeys.Add(AnimQuat);
 #endif
 			}
-			}
+		}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
@@ -2588,7 +2596,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.PosKeys.Add(AnimLocation);
 #endif
 			}
-			}
+		}
 		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 		{
 			if (Curve.Timeline.Num() != Curve.Values.Num())
@@ -2618,7 +2626,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				Track.ScaleKeys.Add((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling());
 #endif
 			}
-			}
+		}
 		else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
 		{
 			TArray<FName> MorphTargetNames;
@@ -2647,11 +2655,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
 		}
-		};
+	};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
-		}
+}
 
 
 bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& NodeName, int32& SkinIndex, const TArray<FString>& ExcludeNodes, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
