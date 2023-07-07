@@ -929,7 +929,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #if WITH_EDITOR
 	SkeletalMeshContext->SkeletalMesh->SetLODSettings(NewObject<USkeletalMeshLODSettings>());
 
-#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 	SkeletalMeshContext->SkeletalMesh->GetLODSettings()->SetLODSettingsFromMesh(SkeletalMeshContext->SkeletalMesh);
 #else
 	SkeletalMeshContext->SkeletalMesh->LODSettings->SetLODSettingsFromMesh(SkeletalMeshContext->SkeletalMesh);
@@ -937,7 +937,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
 	{
-#if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 		const FSkeletalMeshLODGroupSettings& SkeletalMeshLODGroupSettings = SkeletalMeshContext->SkeletalMesh->GetLODSettings()->GetSettingsForLODLevel(LODIndex);
 #else
 		const FSkeletalMeshLODGroupSettings& SkeletalMeshLODGroupSettings = SkeletalMeshContext->SkeletalMesh->LODSettings->GetSettingsForLODLevel(LODIndex);
