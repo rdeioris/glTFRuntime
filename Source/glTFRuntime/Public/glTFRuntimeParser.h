@@ -735,6 +735,11 @@ struct FglTFRuntimeSkeletonConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bAppendNodeIndexOnNameCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bFallbackToNodesTree;
+
+	int32 CachedNodeIndex;
 	
 	FglTFRuntimeSkeletonConfig()
 	{
@@ -747,6 +752,8 @@ struct FglTFRuntimeSkeletonConfig
 		bSkipAlreadyExistentBoneNames = false;
 		bAssignUnmappedBonesToParent = false;
 		bAppendNodeIndexOnNameCollision = false;
+		bFallbackToNodesTree = false;
+		CachedNodeIndex = INDEX_NONE;
 	}
 };
 
@@ -792,6 +799,12 @@ struct FglTFRuntimePhysicsBody
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FglTFRuntimeCapsule> CapsuleCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FSphere> SphereCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FBox> BoxCollisions;
 
 	FglTFRuntimePhysicsBody()
 	{
@@ -1893,6 +1906,8 @@ public:
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetUnlitMaterialsMap() { return UnlitMaterialsMap; };
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetTransmissionMaterialsMap() { return TransmissionMaterialsMap; };
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetClearCoatMaterialsMap() { return ClearCoatMaterialsMap; };
+
+	FString ToJsonString() const;
 
 protected:
 	bool FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues, FMatrix& Matrix);

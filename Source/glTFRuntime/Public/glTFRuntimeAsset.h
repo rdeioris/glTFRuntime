@@ -286,6 +286,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	void AddRequiredExtensions(const TArray<FString>& ExtensionsNames);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	FString ToJsonString() const;
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

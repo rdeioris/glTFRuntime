@@ -1318,10 +1318,21 @@ void UglTFRuntimeAsset::AddRequiredExtension(const FString& ExtensionName)
 
 void UglTFRuntimeAsset::AddUsedExtensions(const TArray<FString>& ExtensionsNames)
 {
+	GLTF_CHECK_PARSER_VOID();
+
 	Parser->ExtensionsUsed.Append(ExtensionsNames);
 }
 
 void UglTFRuntimeAsset::AddRequiredExtensions(const TArray<FString>& ExtensionsNames)
 {
+	GLTF_CHECK_PARSER_VOID();
+
 	Parser->ExtensionsRequired.Append(ExtensionsNames);
+}
+
+FString UglTFRuntimeAsset::ToJsonString() const
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->ToJsonString();
 }

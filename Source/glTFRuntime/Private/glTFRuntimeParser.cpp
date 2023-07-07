@@ -5,6 +5,7 @@
 #include "Engine/Texture2D.h"
 #include "Misc/FileHelper.h"
 #include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 #include "Animation/Skeleton.h"
 #include "Materials/Material.h"
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
@@ -4631,4 +4632,13 @@ FTransform FglTFRuntimeParser::GetParentNodeWorldTransform(const FglTFRuntimeNod
 FTransform FglTFRuntimeParser::GetNodeWorldTransform(const FglTFRuntimeNode& Node)
 {
 	return GetParentNodeWorldTransform(Node) * Node.Transform;
+}
+
+FString FglTFRuntimeParser::ToJsonString() const
+{
+	FString Json;
+	TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&Json);
+	FJsonSerializer::Serialize(MakeShared<FJsonValueObject>(GetJsonRoot()), "", JsonWriter);
+
+	return Json;
 }
