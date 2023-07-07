@@ -1233,9 +1233,11 @@ UTexture2DArray* FglTFRuntimeParser::BuildTextureArray(UObject* Outer, const TAr
 		Texture->Filter = Sampler.MagFilter;
 	}
 
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION > 25 || WITH_EDITOR
 	Texture->AddressX = Sampler.TileX;
 	Texture->AddressY = Sampler.TileY;
 	Texture->AddressZ = Sampler.TileZ;
+#endif
 	Texture->UpdateResource();
 
 	return Texture;

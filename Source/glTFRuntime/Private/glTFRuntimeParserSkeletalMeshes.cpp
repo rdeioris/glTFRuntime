@@ -707,8 +707,20 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		}
 
 		LodRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision);
+#if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION <= 25 && WITH_EDITOR
+		// very annoying hack for support UE4.25 (unfortunately we cannot set bone influences)
+		TArray<FSoftSkinVertex> SoftSkinVertices;
+		SoftSkinVertices.AddUninitialized(InWeights.Num());
+		for (int32 SoftSkinIndex = 0; SoftSkinIndex < InWeights.Num(); SoftSkinIndex++)
+		{
+			FMemory::Memcpy(&SoftSkinVertices[SoftSkinIndex].InfluenceBones, &InWeights[SoftSkinIndex].InfluenceBones, sizeof(InWeights[SoftSkinIndex].InfluenceBones));
+			FMemory::Memcpy(&SoftSkinVertices[SoftSkinIndex].InfluenceWeights, &InWeights[SoftSkinIndex].InfluenceWeights, sizeof(InWeights[SoftSkinIndex].InfluenceWeights));
+		}
+		LodRenderData->SkinWeightVertexBuffer.Init(SoftSkinVertices);
+#else
 		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences);
 		LodRenderData->SkinWeightVertexBuffer = InWeights;
+#endif
 		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));
 
 		for (int32 Index = 0; Index < NumIndices; Index++)
