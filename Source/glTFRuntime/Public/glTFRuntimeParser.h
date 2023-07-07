@@ -802,6 +802,24 @@ struct FglTFRuntimeSphere
 };
 
 USTRUCT(BlueprintType)
+struct FglTFRuntimePhysicsConstraint
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString ConstraintBone1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString ConstraintBone2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector ConstraintPos1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FVector ConstraintPos2;
+};
+
+USTRUCT(BlueprintType)
 struct FglTFRuntimePhysicsBody
 {
 	GENERATED_BODY()
@@ -823,6 +841,9 @@ struct FglTFRuntimePhysicsBody
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FBox> BoxCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FglTFRuntimePhysicsConstraint> Constraints;
 
 	FglTFRuntimePhysicsBody()
 	{

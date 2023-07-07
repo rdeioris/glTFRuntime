@@ -519,6 +519,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						InWeights[TotalVertexIndex].InfluenceBones[2] = 0;
 						InWeights[TotalVertexIndex].InfluenceWeights[3] = 0;
 						InWeights[TotalVertexIndex].InfluenceBones[3] = 0;
+
+						MeshSection.MaxBoneInfluences = 1;
 					}
 					else if (!SkeletalMeshContext->SkeletalMeshConfig.bIgnoreMissingBones)
 					{
@@ -718,7 +720,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		}
 		LodRenderData->SkinWeightVertexBuffer.Init(SoftSkinVertices);
 #else
-		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences);
+		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences > 0 ? MaxBoneInfluences : 1);
 		LodRenderData->SkinWeightVertexBuffer = InWeights;
 #endif
 		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));
@@ -1129,6 +1131,20 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					Box.Y = BoxCollision.GetExtent().Y;
 					Box.Z = BoxCollision.GetExtent().Z;
 					NewBodySetup->AggGeom.BoxElems.Add(Box);
+				}
+
+				for (const FglTFRuntimePhysicsConstraint& PhysicsConstraint : PhysicsBody.Value.Constraints)
+				{
+					const bool bIsValidConstraint = !PhysicsConstraint.ConstraintBone1.IsEmpty() && !PhysicsConstraint.ConstraintBone2.IsEmpty();
+
+					if (bIsValidConstraint)
+					{
+						UPhysicsConstraintTemplate* Constraint = NewObject<UPhysicsConstraintTemplate>(PhysicsAsset, NAME_None, RF_Public);
+						Constraint->DefaultInstance.JointName = NewBodySetup->BoneName;
+						Constraint->DefaultInstance.ConstraintBone1 = *PhysicsConstraint.ConstraintBone1;
+						Constraint->DefaultInstance.ConstraintBone2 = *PhysicsConstraint.ConstraintBone2;
+						PhysicsAsset->ConstraintSetup.Add(Constraint);
+					}
 				}
 
 				PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
