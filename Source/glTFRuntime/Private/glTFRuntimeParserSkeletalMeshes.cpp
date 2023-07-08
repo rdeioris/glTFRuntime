@@ -369,6 +369,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			TMap<int32, TArray<int32>> OverlappingVertices;
 			MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
 
+			// this is used for non-skinned asset loaded as skinned ones
+			int32 OverrideIndexToCheck = 0;
+
 			for (int32 VertexIndex = 0; VertexIndex < Primitive.Indices.Num(); VertexIndex++)
 			{
 				int32 Index = Primitive.Indices[VertexIndex];
@@ -499,17 +502,21 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				}
 				else if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.bFallbackToNodesTree)
 				{
-					if (BoneMapInUse.Contains(0))
+					if (BoneMapInUse.Contains(VertexIndex))
+					{
+						OverrideIndexToCheck = VertexIndex;
+					}
+					if (BoneMapInUse.Contains(OverrideIndexToCheck))
 					{
 						int32 BoneIndex = INDEX_NONE;
-						if (BonesCacheInUse.Contains(0))
+						if (BonesCacheInUse.Contains(OverrideIndexToCheck))
 						{
-							BoneIndex = BonesCacheInUse[0];
+							BoneIndex = BonesCacheInUse[OverrideIndexToCheck];
 						}
 						else
 						{
-							BoneIndex = RefSkeleton.FindBoneIndex(BoneMapInUse[0]);
-							BonesCacheInUse.Add(0, BoneIndex);
+							BoneIndex = RefSkeleton.FindBoneIndex(BoneMapInUse[OverrideIndexToCheck]);
+							BonesCacheInUse.Add(OverrideIndexToCheck, BoneIndex);
 						}
 						InWeights[TotalVertexIndex].InfluenceWeights[0] = MAX_BONE_INFLUENCE_WEIGHT;
 						InWeights[TotalVertexIndex].InfluenceBones[0] = BoneIndex;
@@ -519,6 +526,14 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						InWeights[TotalVertexIndex].InfluenceBones[2] = 0;
 						InWeights[TotalVertexIndex].InfluenceWeights[3] = 0;
 						InWeights[TotalVertexIndex].InfluenceBones[3] = 0;
+
+						if (!SkeletalMeshContext->PerBoneBoundingBox.Contains(BoneIndex))
+						{
+							FBox NewBox(EForceInit::ForceInitToZero);
+							SkeletalMeshContext->PerBoneBoundingBox.Add(BoneIndex, MoveTemp(NewBox));
+						}
+
+						SkeletalMeshContext->PerBoneBoundingBox[BoneIndex] += FVector(ModelVertex.Position);
 
 						MeshSection.MaxBoneInfluences = 1;
 					}
@@ -1099,6 +1114,13 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 				{
 					continue;
 				}
+
+				const int32 CollisionBoneIndex = SkeletalMeshContext->GetBoneIndex(PhysicsBody.Key);
+				if (CollisionBoneIndex <= INDEX_NONE)
+				{
+					continue;
+				}
+
 				USkeletalBodySetup* NewBodySetup = NewObject<USkeletalBodySetup>(PhysicsAsset, NAME_None, RF_Public);
 				NewBodySetup->CollisionTraceFlag = PhysicsBody.Value.CollisionTraceFlag;
 				NewBodySetup->PhysicsType = PhysicsBody.Value.PhysicsType;
@@ -1133,17 +1155,50 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					NewBodySetup->AggGeom.BoxElems.Add(Box);
 				}
 
+				if (PhysicsBody.Value.bSphereAutoCollision)
+				{
+					if (SkeletalMeshContext->PerBoneBoundingBox.Contains(CollisionBoneIndex))
+					{
+						FBoxSphereBounds BoxSphereBounds(SkeletalMeshContext->PerBoneBoundingBox[CollisionBoneIndex]);
+						FKSphereElem Sphere;
+						Sphere.Center = SkeletalMeshContext->GetBoneLocalTransform(CollisionBoneIndex).InverseTransformPosition(BoxSphereBounds.Origin);
+						Sphere.Radius = BoxSphereBounds.SphereRadius;
+						NewBodySetup->AggGeom.SphereElems.Add(Sphere);
+					}
+				}
+
+				if (PhysicsBody.Value.bBoxAutoCollision)
+				{
+					if (SkeletalMeshContext->PerBoneBoundingBox.Contains(CollisionBoneIndex))
+					{
+						FBoxSphereBounds BoxSphereBounds(SkeletalMeshContext->PerBoneBoundingBox[CollisionBoneIndex]);
+						FKBoxElem Box;
+						Box.Center = SkeletalMeshContext->GetBoneLocalTransform(CollisionBoneIndex).InverseTransformPosition(BoxSphereBounds.Origin);
+						Box.X = BoxSphereBounds.BoxExtent.X * 2;
+						Box.Y = BoxSphereBounds.BoxExtent.Y * 2;
+						Box.Z = BoxSphereBounds.BoxExtent.Z * 2;
+						NewBodySetup->AggGeom.BoxElems.Add(Box);
+					}
+				}
+
 				for (const FglTFRuntimePhysicsConstraint& PhysicsConstraint : PhysicsBody.Value.Constraints)
 				{
-					const bool bIsValidConstraint = !PhysicsConstraint.ConstraintBone1.IsEmpty() && !PhysicsConstraint.ConstraintBone2.IsEmpty();
-
+					bool bIsValidConstraint = !PhysicsConstraint.ConstraintBone1.IsEmpty() && !PhysicsConstraint.ConstraintBone2.IsEmpty();
 					if (bIsValidConstraint)
 					{
-						UPhysicsConstraintTemplate* Constraint = NewObject<UPhysicsConstraintTemplate>(PhysicsAsset, NAME_None, RF_Public);
-						Constraint->DefaultInstance.JointName = NewBodySetup->BoneName;
-						Constraint->DefaultInstance.ConstraintBone1 = *PhysicsConstraint.ConstraintBone1;
-						Constraint->DefaultInstance.ConstraintBone2 = *PhysicsConstraint.ConstraintBone2;
-						PhysicsAsset->ConstraintSetup.Add(Constraint);
+						const int32 Bone1Index = SkeletalMeshContext->GetBoneIndex(*(PhysicsConstraint.ConstraintBone1));
+						const int32 Bone2Index = SkeletalMeshContext->GetBoneIndex(*(PhysicsConstraint.ConstraintBone2));
+
+						if (Bone1Index > INDEX_NONE && Bone2Index > INDEX_NONE)
+						{
+							UPhysicsConstraintTemplate* Constraint = NewObject<UPhysicsConstraintTemplate>(PhysicsAsset, NAME_None, RF_Public);
+							Constraint->DefaultInstance.JointName = NewBodySetup->BoneName;
+							Constraint->DefaultInstance.ConstraintBone1 = *PhysicsConstraint.ConstraintBone1;
+							Constraint->DefaultInstance.ConstraintBone2 = *PhysicsConstraint.ConstraintBone2;
+							Constraint->DefaultInstance.Pos2 = SkeletalMeshContext->GetBoneWorldTransform(Bone1Index).GetLocation();
+							Constraint->DefaultInstance.PriAxis2 = SkeletalMeshContext->GetBoneWorldTransform(Bone1Index).GetRotation().Rotator().Vector();
+							PhysicsAsset->ConstraintSetup.Add(Constraint);
+						}
 					}
 				}
 
@@ -2815,7 +2870,7 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 				FglTFRuntimeNode CurrentNode = ChildNode;
 				FTransform AdditionalTransform = CurrentNode.Transform;
 
-				while (CurrentNode.ParentIndex != INDEX_NONE)
+				while (CurrentNode.ParentIndex > INDEX_NONE)
 				{
 					if (!LoadNode(CurrentNode.ParentIndex, CurrentNode))
 					{
@@ -2824,6 +2879,7 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 					AdditionalTransform *= CurrentNode.Transform;
 				}
 
+				// transform primitives in bone space
 				for (int32 PrimitiveIndex = PrimitiveFirstIndex; PrimitiveIndex < RuntimeLOD.Primitives.Num(); PrimitiveIndex++)
 				{
 					FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
@@ -2840,7 +2896,55 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 						Tangent = AdditionalTransform.TransformFVector4NoScale(Tangent);
 					}
 				}
-				BoneMap.Add(0, *ChildNode.Name);
+
+				FString ChildName = ChildNode.Name;
+				if (SkeletonConfig.MaxNodesTreeDepth >= 0)
+				{
+					CurrentNode = ChildNode;
+					do
+					{
+						const int32 Distance = GetNodeDistance(CurrentNode, SkeletonConfig.CachedNodeIndex);
+						if (Distance < 0)
+						{
+							return nullptr;
+						}
+						else if (Distance <= SkeletonConfig.MaxNodesTreeDepth)
+						{
+							ChildName = CurrentNode.Name;
+							break;
+						}
+						if (!LoadNode(CurrentNode.ParentIndex, CurrentNode))
+						{
+							return nullptr;
+						}
+					} while (CurrentNode.ParentIndex > INDEX_NONE);
+				}
+
+				if (SkeletonConfig.BonesNameMap.Contains(ChildName))
+				{
+					ChildName = SkeletonConfig.BonesNameMap[ChildName];
+				}
+				else if (SkeletonConfig.BonesNameMap.Num() > 0 && SkeletonConfig.bAssignUnmappedBonesToParent)
+				{
+					int32 ParentNodeIndex = ChildNode.ParentIndex;
+					while (ParentNodeIndex != INDEX_NONE)
+					{
+						FglTFRuntimeNode ParentNode;
+						if (!LoadNode(ParentNodeIndex, ParentNode))
+						{
+							return nullptr;
+						}
+
+						if (SkeletonConfig.BonesNameMap.Contains(ParentNode.Name))
+						{
+							ChildName = SkeletonConfig.BonesNameMap[ParentNode.Name];
+							break;
+						}
+						ParentNodeIndex = ParentNode.ParentIndex;
+					}
+				}
+
+				BoneMap.Add(0, *ChildName);
 			}
 			else
 			{
@@ -2854,8 +2958,47 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 				FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
 				Primitive.OverrideBoneMap = BoneMap;
 			}
-
 		}
+	}
+
+	// try to merge sections with the same material (only for staticmeshes, for now)
+	// TODO: support skeletalmeshes too
+	if (SkinIndex <= INDEX_NONE && MaterialsConfig.bMergeSectionsByMaterial)
+	{
+		TMap<UMaterialInterface*, TArray<FglTFRuntimePrimitive>> PrimitivesMap;
+		for (FglTFRuntimePrimitive& Primitive : RuntimeLOD.Primitives)
+		{
+			if (PrimitivesMap.Contains(Primitive.Material))
+			{
+				PrimitivesMap[Primitive.Material].Add(Primitive);
+			}
+			else
+			{
+				TArray<FglTFRuntimePrimitive> NewPrimitives;
+				NewPrimitives.Add(Primitive);
+				PrimitivesMap.Add(Primitive.Material, NewPrimitives);
+			}
+		}
+
+		TArray<FglTFRuntimePrimitive> MergedPrimitives;
+		for (TPair<UMaterialInterface*, TArray<FglTFRuntimePrimitive>>& Pair : PrimitivesMap)
+		{
+			FglTFRuntimePrimitive MergedPrimitive;
+			if (MergePrimitives(Pair.Value, MergedPrimitive))
+			{
+				MergedPrimitives.Add(MergedPrimitive);
+			}
+			else
+			{
+				// unable to merge, just leave as is
+				for (FglTFRuntimePrimitive& Primitive : Pair.Value)
+				{
+					MergedPrimitives.Add(Primitive);
+				}
+			}
+		}
+
+		RuntimeLOD.Primitives = MergedPrimitives;
 	}
 
 	return true;

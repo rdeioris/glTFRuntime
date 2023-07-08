@@ -2102,7 +2102,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 
 		BoneName = FName(BoneNameMapValue);
 	}
-	else if (SkeletonConfig.BonesNameMap.Num() && SkeletonConfig.bAssignUnmappedBonesToParent)
+	else if (SkeletonConfig.BonesNameMap.Num() > 0 && SkeletonConfig.bAssignUnmappedBonesToParent)
 	{
 		int32 ParentNodeIndex = Node.ParentIndex;
 		while (ParentNodeIndex != INDEX_NONE)
@@ -2230,6 +2230,21 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 			Transform *= ParentTransform.Inverse();
 		}
 	}
+	else if (Parent == INDEX_NONE && SkeletonConfig.bApplyParentNodesTransformsToRoot)
+	{
+		int32 CurrentParentIndex = Node.ParentIndex;
+		while (CurrentParentIndex > INDEX_NONE)
+		{
+			FglTFRuntimeNode ParentNode;
+			if (!LoadNode(CurrentParentIndex, ParentNode))
+			{
+				return false;
+			}
+
+			Transform *= ParentNode.Transform;
+			CurrentParentIndex = ParentNode.ParentIndex;
+		}
+	}
 
 	Modifier.Add(FMeshBoneInfo(BoneName, Node.Name, Parent), Transform);
 
@@ -2255,6 +2270,23 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 		}
 		Modifier.Add(FMeshBoneInfo(*AdditionalBone, AdditionalBone, NewParentIndex), FTransform::Identity);
 		NewParentIndex = Modifier.FindBoneIndex(*AdditionalBone);
+	}
+
+	if (SkeletonConfig.MaxNodesTreeDepth >= 0)
+	{
+		int32 Depth = 0;
+		const TArray<FMeshBoneInfo>& BoneInfos = Modifier.GetRefBoneInfo();
+		int32 CurrentIndex = NewParentIndex;
+		while (BoneInfos[CurrentIndex].ParentIndex > INDEX_NONE)
+		{
+			Depth++;
+			CurrentIndex = BoneInfos[CurrentIndex].ParentIndex;
+		}
+
+		if (Depth >= SkeletonConfig.MaxNodesTreeDepth)
+		{
+			return true;
+		}
 	}
 
 	for (int32 ChildIndex : Node.ChildrenIndices)
@@ -3392,6 +3424,14 @@ bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePri
 	for (FglTFRuntimePrimitive& SourcePrimitive : SourcePrimitives)
 	{
 		OutPrimitive.Material = SourcePrimitive.Material;
+
+		// TODO the logic here is available only for staticmeshes loaded as skeletal ones.
+		// It should be improved to support plain recursive loading of skeletalmeshes
+		if (SourcePrimitive.OverrideBoneMap.Num() == 1 && SourcePrimitive.OverrideBoneMap.Contains(0))
+		{
+			OutPrimitive.OverrideBoneMap.Add(OutPrimitive.Indices.Num(), SourcePrimitive.OverrideBoneMap[0]);
+		}
+
 		for (uint32 Index : SourcePrimitive.Indices)
 		{
 			OutPrimitive.Indices.Add(Index + BaseIndex);
@@ -3414,7 +3454,6 @@ bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePri
 			for (int32 JointsIndex = 0; JointsIndex < OutPrimitive.Joints.Num(); JointsIndex++)
 			{
 				OutPrimitive.Joints[JointsIndex].Append(SourcePrimitive.Joints[JointsIndex]);
-
 			}
 
 			for (int32 WeightsIndex = 0; WeightsIndex < OutPrimitive.Weights.Num(); WeightsIndex++)
@@ -3433,6 +3472,7 @@ bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePri
 		OutPrimitive.Normals.Append(SourcePrimitive.Normals);
 		OutPrimitive.Tangents.Append(SourcePrimitive.Tangents);
 		OutPrimitive.Colors.Append(SourcePrimitive.Colors);
+
 
 		BaseIndex += SourcePrimitive.Positions.Num();
 	}
@@ -4618,7 +4658,6 @@ FTransform FglTFRuntimeParser::GetParentNodeWorldTransform(const FglTFRuntimeNod
 		FglTFRuntimeNode ParentNode;
 		if (!LoadNode(ParentIndex, ParentNode))
 		{
-			UE_LOG(LogTemp, Error, TEXT("OOOOPS"));
 			break;
 		}
 
@@ -4641,4 +4680,31 @@ FString FglTFRuntimeParser::ToJsonString() const
 	FJsonSerializer::Serialize(MakeShared<FJsonValueObject>(GetJsonRoot()), "", JsonWriter);
 
 	return Json;
+}
+
+int32 FglTFRuntimeParser::GetNodeDistance(const FglTFRuntimeNode& Node, const int32 Ancestor)
+{
+	if (Node.Index == Ancestor)
+	{
+		return 0;
+	}
+
+	int32 Distance = 0;
+
+	FglTFRuntimeNode CurrentNode = Node;
+	while (CurrentNode.ParentIndex > INDEX_NONE)
+	{
+		Distance++;
+		if (!LoadNode(CurrentNode.ParentIndex, CurrentNode))
+		{
+			return -1;
+		}
+
+		if (CurrentNode.Index == Ancestor)
+		{
+			return Distance;
+		}
+	}
+
+	return -1;
 }

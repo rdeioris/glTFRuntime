@@ -63,6 +63,7 @@ enum class EglTFRuntimeTransformBaseType : uint8
 	YForward,
 	BasisMatrix,
 	Identity,
+	LeftHanded
 };
 
 UENUM()
@@ -220,6 +221,11 @@ struct FglTFRuntimeConfig
 		if (TransformBaseType == EglTFRuntimeTransformBaseType::Identity)
 		{
 			return FMatrix::Identity;
+		}
+
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::LeftHanded)
+		{
+			return FBasisVectorMatrix(FVector(0, 0, 1), FVector(-1, 0, 0), FVector(0, 1, 0), FVector::ZeroVector);
 		}
 
 		return DefaultMatrix;
@@ -739,6 +745,12 @@ struct FglTFRuntimeSkeletonConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bFallbackToNodesTree;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bApplyParentNodesTransformsToRoot;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 MaxNodesTreeDepth;
+
 	int32 CachedNodeIndex;
 	
 	FglTFRuntimeSkeletonConfig()
@@ -753,7 +765,9 @@ struct FglTFRuntimeSkeletonConfig
 		bAssignUnmappedBonesToParent = false;
 		bAppendNodeIndexOnNameCollision = false;
 		bFallbackToNodesTree = false;
+		bApplyParentNodesTransformsToRoot = false;
 		CachedNodeIndex = INDEX_NONE;
+		MaxNodesTreeDepth = -1;
 	}
 };
 
@@ -843,6 +857,12 @@ struct FglTFRuntimePhysicsBody
 	TArray<FBox> BoxCollisions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bSphereAutoCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bBoxAutoCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FglTFRuntimePhysicsConstraint> Constraints;
 
 	FglTFRuntimePhysicsBody()
@@ -850,6 +870,8 @@ struct FglTFRuntimePhysicsBody
 		CollisionTraceFlag = ECollisionTraceFlag::CTF_UseDefault;
 		PhysicsType = EPhysicsType::PhysType_Default;
 		bConsiderForBounds = true;
+		bSphereAutoCollision = false;
+		bBoxAutoCollision = false;
 	}
 };
 
@@ -1206,6 +1228,8 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 
 	FBox BoundingBox;
 
+	TMap<int32, FBox> PerBoneBoundingBox;
+
 	// here we cache per-context LODs
 	TArray<FglTFRuntimeMeshLOD> CachedRuntimeMeshLODs;
 
@@ -1254,6 +1278,45 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 	void AddReferencedObjects(FReferenceCollector& Collector) override
 	{
 		Collector.AddReferencedObject(SkeletalMesh);
+	}
+
+	int32 GetBoneIndex(const FString& BoneName) const
+	{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+		return SkeletalMesh->GetRefSkeleton().FindBoneIndex(*BoneName);
+#else
+		return SkeletalMesh->RefSkeleton.FindBoneIndex(*BoneName);
+#endif
+	}
+
+	int32 GetBoneParentIndex(const int32 BoneIndex) const
+	{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+		return SkeletalMesh->GetRefSkeleton().GetParentIndex(BoneIndex);
+#else
+		return SkeletalMesh->Skeleton->RefSkeleton.GetParentIndex(BoneIndex);
+#endif
+	}
+
+	FTransform GetBoneLocalTransform(const int32 BoneIndex) const
+	{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+		return SkeletalMesh->GetRefSkeleton().GetRefBonePose()[BoneIndex];
+#else
+		return SkeletalMesh->Skeleton->GetReferenceSkeleton().GetRefBonePose()[BoneIndex];
+#endif
+	}
+
+	FTransform GetBoneWorldTransform(const int32 BoneIndex) const
+	{
+		FTransform Transform = GetBoneLocalTransform(BoneIndex);
+		int32 ParentIndex = GetBoneParentIndex(BoneIndex);
+		while (ParentIndex > INDEX_NONE)
+		{
+			Transform *= GetBoneLocalTransform(ParentIndex);
+			ParentIndex = GetBoneParentIndex(ParentIndex);
+		}
+		return Transform;
 	}
 };
 
@@ -1863,6 +1926,8 @@ public:
 
 	TSharedPtr<FJsonObject> GetNodeExtensionObject(const int32 NodeIndex, const FString& ExtensionName);
 	TSharedPtr<FJsonObject> GetNodeObject(const int32 NodeIndex);
+
+	int32 GetNodeDistance(const FglTFRuntimeNode& Node, const int32 Ancestor);
 
 	FString GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue);
 	double GetJsonObjectNumber(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const double DefaultValue);
