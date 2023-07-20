@@ -338,7 +338,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		}
 
 		TArray<FSkinWeightInfo> InWeights;
-		InWeights.AddUninitialized(NumIndices);
+		InWeights.AddZeroed(NumIndices);
 
 		int32 TotalVertexIndex = 0;
 		int32 Base = 0;
@@ -454,8 +454,8 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				if (!SkeletalMeshContext->SkeletalMeshConfig.bIgnoreSkin && SkeletalMeshContext->SkinIndex > INDEX_NONE)
 				{
 					uint32 TotalWeight = 0;
-					const int32 JoitsNum = FMath::Min(Primitive.Joints.Num(), MeshSection.MaxBoneInfluences / 4);
-					for (int32 JointsIndex = 0; JointsIndex < JoitsNum; JointsIndex++)
+					const int32 JointsNum = FMath::Min(Primitive.Joints.Num(), MeshSection.MaxBoneInfluences / 4);
+					for (int32 JointsIndex = 0; JointsIndex < JointsNum; JointsIndex++)
 					{
 						FglTFRuntimeUInt16Vector4 Joints = Primitive.Joints[JointsIndex][Index];
 						FVector4 Weights = Primitive.Weights[JointsIndex][Index];
@@ -473,7 +473,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 									BoneIndex = RefSkeleton.FindBoneIndex(BoneMapInUse[Joints[j]]);
 									BonesCacheInUse.Add(Joints[j], BoneIndex);
 								}
-
+                                
 								BONE_INFLUENCE_TYPE QuantizedWeight = FMath::Clamp((BONE_INFLUENCE_TYPE)(Weights[j] * ((double)MAX_BONE_INFLUENCE_WEIGHT)), (BONE_INFLUENCE_TYPE)0x00, (BONE_INFLUENCE_TYPE)MAX_BONE_INFLUENCE_WEIGHT);
 
 								if (QuantizedWeight + TotalWeight > MAX_BONE_INFLUENCE_WEIGHT)
@@ -736,6 +736,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		LodRenderData->SkinWeightVertexBuffer.Init(SoftSkinVertices);
 #else
 		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences > 0 ? MaxBoneInfluences : 1);
+        LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneWeight(true);
 		LodRenderData->SkinWeightVertexBuffer = InWeights;
 #endif
 		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));
