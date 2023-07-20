@@ -2874,7 +2874,7 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 				{
 					if (!LoadNode(CurrentNode.ParentIndex, CurrentNode))
 					{
-						return nullptr;
+						return false;
 					}
 					AdditionalTransform *= CurrentNode.Transform;
 				}
@@ -2906,7 +2906,7 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 						const int32 Distance = GetNodeDistance(CurrentNode, SkeletonConfig.CachedNodeIndex);
 						if (Distance < 0)
 						{
-							return nullptr;
+							return false;
 						}
 						else if (Distance <= SkeletonConfig.MaxNodesTreeDepth)
 						{
@@ -2915,7 +2915,7 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 						}
 						if (!LoadNode(CurrentNode.ParentIndex, CurrentNode))
 						{
-							return nullptr;
+							return false;
 						}
 					} while (CurrentNode.ParentIndex > INDEX_NONE);
 				}
@@ -2932,7 +2932,7 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 						FglTFRuntimeNode ParentNode;
 						if (!LoadNode(ParentNodeIndex, ParentNode))
 						{
-							return nullptr;
+							return false;
 						}
 
 						if (SkeletonConfig.BonesNameMap.Contains(ParentNode.Name))
