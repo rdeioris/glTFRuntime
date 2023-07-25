@@ -24,7 +24,18 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadMaterial_Internal, FColor::Magenta);
 	FglTFRuntimeMaterial RuntimeMaterial;
 
-	RuntimeMaterial.BaseSpecularFactor = MaterialsConfig.SpecularFactor;
+	const FString Generator = GetGenerator();
+	bool bSpecularAutoDetected = false;
+	if (Generator.Contains("Blender") || Generator.Contains("Unreal Engine"))
+	{
+		RuntimeMaterial.BaseSpecularFactor = 0.5;
+		bSpecularAutoDetected = true;
+	}
+
+	if (!bSpecularAutoDetected || MaterialsConfig.SpecularFactor > 0)
+	{
+		RuntimeMaterial.BaseSpecularFactor = MaterialsConfig.SpecularFactor;
+	}
 
 	if (!JsonMaterialObject->TryGetBoolField("doubleSided", RuntimeMaterial.bTwoSided))
 	{

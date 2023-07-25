@@ -806,7 +806,7 @@ FVector4 FglTFRuntimeParser::GetJsonObjectVector4(TSharedRef<FJsonObject> JsonOb
 	return NewValue;
 }
 
-FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue)
+FString FglTFRuntimeParser::GetJsonObjectString(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const FString& DefaultValue) const
 {
 	FString Value;
 	if (!JsonObject->TryGetStringField(FieldName, Value))
@@ -4707,4 +4707,26 @@ int32 FglTFRuntimeParser::GetNodeDistance(const FglTFRuntimeNode& Node, const in
 	}
 
 	return -1;
+}
+
+FString FglTFRuntimeParser::GetVersion() const
+{
+	TSharedPtr<FJsonObject> Asset = GetJsonObjectFromObject(GetJsonRoot().ToSharedRef(), "asset");
+	if (!Asset)
+	{
+		return "";
+	}
+
+	return GetJsonObjectString(Asset.ToSharedRef(), "version", "");
+}
+
+FString FglTFRuntimeParser::GetGenerator() const
+{
+	TSharedPtr<FJsonObject> Asset = GetJsonObjectFromObject(GetJsonRoot().ToSharedRef(), "asset");
+	if (!Asset)
+	{
+		return "";
+	}
+
+	return GetJsonObjectString(Asset.ToSharedRef(), "generator", "");
 }

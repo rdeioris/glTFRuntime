@@ -1336,3 +1336,17 @@ FString UglTFRuntimeAsset::ToJsonString() const
 
 	return Parser->ToJsonString();
 }
+
+FString UglTFRuntimeAsset::GetVersion() const
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->GetVersion();
+}
+
+FString UglTFRuntimeAsset::GetGenerator() const
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->GetGenerator();
+}

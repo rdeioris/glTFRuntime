@@ -289,6 +289,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	FString ToJsonString() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	FString GetVersion() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	FString GetGenerator() const;
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	
