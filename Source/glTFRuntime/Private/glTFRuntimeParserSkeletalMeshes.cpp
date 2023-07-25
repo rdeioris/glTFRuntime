@@ -753,13 +753,14 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
-	bool bHasMorphTargets = false;
-	int32 MorphTargetIndex = 0;
 
 #if WITH_EDITOR
 	FSkeletalMeshModel* ImportedResource = SkeletalMeshContext->SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
 #endif
+
+	bool bHasMorphTargets = false;
+	int32 MorphTargetIndex = 0;
 
 	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
 	{
@@ -807,135 +808,138 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 #endif
 
-		TMap<FString, UMorphTarget*> MorphTargetNamesHistory;
-		TMap<FString, int32> MorphTargetNamesDuplicateCounter;
-
-		int32 BaseIndex = 0;
-
-		for (int32 PrimitiveIndex = 0; PrimitiveIndex < SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives.Num(); PrimitiveIndex++)
+		if (!SkeletalMeshContext->SkeletalMeshConfig.bDisableMorphTargets)
 		{
+			TMap<FString, UMorphTarget*> MorphTargetNamesHistory;
+			TMap<FString, int32> MorphTargetNamesDuplicateCounter;
 
-			FglTFRuntimePrimitive& Primitive = SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[PrimitiveIndex];
+			int32 BaseIndex = 0;
 
-			for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
+			for (int32 PrimitiveIndex = 0; PrimitiveIndex < SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives.Num(); PrimitiveIndex++)
 			{
-				bool bSkip = true;
-				FMorphTargetLODModel MorphTargetLODModel;
-				MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
-				MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
 
-				for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
+				FglTFRuntimePrimitive& Primitive = SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[PrimitiveIndex];
+
+				for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
 				{
-					FMorphTargetDelta Delta;
-					int32 VertexIndex = Primitive.Indices[Index];
-					if (VertexIndex < MorphTargetData.Positions.Num())
-					{
-#if ENGINE_MAJOR_VERSION > 4
-						Delta.PositionDelta = FVector3f(MorphTargetData.Positions[VertexIndex]);
-#else
-						Delta.PositionDelta = MorphTargetData.Positions[VertexIndex];
-#endif
-					}
-					else
-					{
-#if ENGINE_MAJOR_VERSION > 4
-						Delta.PositionDelta = FVector3f::ZeroVector;
-#else
-						Delta.PositionDelta = FVector::ZeroVector;
-#endif
-					}
+					bool bSkip = true;
+					FMorphTargetLODModel MorphTargetLODModel;
+					MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
+					MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
 
-					if (!Delta.PositionDelta.IsNearlyZero())
+					for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
 					{
-						bSkip = false;
-					}
-
-					Delta.SourceIdx = BaseIndex + Index;
-#if ENGINE_MAJOR_VERSION > 4
-					Delta.TangentZDelta = FVector3f::ZeroVector;
-#else
-					Delta.TangentZDelta = FVector::ZeroVector;
-#endif
-					MorphTargetLODModel.Vertices.Add(Delta);
-#if ENGINE_MAJOR_VERSION > 4
-					MorphTargetLODModel.NumVertices = MorphTargetLODModel.Vertices.Num();
-#endif
-				}
-
-				if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreEmptyMorphTargets && bSkip)
-				{
-					continue;
-				}
-
-				FString MorphTargetName = MorphTargetData.Name;
-				if (MorphTargetName.IsEmpty())
-				{
-					MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex);
-				}
-
-				bool bAddMorphTarget = false;
-				if (MorphTargetNamesHistory.Contains(MorphTargetName))
-				{
-					UMorphTarget* CurrentMorphTarget = MorphTargetNamesHistory[MorphTargetName];
-					EglTFRuntimeMorphTargetsDuplicateStrategy DuplicateStrategy = SkeletalMeshContext->SkeletalMeshConfig.MorphTargetsDuplicateStrategy;
-					if (DuplicateStrategy == EglTFRuntimeMorphTargetsDuplicateStrategy::Ignore)
-					{
-						// NOP
-					}
-					else if (DuplicateStrategy == EglTFRuntimeMorphTargetsDuplicateStrategy::Merge)
-					{
-#if ENGINE_MAJOR_VERSION > 4
-						CurrentMorphTarget->GetMorphLODModels()[0].NumBaseMeshVerts += MorphTargetLODModel.NumBaseMeshVerts;
-						CurrentMorphTarget->GetMorphLODModels()[0].SectionIndices.Append(MorphTargetLODModel.SectionIndices);
-						CurrentMorphTarget->GetMorphLODModels()[0].Vertices.Append(MorphTargetLODModel.Vertices);
-						CurrentMorphTarget->GetMorphLODModels()[0].NumVertices = CurrentMorphTarget->GetMorphLODModels()[0].Vertices.Num();
-#else
-						CurrentMorphTarget->MorphLODModels[0].NumBaseMeshVerts += MorphTargetLODModel.NumBaseMeshVerts;
-						CurrentMorphTarget->MorphLODModels[0].SectionIndices.Append(MorphTargetLODModel.SectionIndices);
-						CurrentMorphTarget->MorphLODModels[0].Vertices.Append(MorphTargetLODModel.Vertices);
-#endif
-					}
-					else if (DuplicateStrategy == EglTFRuntimeMorphTargetsDuplicateStrategy::AppendDuplicateCounter)
-					{
-						if (MorphTargetNamesDuplicateCounter.Contains(MorphTargetName))
+						FMorphTargetDelta Delta;
+						int32 VertexIndex = Primitive.Indices[Index];
+						if (VertexIndex < MorphTargetData.Positions.Num())
 						{
-							MorphTargetName = FString::Printf(TEXT("%s_%d"), *MorphTargetName, MorphTargetNamesDuplicateCounter[MorphTargetName] + 1);
-							MorphTargetNamesDuplicateCounter[MorphTargetName] += 1;
+	#if ENGINE_MAJOR_VERSION > 4
+							Delta.PositionDelta = FVector3f(MorphTargetData.Positions[VertexIndex]);
+	#else
+							Delta.PositionDelta = MorphTargetData.Positions[VertexIndex];
+	#endif
 						}
 						else
 						{
-							MorphTargetName = FString::Printf(TEXT("%s_1"), *MorphTargetName);
-							MorphTargetNamesDuplicateCounter.Add(MorphTargetName, 1);
+	#if ENGINE_MAJOR_VERSION > 4
+							Delta.PositionDelta = FVector3f::ZeroVector;
+	#else
+							Delta.PositionDelta = FVector::ZeroVector;
+	#endif
 						}
-						bAddMorphTarget = true;
+
+						if (!Delta.PositionDelta.IsNearlyZero())
+						{
+							bSkip = false;
+						}
+
+						Delta.SourceIdx = BaseIndex + Index;
+	#if ENGINE_MAJOR_VERSION > 4
+						Delta.TangentZDelta = FVector3f::ZeroVector;
+	#else
+						Delta.TangentZDelta = FVector::ZeroVector;
+	#endif
+						MorphTargetLODModel.Vertices.Add(Delta);
+	#if ENGINE_MAJOR_VERSION > 4
+						MorphTargetLODModel.NumVertices = MorphTargetLODModel.Vertices.Num();
+	#endif
 					}
-					else if (DuplicateStrategy == EglTFRuntimeMorphTargetsDuplicateStrategy::AppendMorphIndex)
+
+					if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreEmptyMorphTargets && bSkip)
 					{
-						MorphTargetName = FString::Printf(TEXT("%s_%d"), *MorphTargetName, MorphTargetIndex);
+						continue;
+					}
+
+					FString MorphTargetName = MorphTargetData.Name;
+					if (MorphTargetName.IsEmpty())
+					{
+						MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex);
+					}
+
+					bool bAddMorphTarget = false;
+					if (MorphTargetNamesHistory.Contains(MorphTargetName))
+					{
+						UMorphTarget* CurrentMorphTarget = MorphTargetNamesHistory[MorphTargetName];
+						EglTFRuntimeMorphTargetsDuplicateStrategy DuplicateStrategy = SkeletalMeshContext->SkeletalMeshConfig.MorphTargetsDuplicateStrategy;
+						if (DuplicateStrategy == EglTFRuntimeMorphTargetsDuplicateStrategy::Ignore)
+						{
+							// NOP
+						}
+						else if (DuplicateStrategy == EglTFRuntimeMorphTargetsDuplicateStrategy::Merge)
+						{
+	#if ENGINE_MAJOR_VERSION > 4
+							CurrentMorphTarget->GetMorphLODModels()[0].NumBaseMeshVerts += MorphTargetLODModel.NumBaseMeshVerts;
+							CurrentMorphTarget->GetMorphLODModels()[0].SectionIndices.Append(MorphTargetLODModel.SectionIndices);
+							CurrentMorphTarget->GetMorphLODModels()[0].Vertices.Append(MorphTargetLODModel.Vertices);
+							CurrentMorphTarget->GetMorphLODModels()[0].NumVertices = CurrentMorphTarget->GetMorphLODModels()[0].Vertices.Num();
+	#else
+							CurrentMorphTarget->MorphLODModels[0].NumBaseMeshVerts += MorphTargetLODModel.NumBaseMeshVerts;
+							CurrentMorphTarget->MorphLODModels[0].SectionIndices.Append(MorphTargetLODModel.SectionIndices);
+							CurrentMorphTarget->MorphLODModels[0].Vertices.Append(MorphTargetLODModel.Vertices);
+	#endif
+						}
+						else if (DuplicateStrategy == EglTFRuntimeMorphTargetsDuplicateStrategy::AppendDuplicateCounter)
+						{
+							if (MorphTargetNamesDuplicateCounter.Contains(MorphTargetName))
+							{
+								MorphTargetName = FString::Printf(TEXT("%s_%d"), *MorphTargetName, MorphTargetNamesDuplicateCounter[MorphTargetName] + 1);
+								MorphTargetNamesDuplicateCounter[MorphTargetName] += 1;
+							}
+							else
+							{
+								MorphTargetName = FString::Printf(TEXT("%s_1"), *MorphTargetName);
+								MorphTargetNamesDuplicateCounter.Add(MorphTargetName, 1);
+							}
+							bAddMorphTarget = true;
+						}
+						else if (DuplicateStrategy == EglTFRuntimeMorphTargetsDuplicateStrategy::AppendMorphIndex)
+						{
+							MorphTargetName = FString::Printf(TEXT("%s_%d"), *MorphTargetName, MorphTargetIndex);
+							bAddMorphTarget = true;
+						}
+					}
+					else
+					{
 						bAddMorphTarget = true;
 					}
-				}
-				else
-				{
-					bAddMorphTarget = true;
-				}
 
-				if (bAddMorphTarget)
-				{
-					UMorphTarget* MorphTarget = NewObject<UMorphTarget>(SkeletalMeshContext->SkeletalMesh, *MorphTargetName, RF_Public);
-#if ENGINE_MAJOR_VERSION > 4
-					MorphTarget->GetMorphLODModels().Add(MorphTargetLODModel);
-#else
-					MorphTarget->MorphLODModels.Add(MorphTargetLODModel);
-#endif
-					SkeletalMeshContext->SkeletalMesh->RegisterMorphTarget(MorphTarget, false);
-					MorphTargetNamesHistory.Add(MorphTargetName, MorphTarget);
-					bHasMorphTargets = true;
-				}
+					if (bAddMorphTarget)
+					{
+						UMorphTarget* MorphTarget = NewObject<UMorphTarget>(SkeletalMeshContext->SkeletalMesh, *MorphTargetName, RF_Public);
+	#if ENGINE_MAJOR_VERSION > 4
+						MorphTarget->GetMorphLODModels().Add(MorphTargetLODModel);
+	#else
+						MorphTarget->MorphLODModels.Add(MorphTargetLODModel);
+	#endif
+						SkeletalMeshContext->SkeletalMesh->RegisterMorphTarget(MorphTarget, false);
+						MorphTargetNamesHistory.Add(MorphTargetName, MorphTarget);
+						bHasMorphTargets = true;
+					}
 
-				MorphTargetIndex++;
+					MorphTargetIndex++;
+				}
+				BaseIndex += Primitive.Indices.Num();
 			}
-			BaseIndex += Primitive.Indices.Num();
 		}
 
 		for (int32 MatIndex = 0; MatIndex < SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives.Num(); MatIndex++)
