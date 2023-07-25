@@ -177,6 +177,12 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		DataPtr = UncompressedData.GetData();
 		DataNum = *GzipOriginalSize;
 	}
+	// LZ4 ? magic number(4) + 3 + 8 bytes size (expects uncompressed size)
+	else if (DataNum > 15 && DataPtr[0] == 0x04 && DataPtr[1] == 0x22 && DataPtr[2] == 0x4D && DataPtr[3] == 0x18)
+	{
+		UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to uncompress LZ4 data."));
+		return nullptr;
+	}
 
 	// Zip archive ?
 	TSharedPtr<FglTFRuntimeZipFile> ZipFile = nullptr;

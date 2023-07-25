@@ -27,7 +27,7 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 			LoadGLTFText.ToString(),
 			"",
 			"",
-			"GLTF Files|*.gltf;*.glb;*.zip;*.gz|",
+			"GLTF Files|*.gltf;*.glb;*.zip;*.gz;*.lz4;*.tar;*.glxf|",
 			EFileDialogFlags::Type::None,
 			OutFilenames) && OutFilenames.Num() > 0)
 		{
