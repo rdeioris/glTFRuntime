@@ -43,6 +43,7 @@
 #endif
 
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+#include "Engine/SkeletalMeshLODSettings.h"
 #define BONE_INFLUENCE_TYPE uint16
 #define MAX_BONE_INFLUENCE_WEIGHT 0xffff
 #else
