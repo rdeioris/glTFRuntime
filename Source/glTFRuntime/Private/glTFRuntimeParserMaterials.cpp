@@ -289,7 +289,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			{
 				return;
 			}
-	Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+			Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 		}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 
@@ -836,8 +836,8 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 			(Height % GPixelFormats[PixelFormat].BlockSizeY) == 0)
 		{
 
-			// limit image size
-			if ((MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0) && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
+			// limit image size (currently only PF_B8G8R8A8 is supported)
+			if (PixelFormat == EPixelFormat::PF_B8G8R8A8 && (MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0) && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
 			{
 				const int32 NewWidth = MaterialsConfig.ImagesConfig.MaxWidth > 0 ? MaterialsConfig.ImagesConfig.MaxWidth : Width;
 				const int32 NewHeight = MaterialsConfig.ImagesConfig.MaxHeight > 0 ? MaterialsConfig.ImagesConfig.MaxHeight : Height;
@@ -884,6 +884,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 				FglTFRuntimeMipMap MipMap(TextureIndex);
 				MipMap.Width = MipWidth;
 				MipMap.Height = MipHeight;
+				MipMap.PixelFormat = PixelFormat;
 
 				// Resize Image
 				if (MipIndex > 0)
