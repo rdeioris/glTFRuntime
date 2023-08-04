@@ -252,3 +252,13 @@ void AglTFRuntimeAssetActorAsync::ReceiveOnScenesLoaded_Implementation()
 {
 
 }
+
+void AglTFRuntimeAssetActorAsync::PostUnregisterAllComponents()
+{
+	if (Asset)
+	{
+		Asset->ClearCache();
+		Asset = nullptr;
+	}
+	Super::PostUnregisterAllComponents();
+}

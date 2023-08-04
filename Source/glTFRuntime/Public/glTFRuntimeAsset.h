@@ -295,6 +295,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	FString GetGenerator() const;
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	void ClearCache();
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

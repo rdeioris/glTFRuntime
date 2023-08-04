@@ -1350,3 +1350,11 @@ FString UglTFRuntimeAsset::GetGenerator() const
 
 	return Parser->GetGenerator();
 }
+
+void UglTFRuntimeAsset::ClearCache()
+{
+	if (Parser)
+	{
+		Parser->ClearCache();
+	}
+}

@@ -3338,6 +3338,19 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(TransmissionMaterialsMap);
 }
 
+void FglTFRuntimeParser::ClearCache()
+{
+	StaticMeshesCache.Empty();
+	MaterialsCache.Empty();
+	SkeletonsCache.Empty();
+	SkeletalMeshesCache.Empty();
+	TexturesCache.Empty();
+	MetallicRoughnessMaterialsMap.Empty();
+	SpecularGlossinessMaterialsMap.Empty();
+	UnlitMaterialsMap.Empty();
+	TransmissionMaterialsMap.Empty();
+}
+
 float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)
 {
 	SecondIndex = INDEX_NONE;
