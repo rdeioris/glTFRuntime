@@ -100,6 +100,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadStaticMesh_Internal, FColor::Magenta);
 
+	OnPreCreatedStaticMesh.Broadcast(StaticMeshContext);
+
 	UStaticMesh* StaticMesh = StaticMeshContext->StaticMesh;
 	FStaticMeshRenderData* RenderData = StaticMeshContext->RenderData;
 	const FglTFRuntimeStaticMeshConfig& StaticMeshConfig = StaticMeshContext->StaticMeshConfig;
@@ -254,8 +256,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 					else
 					{
 						StaticMeshVertex.Color = FColor::White;
-				}
 					}
+				}
 
 				if (bApplyAdditionalTransforms)
 				{
@@ -277,7 +279,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #else
 				BoundingBox += StaticMeshVertex.Position;
 #endif
-				}
+			}
 			// End of Geometry generation
 
 			AdditionalTransformsPrimitiveIndex++;
@@ -325,7 +327,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 				}
 				bMissingNormals = false;
-				}
+			}
 
 			const bool bCanGenerateTangents = (bMissingTangents && StaticMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::IfMissing) ||
 				StaticMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Always;
@@ -414,7 +416,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 					StaticMeshVertex2.TangentY = ComputeTangentY(StaticMeshVertex2.TangentZ, StaticMeshVertex2.TangentX) * TangentsDirection;
 #endif
 
-			}
+				}
 			}
 
 			VertexInstanceBaseIndex += NumVertexInstancesPerSection;
@@ -443,13 +445,13 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #else
 				StaticMeshVertex.Position -= PivotDelta;
 #endif
-		}
+			}
 
 			if (CurrentLODIndex == 0)
 			{
 				StaticMeshContext->LOD0PivotDelta = PivotDelta;
 			}
-				}
+		}
 
 		if (CurrentLODIndex == 0)
 		{
@@ -476,7 +478,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		if (StaticMesh->bAllowCPUAccess)
 		{
 			LODResources.IndexBuffer = FRawStaticIndexBuffer(true);
-			}
+		}
 		LODResources.IndexBuffer.SetIndices(LODIndices, EIndexBufferStride::Force32Bit);
 
 #if WITH_EDITOR
@@ -561,10 +563,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 		}
 #endif
-		}
+	}
 
 	return StaticMesh;
-			}
+}
 
 UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext)
 {
@@ -589,13 +591,13 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	StaticMesh->InitResources();
 
 	// set default LODs screen sizes
-	float DeltaScreenSize = (1.0f / RenderData->LODResources.Num()) / 2.0f;
+	float DeltaScreenSize = (1.0f / RenderData->LODResources.Num()) / StaticMeshConfig.LODScreenSizeMultiplier;
 	float ScreenSize = 1;
 	for (int32 LODIndex = 0; LODIndex < RenderData->LODResources.Num(); LODIndex++)
 	{
 		RenderData->ScreenSize[LODIndex].Default = ScreenSize;
 		ScreenSize -= DeltaScreenSize;
-}
+	}
 
 	// Override LODs ScreenSize
 	for (const TPair<int32, float>& Pair : StaticMeshConfig.LODScreenSize)
@@ -716,13 +718,10 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 
 	OnFinalizedStaticMesh.Broadcast(AsShared(), StaticMesh, StaticMeshConfig);
 
-	if (OnStaticMeshCreated.IsBound())
-	{
-		OnStaticMeshCreated.Broadcast(StaticMesh);
-	}
+	OnStaticMeshCreated.Broadcast(StaticMesh);
 
 	return StaticMesh;
-		}
+}
 
 bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
