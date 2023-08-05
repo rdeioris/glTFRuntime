@@ -1195,38 +1195,15 @@ struct FglTFRuntimePrimitive
 	}
 };
 
-struct FglTFRuntimeSkeletalMeshLOD
-{
-	// non-const here as the SkeletalMesh parser could modify internal bones mappings
-	FglTFRuntimeMeshLOD* RuntimeLOD;
-
-	bool bHasNormals;
-	bool bHasTangents;
-	bool bHasUV;
-
-#if WITH_EDITOR
-	FSkeletalMeshImportData ImportData;
-#endif
-
-	FglTFRuntimeSkeletalMeshLOD() = delete;
-
-	FglTFRuntimeSkeletalMeshLOD(FglTFRuntimeMeshLOD* InRuntimeLOD) : RuntimeLOD(InRuntimeLOD)
-	{
-		bHasNormals = false;
-		bHasTangents = false;
-		bHasUV = false;
-	}
-};
-
 struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 {
 	TSharedRef<class FglTFRuntimeParser> Parser;
 
+	TArray<FglTFRuntimeMeshLOD*> LODs;
+
 	const FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig;
 
 	USkeletalMesh* SkeletalMesh;
-
-	TArray<FglTFRuntimeSkeletalMeshLOD> LODs;
 
 	int32 SkinIndex;
 
@@ -1237,11 +1214,17 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 	// here we cache per-context LODs
 	TArray<FglTFRuntimeMeshLOD> CachedRuntimeMeshLODs;
 
+	// for LOD generators
+	TArray<FglTFRuntimeMeshLOD> ContextLODs;
+	TMap<int32, int32> ContextLODsMap;
+
 	FglTFRuntimeSkeletalMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : Parser(InParser), SkeletalMeshConfig(InSkeletalMeshConfig)
 	{
 		EObjectFlags Flags = RF_Public;
 		UObject* Outer = InSkeletalMeshConfig.Outer ? InSkeletalMeshConfig.Outer : GetTransientPackage();
 #if WITH_EDITOR
+		// TODO: get rid of this, it was a bad idea!
+		// a generic plugin for saving transient assets will be a better (and saner) approach
 		if (!InSkeletalMeshConfig.SaveToPackage.IsEmpty())
 		{
 			if (FindPackage(nullptr, *InSkeletalMeshConfig.SaveToPackage) || LoadPackage(nullptr, *InSkeletalMeshConfig.SaveToPackage, RF_Public|RF_Standalone))
@@ -1322,6 +1305,19 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 		}
 		return Transform;
 	}
+
+	FglTFRuntimeMeshLOD& AddContextLOD()
+	{
+		const int32 NewIndex = ContextLODs.AddDefaulted();
+		const int32 NewPtrIndex = LODs.AddUninitialized();
+		ContextLODsMap.Add(NewIndex, NewPtrIndex);
+		// rebuild ContextLODs pointers (as they could have changed)
+		for (const TPair<int32, int32>& Pair : ContextLODsMap)
+		{
+			LODs[Pair.Value] = &ContextLODs[Pair.Key];
+		}
+		return ContextLODs[NewIndex];
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -1332,8 +1328,15 @@ struct FglTFRuntimeMeshLOD
 	TArray<FglTFRuntimePrimitive> Primitives;
 	TArray<FTransform> AdditionalTransforms;
 
+	bool bHasNormals;
+	bool bHasTangents;
+	bool bHasUV;
+
 	FglTFRuntimeMeshLOD()
 	{
+		bHasNormals = false;
+		bHasTangents = false;
+		bHasUV = false;
 	}
 };
 
