@@ -565,6 +565,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #endif
 	}
 
+	OnPostCreatedStaticMesh.Broadcast(StaticMeshContext);
+
 	return StaticMesh;
 }
 

@@ -1721,6 +1721,7 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnTextureFilterMips, TSharedR
 DECLARE_MULTICAST_DELEGATE_EightParams(FglTFRuntimeOnTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, TArray64<uint8>&, int32&, int32&, EPixelFormat&, TArray64<uint8>&, const FglTFRuntimeImagesConfig&);
 DECLARE_MULTICAST_DELEGATE_FiveParams(FglTFRuntimeOnLoadedTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, const int32, const int32, FColor*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreCreatedStaticMesh, FglTFRuntimeStaticMeshContextRef);
+DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPostCreatedStaticMesh, FglTFRuntimeStaticMeshContextRef);
 DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreCreatedSkeletalMesh, FglTFRuntimeSkeletalMeshContextRef);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnFinalizedStaticMesh, TSharedRef<FglTFRuntimeParser>, UStaticMesh*, const FglTFRuntimeStaticMeshConfig&);
 
@@ -1904,6 +1905,7 @@ public:
 	static FglTFRuntimeOnLoadedTexturePixels OnLoadedTexturePixels;
 	static FglTFRuntimeOnFinalizedStaticMesh OnFinalizedStaticMesh;
 	static FglTFRuntimeOnPreCreatedStaticMesh OnPreCreatedStaticMesh;
+	static FglTFRuntimeOnPostCreatedStaticMesh OnPostCreatedStaticMesh;
 	static FglTFRuntimeOnPreCreatedSkeletalMesh OnPreCreatedSkeletalMesh;
 
 	const FglTFRuntimeBlob* GetAdditionalBufferView(const int64 Index, const FString& Name) const;
