@@ -4767,3 +4767,29 @@ FString FglTFRuntimeParser::GetGenerator() const
 
 	return GetJsonObjectString(Asset.ToSharedRef(), "generator", "");
 }
+
+bool FglTFRuntimeParser::IsArchive() const
+{
+	return ZipFile.IsValid();
+}
+
+
+TArray<FString> FglTFRuntimeParser::GetArchiveItems() const
+{
+	TArray<FString> Items;
+	if (ZipFile.IsValid())
+	{
+		ZipFile->GetItems(Items);
+	}
+	return Items;
+}
+
+bool FglTFRuntimeParser::GetBlobByName(const FString& Name, TArray64<uint8>& Blob) const
+{
+	if (!IsArchive())
+	{
+		return false;
+	}
+
+	return ZipFile->GetFileContent(Name, Blob);
+}

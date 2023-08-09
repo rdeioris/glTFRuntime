@@ -1643,6 +1643,11 @@ public:
 
 	FString GetFirstFilenameByExtension(const FString& Extension) const;
 
+	void GetItems(TArray<FString>& Items) const
+	{
+		OffsetsMap.GetKeys(Items);
+	}
+
 protected:
 	TMap<FString, uint32> OffsetsMap;
 	FArrayReader Data;
@@ -2343,4 +2348,9 @@ protected:
 	TArray<TArray64<uint8>> AdditionalBufferViewsData;
 
 	FString DefaultPrefixForUnnamedNodes;
+
+public:
+	bool IsArchive() const;
+	TArray<FString> GetArchiveItems() const;
+	bool GetBlobByName(const FString& Name, TArray64<uint8>& Blob) const;
 };

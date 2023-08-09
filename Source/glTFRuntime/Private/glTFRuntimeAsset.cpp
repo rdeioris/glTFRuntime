@@ -1358,3 +1358,17 @@ void UglTFRuntimeAsset::ClearCache()
 		Parser->ClearCache();
 	}
 }
+
+bool UglTFRuntimeAsset::IsArchive() const
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->IsArchive();
+}
+
+TArray<FString> UglTFRuntimeAsset::GetArchiveItems() const
+{
+	GLTF_CHECK_PARSER(TArray<FString>());
+
+	return Parser->GetArchiveItems();
+}

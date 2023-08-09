@@ -299,6 +299,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	void ClearCache();
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool IsArchive() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	TArray<FString> GetArchiveItems() const;
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	
