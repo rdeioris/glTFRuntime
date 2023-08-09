@@ -215,13 +215,13 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 			}
 		}
 
-		if (Filename.IsEmpty())
+		if (!LoaderConfig.bAsBlob && Filename.IsEmpty())
 		{
 			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to find entry point from Zip archive."), *Filename);
 			return nullptr;
 		}
 
-		if (!ZipFile->GetFileContent(Filename, UnzippedData))
+		if (!LoaderConfig.bAsBlob && !ZipFile->GetFileContent(Filename, UnzippedData))
 		{
 			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to get %s from Zip archive."), *Filename);
 			return nullptr;
@@ -232,6 +232,11 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 			DataPtr = UnzippedData.GetData();
 			DataNum = UnzippedData.Num();
 		}
+		else
+		{
+			DataPtr = nullptr;
+			DataNum = 0;
+		}
 	}
 
 	if (LoaderConfig.bAsBlob)
@@ -240,6 +245,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		if (NewParser)
 		{
 			NewParser->AsBlob.Append(DataPtr, DataNum);
+			NewParser->ZipFile = ZipFile;
 		}
 		return NewParser;
 	}
