@@ -529,6 +529,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						InWeights[TotalVertexIndex].InfluenceWeights[3] = 0;
 						InWeights[TotalVertexIndex].InfluenceBones[3] = 0;
 
+						// TODO PerBoneBoundBox could be useful for other algorithms too (should be a flag?)
 						if (!SkeletalMeshContext->PerBoneBoundingBox.Contains(BoneIndex))
 						{
 							FBox NewBox(EForceInit::ForceInitToZero);

@@ -63,7 +63,8 @@ enum class EglTFRuntimeTransformBaseType : uint8
 	YForward,
 	BasisMatrix,
 	Identity,
-	LeftHanded
+	LeftHanded,
+	IdentityXInverted
 };
 
 UENUM()
@@ -226,6 +227,11 @@ struct FglTFRuntimeConfig
 		if (TransformBaseType == EglTFRuntimeTransformBaseType::LeftHanded)
 		{
 			return FBasisVectorMatrix(FVector(0, 0, 1), FVector(-1, 0, 0), FVector(0, 1, 0), FVector::ZeroVector);
+		}
+
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::IdentityXInverted)
+		{
+			return FBasisVectorMatrix(FVector(-1, 0, 0), FVector(0, 1, 0), FVector(0, 0, 1), FVector::ZeroVector);
 		}
 
 		return DefaultMatrix;
@@ -2086,6 +2092,10 @@ protected:
 	TArray64<uint8> AsBlob;
 
 public:
+
+	FVector TransformVector(FVector Vector) const;
+	FVector TransformPosition(FVector Position) const;
+	FVector4 TransformVector4(FVector4 Vector) const;
 
 	const TArray64<uint8>& GetBlob() const { return AsBlob; }
 	TArray64<uint8>& GetBlob() { return AsBlob; }

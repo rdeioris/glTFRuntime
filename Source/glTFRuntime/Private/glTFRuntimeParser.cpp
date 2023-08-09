@@ -2417,6 +2417,21 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 	return true;
 }
 
+FVector FglTFRuntimeParser::TransformVector(FVector Vector) const
+{
+	return SceneBasis.TransformVector(Vector);
+}
+
+FVector FglTFRuntimeParser::TransformPosition(FVector Position) const
+{
+	return SceneBasis.TransformPosition(Position) * SceneScale;
+}
+
+FVector4 FglTFRuntimeParser::TransformVector4(FVector4 Vector) const
+{
+	return SceneBasis.TransformFVector4(Vector);
+}
+
 bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadPrimitive, FColor::Magenta);
