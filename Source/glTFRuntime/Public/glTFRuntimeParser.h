@@ -1717,6 +1717,7 @@ protected:
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeStaticMeshAsync, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FglTFRuntimeMeshLODAsync, const bool, bValid, const FglTFRuntimeMeshLOD&, MeshLOD);
 
 using FglTFRuntimeStaticMeshContextRef = TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>;
 using FglTFRuntimeSkeletalMeshContextRef = TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>;
@@ -1794,6 +1795,8 @@ public:
 	void LoadStaticMeshAsync(const int32 MeshIndex, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	void LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+
+	void LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, FglTFRuntimeMeshLODAsync AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	USkeletalMesh* LoadSkeletalMeshLODs(const TArray<int32>& MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
@@ -2113,7 +2116,7 @@ public:
 	}
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, bool bNormalized, Callback Filter, const int64 AdditionalBufferView)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -2123,15 +2126,11 @@ public:
 
 		FglTFRuntimeBlob Blob;
 		int64 ComponentType = 0, Stride = 0, Elements = 0, ElementSize = 0, Count = 0;
-		bool bOverrideNormalized = false;
-		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob, GetAdditionalBufferView(AdditionalBufferView, Name)))
+		bool bNormalized = bDefaultNormalized;
+
+		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bNormalized, Blob, GetAdditionalBufferView(AdditionalBufferView, Name)))
 		{
 			return false;
-		}
-
-		if (bOverrideNormalized)
-		{
-			bNormalized = bOverrideNormalized;
 		}
 
 		if (!SupportedElements.Contains(Elements))
@@ -2208,7 +2207,7 @@ public:
 	}
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, bool bNormalized, Callback Filter, const int64 AdditionalBufferView)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -2218,16 +2217,11 @@ public:
 
 		FglTFRuntimeBlob Blob;
 		int64 ComponentType, Stride, Elements, ElementSize, Count;
-		bool bOverrideNormalized = false;
+		bool bNormalized = bDefaultNormalized;
 
-		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bOverrideNormalized, Blob, GetAdditionalBufferView(AdditionalBufferView, Name)))
+		if (!GetAccessor(AccessorIndex, ComponentType, Stride, Elements, ElementSize, Count, bNormalized, Blob, GetAdditionalBufferView(AdditionalBufferView, Name)))
 		{
 			return false;
-		}
-
-		if (bOverrideNormalized)
-		{
-			bNormalized = bOverrideNormalized;
 		}
 
 		if (Elements != 1)
@@ -2288,18 +2282,16 @@ public:
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const bool bNormalized, const int64 AdditionalBufferView)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized)
 	{
-		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; }, AdditionalBufferView);
+		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, [&](T InValue) -> T {return InValue; }, AdditionalBufferView, bDefaultNormalized);
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const bool bNormalized, const int64 AdditionalBufferView)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized)
 	{
-		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, bNormalized, [&](T InValue) -> T {return InValue; }, AdditionalBufferView);
+		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, [&](T InValue) -> T {return InValue; }, AdditionalBufferView, bDefaultNormalized);
 	}
-
-
 
 	template<int32 Num, typename T>
 	bool GetJsonVector(const TArray<TSharedPtr<FJsonValue>>* JsonValues, T& Value)

@@ -592,6 +592,13 @@ void UglTFRuntimeAsset::LoadStaticMeshAsync(const int32 MeshIndex, FglTFRuntimeS
 	Parser->LoadStaticMeshAsync(MeshIndex, AsyncCallback, StaticMeshConfig);
 }
 
+void UglTFRuntimeAsset::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, FglTFRuntimeMeshLODAsync AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	GLTF_CHECK_PARSER_VOID();
+
+	Parser->LoadMeshAsRuntimeLODAsync(MeshIndex, AsyncCallback, MaterialsConfig);
+}
+
 void UglTFRuntimeAsset::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
@@ -1182,7 +1189,7 @@ bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TA
 	TArray<FVector4> Rotations;
 	TArray<FVector> Scales;
 
-	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "TRANSLATION", Translations, { 3 }, { 5126 }, false, [](FVector V) { return V; }, INDEX_NONE))
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "TRANSLATION", Translations, { 3 }, { 5126 }, [](FVector V) { return V; }, INDEX_NONE, false))
 	{
 		Transforms.AddUninitialized(Translations.Num());
 		for (int32 Index = 0; Index < Translations.Num(); Index++)
@@ -1191,7 +1198,7 @@ bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TA
 		}
 	}
 
-	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "ROTATION", Rotations, { 4 }, { 5126, 5120, 5122 }, true, [](FVector4 Q) { return Q; }, INDEX_NONE))
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "ROTATION", Rotations, { 4 }, { 5126, 5120, 5122 }, [](FVector4 Q) { return Q; }, INDEX_NONE, true))
 	{
 		if (Transforms.Num() == 0)
 		{
@@ -1208,7 +1215,7 @@ bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TA
 		}
 	}
 
-	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "SCALE", Scales, { 3 }, { 5126 }, false, [](FVector V) { return V; }, INDEX_NONE))
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "SCALE", Scales, { 3 }, { 5126 }, [](FVector V) { return V; }, INDEX_NONE, false))
 	{
 		if (Transforms.Num() == 0)
 		{

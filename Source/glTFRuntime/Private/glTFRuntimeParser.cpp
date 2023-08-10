@@ -1,6 +1,7 @@
 // Copyright 2020-2023, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Async/Async.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "Engine/Texture2D.h"
 #include "Misc/FileHelper.h"
@@ -1231,13 +1232,13 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 
 		FglTFRuntimeAnimationCurve AnimationCurve;
 
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", AnimationCurve.Timeline, { 5126 }, false, INDEX_NONE))
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", AnimationCurve.Timeline, { 5126 }, INDEX_NONE, false))
 		{
 			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"input\" from sampler %d"), SamplerIndex));
 			return false;
 		}
 
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", AnimationCurve.Values, { 1, 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, true, INDEX_NONE))
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", AnimationCurve.Values, { 1, 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, INDEX_NONE, true))
 		{
 			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"output\" from sampler %d"), SamplerIndex));
 			return false;
@@ -2471,6 +2472,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	TArray<int64> SupportedTexCoordComponentTypes = { 5126, 5121, 5123 };
 	if (bHasMeshQuantization)
 	{
+		// the bDefaultNormalized is not necessarely a good idea but I do not want to break old (technically invalid) assets
 		SupportedPositionComponentTypes.Append({ 5120, 5121, 5122, 5123 });
 		SupportedNormalComponentTypes.Append({ 5120, 5122 });
 		SupportedTangentComponentTypes.Append({ 5120, 5122 });
@@ -2478,7 +2480,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	}
 
 	if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "POSITION", Primitive.Positions,
-		{ 3 }, SupportedPositionComponentTypes, false, [&](FVector Value) -> FVector {return SceneBasis.TransformPosition(Value) * SceneScale; }, Primitive.AdditionalBufferView))
+		{ 3 }, SupportedPositionComponentTypes, [&](FVector Value) -> FVector {return SceneBasis.TransformPosition(Value) * SceneScale; }, Primitive.AdditionalBufferView, false))
 	{
 		AddError("LoadPrimitive()", "Unable to load POSITION attribute");
 		return false;
@@ -2487,7 +2489,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("NORMAL"))
 	{
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "NORMAL", Primitive.Normals,
-			{ 3 }, SupportedNormalComponentTypes, false, [&](FVector Value) -> FVector { return SceneBasis.TransformVector(Value); }, Primitive.AdditionalBufferView))
+			{ 3 }, SupportedNormalComponentTypes, [&](FVector Value) -> FVector { return SceneBasis.TransformVector(Value); }, Primitive.AdditionalBufferView, true))
 		{
 			AddError("LoadPrimitive()", "Unable to load NORMAL attribute");
 			return false;
@@ -2497,7 +2499,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("TANGENT"))
 	{
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TANGENT", Primitive.Tangents,
-			{ 4 }, SupportedTangentComponentTypes, false, [&](FVector4 Value) -> FVector4 { return SceneBasis.TransformFVector4(Value); }, Primitive.AdditionalBufferView))
+			{ 4 }, SupportedTangentComponentTypes, [&](FVector4 Value) -> FVector4 { return SceneBasis.TransformFVector4(Value); }, Primitive.AdditionalBufferView, true))
 		{
 			AddError("LoadPrimitive()", "Unable to load TANGENT attribute");
 			return false;
@@ -2508,7 +2510,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FVector2D> UV;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TEXCOORD_0", UV,
-			{ 2 }, SupportedTexCoordComponentTypes, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, Value.Y); }, Primitive.AdditionalBufferView))
+			{ 2 }, SupportedTexCoordComponentTypes, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, Value.Y); }, Primitive.AdditionalBufferView, !bHasMeshQuantization))
 		{
 			AddError("LoadPrimitive()", "Error loading TEXCOORD_0");
 			return false;
@@ -2521,7 +2523,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FVector2D> UV;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "TEXCOORD_1", UV,
-			{ 2 }, SupportedTexCoordComponentTypes, true, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, Value.Y); }, Primitive.AdditionalBufferView))
+			{ 2 }, SupportedTexCoordComponentTypes, [&](FVector2D Value) -> FVector2D {return FVector2D(Value.X, Value.Y); }, Primitive.AdditionalBufferView, !bHasMeshQuantization))
 		{
 			AddError("LoadPrimitive()", "Error loading TEXCOORD_1");
 			return false;
@@ -2534,7 +2536,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FglTFRuntimeUInt16Vector4> Joints;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_0", Joints,
-			{ 4 }, { 5121, 5123 }, false, Primitive.AdditionalBufferView))
+			{ 4 }, { 5121, 5123 }, Primitive.AdditionalBufferView, false))
 		{
 			AddError("LoadPrimitive()", "Error loading JOINTS_0");
 			return false;
@@ -2547,7 +2549,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FglTFRuntimeUInt16Vector4> Joints;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_1", Joints,
-			{ 4 }, { 5121, 5123 }, false, Primitive.AdditionalBufferView))
+			{ 4 }, { 5121, 5123 }, Primitive.AdditionalBufferView, false))
 		{
 			AddError("LoadPrimitive()", "Error loading JOINTS_1");
 			return false;
@@ -2560,7 +2562,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FVector4> Weights;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_0", Weights,
-			{ 4 }, { 5126, 5121, 5123 }, true, Primitive.AdditionalBufferView))
+			{ 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true))
 		{
 			AddError("LoadPrimitive()", "Error loading WEIGHTS_0");
 			return false;
@@ -2572,7 +2574,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FVector4> Weights;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_1", Weights,
-			{ 4 }, { 5126, 5121, 5123 }, true, Primitive.AdditionalBufferView))
+			{ 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true))
 		{
 			AddError("LoadPrimitive()", "Error loading WEIGHTS_1");
 			return false;
@@ -2583,7 +2585,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("COLOR_0"))
 	{
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "COLOR_0", Primitive.Colors,
-			{ 3, 4 }, { 5126, 5121, 5123 }, true, Primitive.AdditionalBufferView))
+			{ 3, 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true))
 		{
 			AddError("LoadPrimitive()", "Error loading COLOR_0");
 			return false;
@@ -2609,7 +2611,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			if (JsonTargetObject->HasField("POSITION"))
 			{
 				if (!BuildFromAccessorField(JsonTargetObject.ToSharedRef(), "POSITION", MorphTarget.Positions,
-					{ 3 }, SupportedPositionComponentTypes, false, [&](FVector Value) -> FVector { return SceneBasis.TransformPosition(Value) * SceneScale; }, INDEX_NONE))
+					{ 3 }, SupportedPositionComponentTypes, [&](FVector Value) -> FVector { return SceneBasis.TransformPosition(Value) * SceneScale; }, INDEX_NONE, false))
 				{
 					AddError("LoadPrimitive()", "Unable to load POSITION attribute for MorphTarget");
 					return false;
@@ -2625,7 +2627,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			if (JsonTargetObject->HasField("NORMAL"))
 			{
 				if (!BuildFromAccessorField(JsonTargetObject.ToSharedRef(), "NORMAL", MorphTarget.Normals,
-					{ 3 }, SupportedNormalComponentTypes, false, [&](FVector Value) -> FVector { return SceneBasis.TransformVector(Value); }, INDEX_NONE))
+					{ 3 }, SupportedNormalComponentTypes, [&](FVector Value) -> FVector { return SceneBasis.TransformVector(Value); }, INDEX_NONE, true))
 				{
 					AddError("LoadPrimitive()", "Unable to load NORMAL attribute for MorphTarget");
 					return false;
@@ -3059,9 +3061,11 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 		bHasSparse = true;
 	}
 
+	const bool bOriginalNormalized = bNormalized;
+
 	if (!JsonAccessorObject->TryGetBoolField("normalized", bNormalized))
 	{
-		bNormalized = false;
+		bNormalized = bOriginalNormalized;
 	}
 
 	if (!JsonAccessorObject->TryGetNumberField("componentType", ComponentType))
@@ -4798,4 +4802,26 @@ bool FglTFRuntimeParser::GetBlobByName(const FString& Name, TArray64<uint8>& Blo
 	}
 
 	return ZipFile->GetFileContent(Name, Blob);
+}
+
+void FglTFRuntimeParser::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, FglTFRuntimeMeshLODAsync AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+	if (!JsonMeshObject)
+	{
+		AsyncCallback.ExecuteIfBound(false, FglTFRuntimeMeshLOD());
+	}
+
+	Async(EAsyncExecution::Thread, [this, JsonMeshObject, MaterialsConfig, AsyncCallback]()
+		{
+			FglTFRuntimeMeshLOD* LOD;
+			bool bSuccess = LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, MaterialsConfig);
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([bSuccess, LOD, AsyncCallback]()
+				{
+					AsyncCallback.ExecuteIfBound(bSuccess, bSuccess ? *LOD : FglTFRuntimeMeshLOD());
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		}
+
+	);
 }
