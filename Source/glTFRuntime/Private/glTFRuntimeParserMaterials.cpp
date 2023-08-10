@@ -255,6 +255,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			{
 				RuntimeMaterial.BaseSpecularFactor = 1;
 			}
+			GetMaterialTexture(JsonMaterialSpecular->ToSharedRef(), "specularTexture", false, RuntimeMaterial.SpecularTextureCache, RuntimeMaterial.SpecularTextureMips, RuntimeMaterial.SpecularTransform, RuntimeMaterial.SpecularSampler, false);
+			RuntimeMaterial.bKHR_materials_specular = true;
 		}
 
 		// KHR_materials_clearcoat
@@ -582,6 +584,14 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		ApplyMaterialTexture("transmissionTexture", RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips,
 			RuntimeMaterial.TransmissionSampler,
 			"transmission", RuntimeMaterial.TransmissionTransform,
+			TextureCompressionSettings::TC_Default, false);
+	}
+
+	if (RuntimeMaterial.bKHR_materials_specular)
+	{
+		ApplyMaterialTexture("specularTexture", RuntimeMaterial.SpecularTextureCache, RuntimeMaterial.SpecularTextureMips,
+			RuntimeMaterial.SpecularSampler,
+			"specular", RuntimeMaterial.SpecularTransform,
 			TextureCompressionSettings::TC_Default, false);
 	}
 

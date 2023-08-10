@@ -1565,7 +1565,12 @@ struct FglTFRuntimeMaterial
 	FglTFRuntimeTextureTransform SpecularGlossinessTransform;
 	FglTFRuntimeTextureSampler SpecularGlossinessSampler;
 
+	bool bKHR_materials_specular;
 	double BaseSpecularFactor;
+	TArray<FglTFRuntimeMipMap> SpecularTextureMips;
+	UTexture2D* SpecularTextureCache;
+	FglTFRuntimeTextureTransform SpecularTransform;
+	FglTFRuntimeTextureSampler SpecularSampler;
 
 	bool bHasDiffuseFactor;
 	FLinearColor DiffuseFactor;
@@ -1629,6 +1634,7 @@ struct FglTFRuntimeMaterial
 		bHasIOR = false;
 		IOR = 1;
 		bKHR_materials_clearcoat = false;
+		bKHR_materials_specular = false;
 	}
 };
 
