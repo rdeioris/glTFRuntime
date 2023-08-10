@@ -1287,7 +1287,7 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 		return SkeletalMesh->GetRefSkeleton().GetParentIndex(BoneIndex);
 #else
-		return SkeletalMesh->Skeleton->RefSkeleton.GetParentIndex(BoneIndex);
+		return SkeletalMesh->RefSkeleton.GetParentIndex(BoneIndex);
 #endif
 	}
 
