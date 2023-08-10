@@ -1635,6 +1635,7 @@ struct FglTFRuntimeMaterial
 		IOR = 1;
 		bKHR_materials_clearcoat = false;
 		bKHR_materials_specular = false;
+		SpecularTextureCache = nullptr;
 	}
 };
 
