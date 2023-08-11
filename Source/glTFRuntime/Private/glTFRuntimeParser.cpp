@@ -1863,6 +1863,71 @@ bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
 	return false;
 }
 
+bool FglTFRuntimeParser::FillLODSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const TArray<FglTFRuntimeBone>& Skeleton)
+{
+	RefSkeleton.Empty();
+
+	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
+
+	bool bFoundRoot = false;
+	for (int32 BoneIndex = 0; BoneIndex < Skeleton.Num(); BoneIndex++)
+	{
+		const FString CurrentBoneName = Skeleton[BoneIndex].BoneName;
+		const int32 CurrentBoneParentIndex = Skeleton[BoneIndex].ParentIndex;
+		const FTransform CurrentBoneTransform = Skeleton[BoneIndex].Transform;
+		if (CurrentBoneParentIndex == INDEX_NONE)
+		{
+			if (bFoundRoot)
+			{
+				AddError("FillLODSkeleton()", "Only one root bone can be defined.");
+				return false;
+			}
+			bFoundRoot = true;
+		}
+		else if (CurrentBoneParentIndex >= 0)
+		{
+			if (CurrentBoneParentIndex >= Skeleton.Num())
+			{
+				AddError("FillLODSkeleton()", "Bone ParentIndex is not valid.");
+				return false;
+			}
+		}
+		else
+		{
+			AddError("FillLODSkeleton()", "The only supported negative ParentIndex is -1 (for root bone)");
+			return false;
+		}
+
+		// now check for duplicated bone names
+		for (int32 CheckBoneIndex = 0; CheckBoneIndex < Skeleton.Num(); CheckBoneIndex++)
+		{
+			if (CheckBoneIndex == BoneIndex)
+			{
+				continue;
+			}
+
+			if (Skeleton[CheckBoneIndex].BoneName == CurrentBoneName)
+			{
+				AddError("FillLODSkeleton()", "Duplicated bone name found");
+				return false;
+			}
+		}
+		FName BoneName = FName(CurrentBoneName);
+		Modifier.Add(FMeshBoneInfo(BoneName, CurrentBoneName, CurrentBoneParentIndex), CurrentBoneTransform);
+
+		BoneMap.Add(BoneIndex, BoneName);
+	}
+
+	if (!bFoundRoot)
+	{
+		return false;
+	}
+
+	OnLoadedRefSkeleton.Broadcast(AsShared(), nullptr, Modifier);
+
+	return true;
+}
+
 bool FglTFRuntimeParser::FillFakeSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	RefSkeleton.Empty();

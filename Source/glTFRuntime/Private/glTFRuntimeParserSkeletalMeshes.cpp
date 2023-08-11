@@ -258,6 +258,14 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			return nullptr;
 		}
 	}
+	else if (SkeletalMeshContext->LODs.IsValidIndex(0) && SkeletalMeshContext->LODs[0]->Skeleton.Num() > 0)
+	{
+		if (!FillLODSkeleton(RefSkeleton, MainBoneMap, SkeletalMeshContext->LODs[0]->Skeleton))
+		{
+			AddError("CreateSkeletalMeshFromLODs()", "Unable to fill fake RefSkeleton.");
+			return nullptr;
+		}
+	}
 	else
 	{
 		if (!FillFakeSkeleton(RefSkeleton, MainBoneMap, SkeletalMeshContext->SkeletalMeshConfig))
