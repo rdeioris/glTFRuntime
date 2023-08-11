@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Animation/AnimEnums.h"
 #include "Animation/Skeleton.h"
+#include "Async/Async.h"
 #include "Dom/JsonValue.h"
 #include "Dom/JsonObject.h"
 #include "Engine/DataAsset.h"
@@ -1722,6 +1723,12 @@ protected:
 	const TArray64<uint8>& Data;
 };
 
+// generic struct for plugins cache
+struct FglTFRuntimePluginCacheData
+{
+	bool bValid = false;
+};
+
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeStaticMeshAsync, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FglTFRuntimeMeshLODAsync, const bool, bValid, const FglTFRuntimeMeshLOD&, MeshLOD);
@@ -1735,9 +1742,9 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedPrimitive, TSharedRef
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedRefSkeleton, TSharedRef<FglTFRuntimeParser>, TSharedPtr<FJsonObject>, FReferenceSkeletonModifier&);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeOnCreatedPoseTracks, TSharedRef<FglTFRuntimeParser>, FglTFRuntimePoseTracksMap&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnTextureImageIndex, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, int64&);
-DECLARE_MULTICAST_DELEGATE_SevenParams(FglTFRuntimeOnTextureMips, TSharedRef<FglTFRuntimeParser>, const int32, TSharedRef<FJsonObject>, TSharedRef<FJsonObject>, TArray64<uint8>&, TArray<FglTFRuntimeMipMap>&, const FglTFRuntimeImagesConfig&);
+DECLARE_MULTICAST_DELEGATE_SevenParams(FglTFRuntimeOnTextureMips, TSharedRef<FglTFRuntimeParser>, const int32, TSharedRef<FJsonObject>, TSharedRef<FJsonObject>, const TArray64<uint8>&, TArray<FglTFRuntimeMipMap>&, const FglTFRuntimeImagesConfig&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnTextureFilterMips, TSharedRef<FglTFRuntimeParser>, TArray<FglTFRuntimeMipMap>&, const FglTFRuntimeImagesConfig&);
-DECLARE_MULTICAST_DELEGATE_EightParams(FglTFRuntimeOnTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, TArray64<uint8>&, int32&, int32&, EPixelFormat&, TArray64<uint8>&, const FglTFRuntimeImagesConfig&);
+DECLARE_MULTICAST_DELEGATE_EightParams(FglTFRuntimeOnTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, const TArray64<uint8>&, int32&, int32&, EPixelFormat&, TArray64<uint8>&, const FglTFRuntimeImagesConfig&);
 DECLARE_MULTICAST_DELEGATE_FiveParams(FglTFRuntimeOnLoadedTexturePixels, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, const int32, const int32, FColor*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreCreatedStaticMesh, FglTFRuntimeStaticMeshContextRef);
 DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPostCreatedStaticMesh, FglTFRuntimeStaticMeshContextRef);
@@ -1766,13 +1773,14 @@ public:
 	bool LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& NodeName, int32& SkinIndex, const TArray<FString>& ExcludeNodes, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
 	UStaticMesh* LoadStaticMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	void LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	UStaticMesh* LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 	bool LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	TArray<UStaticMesh*> LoadStaticMeshesFromPrimitives(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UStaticMesh* LoadStaticMeshRecursive(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
-	void LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	void LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 	UStaticMesh* LoadStaticMeshLODs(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
@@ -1798,17 +1806,17 @@ public:
 	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 	USkeleton* LoadSkeletonFromNode(const FglTFRuntimeNode& Node, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
-	void LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
-	void LoadStaticMeshAsync(const int32 MeshIndex, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	void LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	void LoadStaticMeshAsync(const int32 MeshIndex, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
-	void LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
+	void LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
-	void LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, FglTFRuntimeMeshLODAsync AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	void LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	USkeletalMesh* LoadSkeletalMeshLODs(const TArray<int32>& MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
 	USkeletalMesh* LoadSkeletalMeshRecursive(const FString& NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
-	void LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+	void LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
@@ -1893,7 +1901,7 @@ public:
 
 	bool LoadImageBytes(const int32 ImageIndex, TSharedPtr<FJsonObject>& JsonImageObject, TArray64<uint8>& Bytes);
 	bool LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig);
-	bool LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig);
+	bool LoadImageFromBlob(const TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig);
 	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 	UTextureCube* BuildTextureCube(UObject* Outer, const TArray<FglTFRuntimeMipMap>& MipsXP, const TArray<FglTFRuntimeMipMap>& MipsXN, const TArray<FglTFRuntimeMipMap>& MipsYP, const TArray<FglTFRuntimeMipMap>& MipsYN, const TArray<FglTFRuntimeMipMap>& MipsZP, const TArray<FglTFRuntimeMipMap>& MipsZN, const bool bAutoRotate, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 	UTexture2DArray* BuildTextureArray(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips,const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
@@ -2028,9 +2036,6 @@ protected:
 	UMaterialInterface* LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors);
 	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
 
-	UMaterialInterface* BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors);
-	UMaterialInterface* BuildVertexColorOnlyMaterial(const FglTFRuntimeMaterialsConfig& MaterialsConfig);
-
 	bool LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter);
 
 	bool LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter, const TArray<FglTFRuntimePathItem>& OverrideTrackNameFromExtension);
@@ -2051,6 +2056,9 @@ protected:
 	bool HasRoot(int32 NodeIndex, int32 RootIndex);
 
 public:
+	UMaterialInterface* BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors);
+	UMaterialInterface* BuildVertexColorOnlyMaterial(const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+
 	bool CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems);
 	bool CheckJsonRootIndex(const FString FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems) { return CheckJsonIndex(Root, FieldName, Index, JsonItems); }
 	TSharedPtr<FJsonObject> GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index);
@@ -2352,4 +2360,31 @@ public:
 	bool IsArchive() const;
 	TArray<FString> GetArchiveItems() const;
 	bool GetBlobByName(const FString& Name, TArray64<uint8>& Blob) const;
+
+	template<typename FUNCTION>
+	void LoadAsRuntimeLODAsync(FUNCTION Function, const FglTFRuntimeMeshLODAsync& AsyncCallback)
+	{
+		Async(EAsyncExecution::Thread, [Function, AsyncCallback]()
+			{
+				FglTFRuntimeMeshLOD LOD;
+				bool bSuccess = Function(LOD);
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([bSuccess, &LOD, AsyncCallback]()
+					{
+						AsyncCallback.ExecuteIfBound(bSuccess, bSuccess ? LOD : FglTFRuntimeMeshLOD());
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+			}
+
+		);
+	}
+
+	TMap<FString, TSharedPtr<FglTFRuntimePluginCacheData>> PluginsCacheData;
+
+	const FString& GetBaseDirectory() const { return BaseDirectory; }
+
+	bool LoadPathToBlob(const FString& Path, TArray64<uint8>& Blob);
+
+	bool LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJsonObject> JsonTextureObject, TSharedRef<FJsonObject> JsonImageObject, const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	bool LoadBlobToMips(const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+
 };

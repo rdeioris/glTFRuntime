@@ -4804,7 +4804,7 @@ bool FglTFRuntimeParser::GetBlobByName(const FString& Name, TArray64<uint8>& Blo
 	return ZipFile->GetFileContent(Name, Blob);
 }
 
-void FglTFRuntimeParser::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, FglTFRuntimeMeshLODAsync AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+void FglTFRuntimeParser::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 	if (!JsonMeshObject)
@@ -4824,4 +4824,19 @@ void FglTFRuntimeParser::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, FglTFR
 		}
 
 	);
+}
+
+bool FglTFRuntimeParser::LoadPathToBlob(const FString& Path, TArray64<uint8>& Blob)
+{
+	if (IsArchive())
+	{
+		return GetBlobByName(Path, Blob);
+	}
+
+	if (!BaseDirectory.IsEmpty())
+	{
+		return FFileHelper::LoadFileToArray(Blob, *FPaths::Combine(BaseDirectory, Path));
+	}
+
+	return false;
 }

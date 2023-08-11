@@ -629,7 +629,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	return Material;
 }
 
-bool FglTFRuntimeParser::LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig)
+bool FglTFRuntimeParser::LoadImageFromBlob(const TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	OnTexturePixels.Broadcast(AsShared(), JsonImageObject, Blob, Width, Height, PixelFormat, UncompressedBytes, ImagesConfig);
 
@@ -813,15 +813,90 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		return nullptr;
 	}
 
+	if (!LoadBlobToMips(TextureIndex, JsonTextureObject.ToSharedRef(), JsonImageObject.ToSharedRef(), CompressedBytes, Mips, sRGB, MaterialsConfig))
+	{
+		return nullptr;
+	}
+
+	int64 SamplerIndex;
+	if (JsonTextureObject->TryGetNumberField("sampler", SamplerIndex))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
+		// no samplers ?
+		if (!Root->TryGetArrayField("samplers", JsonSamplers))
+		{
+			UE_LOG(LogGLTFRuntime, Warning, TEXT("No texture sampler defined!"));
+		}
+		else
+		{
+			if (SamplerIndex >= JsonSamplers->Num())
+			{
+				UE_LOG(LogGLTFRuntime, Warning, TEXT("Invalid texture sampler index: %lld"), SamplerIndex);
+			}
+			else
+			{
+				TSharedPtr<FJsonObject> JsonSamplerObject = (*JsonSamplers)[SamplerIndex]->AsObject();
+				if (JsonSamplerObject)
+				{
+					int64 MinFilter;
+					if (JsonSamplerObject->TryGetNumberField("minFilter", MinFilter))
+					{
+						if (MinFilter == 9728)
+						{
+							Sampler.MinFilter = TextureFilter::TF_Nearest;
+						}
+					}
+					int64 MagFilter;
+					if (JsonSamplerObject->TryGetNumberField("magFilter", MagFilter))
+					{
+						if (MagFilter == 9728)
+						{
+							Sampler.MagFilter = TextureFilter::TF_Nearest;
+						}
+					}
+					int64 WrapS;
+					if (JsonSamplerObject->TryGetNumberField("wrapS", WrapS))
+					{
+						if (WrapS == 33071)
+						{
+							Sampler.TileX = TextureAddress::TA_Clamp;
+						}
+						else if (WrapS == 33648)
+						{
+							Sampler.TileX = TextureAddress::TA_Mirror;
+						}
+					}
+					int64 WrapT;
+					if (JsonSamplerObject->TryGetNumberField("wrapT", WrapT))
+					{
+						if (WrapT == 33071)
+						{
+							Sampler.TileY = TextureAddress::TA_Clamp;
+						}
+						else if (WrapT == 33648)
+						{
+							Sampler.TileY = TextureAddress::TA_Mirror;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+bool FglTFRuntimeParser::LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJsonObject> JsonTextureObject, TSharedRef<FJsonObject> JsonImageObject, const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
 	if (MaterialsConfig.bLoadMipMaps)
 	{
-		OnTextureMips.Broadcast(AsShared(), TextureIndex, JsonTextureObject.ToSharedRef(), JsonImageObject.ToSharedRef(), CompressedBytes, Mips, MaterialsConfig.ImagesConfig);
+		OnTextureMips.Broadcast(AsShared(), TextureIndex, JsonTextureObject, JsonImageObject, Blob, Mips, MaterialsConfig.ImagesConfig);
 		// if no Mips have been loaded, attempt parsing a DDS asset
 		if (Mips.Num() == 0)
 		{
-			if (FglTFRuntimeDDS::IsDDS(CompressedBytes))
+			if (FglTFRuntimeDDS::IsDDS(Blob))
 			{
-				FglTFRuntimeDDS DDS(CompressedBytes);
+				FglTFRuntimeDDS DDS(Blob);
 				DDS.LoadMips(TextureIndex, Mips, 0, MaterialsConfig.ImagesConfig);
 			}
 		}
@@ -834,12 +909,12 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		int32 Width = 0;
 		int32 Height = 0;
 		EPixelFormat PixelFormat;
-		if (!LoadImageFromBlob(CompressedBytes, JsonImageObject.ToSharedRef(), UncompressedBytes, Width, Height, PixelFormat, MaterialsConfig.ImagesConfig))
+		if (!LoadImageFromBlob(Blob, JsonImageObject, UncompressedBytes, Width, Height, PixelFormat, MaterialsConfig.ImagesConfig))
 		{
-			return nullptr;
+			return false;
 		}
 
-		OnLoadedTexturePixels.Broadcast(AsShared(), JsonTextureObject.ToSharedRef(), Width, Height, reinterpret_cast<FColor*>(UncompressedBytes.GetData()));
+		OnLoadedTexturePixels.Broadcast(AsShared(), JsonTextureObject, Width, Height, reinterpret_cast<FColor*>(UncompressedBytes.GetData()));
 
 		if (Width > 0 && Height > 0 &&
 			(Width % GPixelFormats[PixelFormat].BlockSizeX) == 0 &&
@@ -925,72 +1000,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 
 	OnTextureFilterMips.Broadcast(AsShared(), Mips, MaterialsConfig.ImagesConfig);
 
-	int64 SamplerIndex;
-	if (JsonTextureObject->TryGetNumberField("sampler", SamplerIndex))
-	{
-		const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
-		// no samplers ?
-		if (!Root->TryGetArrayField("samplers", JsonSamplers))
-		{
-			UE_LOG(LogGLTFRuntime, Warning, TEXT("No texture sampler defined!"));
-		}
-		else
-		{
-			if (SamplerIndex >= JsonSamplers->Num())
-			{
-				UE_LOG(LogGLTFRuntime, Warning, TEXT("Invalid texture sampler index: %lld"), SamplerIndex);
-			}
-			else
-			{
-				TSharedPtr<FJsonObject> JsonSamplerObject = (*JsonSamplers)[SamplerIndex]->AsObject();
-				if (JsonSamplerObject)
-				{
-					int64 MinFilter;
-					if (JsonSamplerObject->TryGetNumberField("minFilter", MinFilter))
-					{
-						if (MinFilter == 9728)
-						{
-							Sampler.MinFilter = TextureFilter::TF_Nearest;
-						}
-					}
-					int64 MagFilter;
-					if (JsonSamplerObject->TryGetNumberField("magFilter", MagFilter))
-					{
-						if (MagFilter == 9728)
-						{
-							Sampler.MagFilter = TextureFilter::TF_Nearest;
-						}
-					}
-					int64 WrapS;
-					if (JsonSamplerObject->TryGetNumberField("wrapS", WrapS))
-					{
-						if (WrapS == 33071)
-						{
-							Sampler.TileX = TextureAddress::TA_Clamp;
-						}
-						else if (WrapS == 33648)
-						{
-							Sampler.TileX = TextureAddress::TA_Mirror;
-						}
-					}
-					int64 WrapT;
-					if (JsonSamplerObject->TryGetNumberField("wrapT", WrapT))
-					{
-						if (WrapT == 33071)
-						{
-							Sampler.TileY = TextureAddress::TA_Clamp;
-						}
-						else if (WrapT == 33648)
-						{
-							Sampler.TileY = TextureAddress::TA_Mirror;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return nullptr;
+	return true;
 }
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName)
@@ -1446,4 +1456,9 @@ int32 FglTFRuntimeTextureMipDataProvider::GetMips(const FTextureUpdateContext& C
 
 	AdvanceTo(ETickState::CleanUp, ETickThread::Async);
 	return CurrentFirstLODIdx;
+}
+
+bool FglTFRuntimeParser::LoadBlobToMips(const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	return LoadBlobToMips(-1, MakeShared<FJsonObject>(), MakeShared<FJsonObject>(), Blob, Mips, sRGB, MaterialsConfig);
 }

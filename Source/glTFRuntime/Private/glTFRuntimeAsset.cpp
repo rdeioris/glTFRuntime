@@ -315,7 +315,7 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMesh(const int32 MeshIndex, const 
 	return Parser->LoadSkeletalMesh(MeshIndex, SkinIndex, SkeletalMeshConfig);
 }
 
-void UglTFRuntimeAsset::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+void UglTFRuntimeAsset::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
 
@@ -329,14 +329,14 @@ USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeN
 	return Parser->LoadSkeletalMeshRecursive(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, SkeletalMeshConfig);
 }
 
-void UglTFRuntimeAsset::LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeSkeletalMeshAsync AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+void UglTFRuntimeAsset::LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
 
 	Parser->LoadSkeletalMeshRecursiveAsync(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, AsyncCallback, SkeletalMeshConfig);
 }
 
-void UglTFRuntimeAsset::LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+void UglTFRuntimeAsset::LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
 
@@ -585,21 +585,21 @@ bool UglTFRuntimeAsset::LoadEmitterIntoAudioComponent(const FglTFRuntimeAudioEmi
 	return Parser->LoadEmitterIntoAudioComponent(Emitter, AudioComponent);
 }
 
-void UglTFRuntimeAsset::LoadStaticMeshAsync(const int32 MeshIndex, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+void UglTFRuntimeAsset::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
 
 	Parser->LoadStaticMeshAsync(MeshIndex, AsyncCallback, StaticMeshConfig);
 }
 
-void UglTFRuntimeAsset::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, FglTFRuntimeMeshLODAsync AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+void UglTFRuntimeAsset::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
 
 	Parser->LoadMeshAsRuntimeLODAsync(MeshIndex, AsyncCallback, MaterialsConfig);
 }
 
-void UglTFRuntimeAsset::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+void UglTFRuntimeAsset::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	GLTF_CHECK_PARSER_VOID();
 
@@ -1378,4 +1378,11 @@ TArray<FString> UglTFRuntimeAsset::GetArchiveItems() const
 	GLTF_CHECK_PARSER(TArray<FString>());
 
 	return Parser->GetArchiveItems();
+}
+
+void UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	GLTF_CHECK_PARSER_VOID();
+
+	Parser->LoadStaticMeshFromRuntimeLODsAsync(RuntimeLODs, AsyncCallback, StaticMeshConfig);
 }

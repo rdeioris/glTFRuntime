@@ -1,7 +1,6 @@
 // Copyright 2020-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
-#include "Async/Async.h"
 #include "MeshDescription.h"
 #include "StaticMeshAttributes.h"
 #include "StaticMeshOperations.h"
@@ -48,7 +47,7 @@ FglTFRuntimeStaticMeshContext::FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRun
 }
 
 
-void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	// first check cache
 	if (CanReadFromCache(StaticMeshConfig.CacheMode) && StaticMeshesCache.Contains(MeshIndex))
@@ -885,7 +884,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshLODs(const TArray<int32>& MeshInd
 	return nullptr;
 }
 
-void FglTFRuntimeParser::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+void FglTFRuntimeParser::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext = MakeShared<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>(AsShared(), StaticMeshConfig);
 
@@ -1112,7 +1111,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshRecursive(const FString& NodeName
 	return FinalizeStaticMesh(StaticMeshContext);
 }
 
-void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeStaticMeshAsync AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 
 	TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext = MakeShared<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>(AsShared(), StaticMeshConfig);
@@ -1255,4 +1254,31 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshFromRuntimeLODs(const TArray<FglT
 	}
 
 	return FinalizeStaticMesh(StaticMeshContext);
+}
+
+void FglTFRuntimeParser::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext = MakeShared<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>(AsShared(), StaticMeshConfig);
+
+	Async(EAsyncExecution::Thread, [this, StaticMeshContext, StaticMeshConfig, RuntimeLODs, AsyncCallback]()
+		{
+			for (const FglTFRuntimeMeshLOD& RuntimeLOD : RuntimeLODs)
+			{
+				StaticMeshContext->LODs.Add(&RuntimeLOD);
+			}
+
+			StaticMeshContext->StaticMesh = LoadStaticMesh_Internal(StaticMeshContext);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([StaticMeshContext, AsyncCallback]()
+				{
+					if (StaticMeshContext->StaticMesh)
+					{
+						StaticMeshContext->StaticMesh = StaticMeshContext->Parser->FinalizeStaticMesh(StaticMeshContext);
+					}
+
+					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		}
+	);
 }
