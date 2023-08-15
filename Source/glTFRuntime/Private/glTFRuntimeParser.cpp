@@ -2623,6 +2623,19 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		Primitive.Joints.Add(Joints);
 	}
 
+	if ((*JsonAttributesObject)->HasField("JOINTS_2"))
+	{
+		TArray<FglTFRuntimeUInt16Vector4> Joints;
+		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_2", Joints,
+			{ 4 }, { 5121, 5123 }, Primitive.AdditionalBufferView, false))
+		{
+			AddError("LoadPrimitive()", "Error loading JOINTS_2");
+			return false;
+		}
+
+		Primitive.Joints.Add(Joints);
+	}
+
 	if ((*JsonAttributesObject)->HasField("WEIGHTS_0"))
 	{
 		TArray<FVector4> Weights;
@@ -2642,6 +2655,18 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			{ 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true))
 		{
 			AddError("LoadPrimitive()", "Error loading WEIGHTS_1");
+			return false;
+		}
+		Primitive.Weights.Add(Weights);
+	}
+
+	if ((*JsonAttributesObject)->HasField("WEIGHTS_2"))
+	{
+		TArray<FVector4> Weights;
+		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_2", Weights,
+			{ 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true))
+		{
+			AddError("LoadPrimitive()", "Error loading WEIGHTS_2");
 			return false;
 		}
 		Primitive.Weights.Add(Weights);
