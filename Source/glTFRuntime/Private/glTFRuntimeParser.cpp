@@ -522,6 +522,7 @@ void FglTFRuntimeParser::LoadAndFillBaseMaterials()
 FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
 {
 	bAllNodesCached = false;
+	DownloadTime = 0;
 
 	if (IsInGameThread())
 	{
@@ -4929,4 +4930,14 @@ bool FglTFRuntimeParser::LoadPathToBlob(const FString& Path, TArray64<uint8>& Bl
 	}
 
 	return false;
+}
+
+void FglTFRuntimeParser::SetDownloadTime(const float Value)
+{
+	DownloadTime = Value;
+}
+
+float FglTFRuntimeParser::GetDownloadTime() const
+{
+	return DownloadTime;
 }

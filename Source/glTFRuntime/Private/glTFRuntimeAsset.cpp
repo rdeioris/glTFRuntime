@@ -1386,3 +1386,10 @@ void UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRun
 
 	Parser->LoadStaticMeshFromRuntimeLODsAsync(RuntimeLODs, AsyncCallback, StaticMeshConfig);
 }
+
+float UglTFRuntimeAsset::GetDownloadTime() const
+{
+	GLTF_CHECK_PARSER(0);
+
+	return Parser->GetDownloadTime();
+}

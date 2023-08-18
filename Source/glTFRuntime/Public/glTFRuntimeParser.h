@@ -2358,6 +2358,8 @@ protected:
 
 	FString DefaultPrefixForUnnamedNodes;
 
+	float DownloadTime;
+
 public:
 	bool IsArchive() const;
 	TArray<FString> GetArchiveItems() const;
@@ -2388,5 +2390,8 @@ public:
 
 	bool LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJsonObject> JsonTextureObject, TSharedRef<FJsonObject> JsonImageObject, const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	bool LoadBlobToMips(const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+
+	void SetDownloadTime(const float Value);
+	float GetDownloadTime() const;
 
 };
