@@ -1189,7 +1189,7 @@ bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TA
 	TArray<FVector4> Rotations;
 	TArray<FVector> Scales;
 
-	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "TRANSLATION", Translations, { 3 }, { 5126 }, [](FVector V) { return V; }, INDEX_NONE, false))
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "TRANSLATION", Translations, { 3 }, { 5126 }, [](FVector V) { return V; }, INDEX_NONE, false, nullptr))
 	{
 		Transforms.AddUninitialized(Translations.Num());
 		for (int32 Index = 0; Index < Translations.Num(); Index++)
@@ -1198,7 +1198,7 @@ bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TA
 		}
 	}
 
-	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "ROTATION", Rotations, { 4 }, { 5126, 5120, 5122 }, [](FVector4 Q) { return Q; }, INDEX_NONE, true))
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "ROTATION", Rotations, { 4 }, { 5126, 5120, 5122 }, [](FVector4 Q) { return Q; }, INDEX_NONE, true, nullptr))
 	{
 		if (Transforms.Num() == 0)
 		{
@@ -1215,7 +1215,7 @@ bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TA
 		}
 	}
 
-	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "SCALE", Scales, { 3 }, { 5126 }, [](FVector V) { return V; }, INDEX_NONE, false))
+	if (Parser->BuildFromAccessorField(InstancingExtensionAttributes.ToSharedRef(), "SCALE", Scales, { 3 }, { 5126 }, [](FVector V) { return V; }, INDEX_NONE, false, nullptr))
 	{
 		if (Transforms.Num() == 0)
 		{

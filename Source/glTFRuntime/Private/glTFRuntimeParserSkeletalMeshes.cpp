@@ -334,14 +334,25 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 		LodRenderData->RenderSections.SetNumUninitialized(LOD->Primitives.Num());
 
+		bool bUseHighPrecisionUVs = false;
+		bool bUseHighPrecisionWeights = false;
+
 		int32 NumIndices = 0;
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
 		{
 			NumIndices += LOD->Primitives[PrimitiveIndex].Indices.Num();
+			if (LOD->Primitives[PrimitiveIndex].bHighPrecisionUVs)
+			{
+				bUseHighPrecisionUVs = true;
+			}
+			if (LOD->Primitives[PrimitiveIndex].bHighPrecisionWeights)
+			{
+				bUseHighPrecisionWeights = true;
+			}
 		}
 
 		LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumIndices);
-		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(SkeletalMeshContext->SkeletalMeshConfig.bUseHighPrecisionUVs);
+		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bUseHighPrecisionUVs || SkeletalMeshContext->SkeletalMeshConfig.bUseHighPrecisionUVs);
 		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumIndices, 1);
 
 		int32 NumBones = RefSkeleton.GetNum();
@@ -752,13 +763,13 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		LodRenderData->SkinWeightVertexBuffer.Init(SoftSkinVertices);
 #else
 		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences > 0 ? MaxBoneInfluences : 1);
-#if MAX_BONE_INFLUENCE_WEIGHT == 0xffff
-		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneIndex(true);
-		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneWeight(true);
-#endif
+
+		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneIndex(NumBones > MAX_uint8);
+		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneWeight(bUseHighPrecisionWeights);
+
 		LodRenderData->SkinWeightVertexBuffer = InWeights;
 #endif
-		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));
+		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(NumIndices > MAX_uint16 ? sizeof(uint32) : sizeof(uint16));
 
 		for (int32 Index = 0; Index < NumIndices; Index++)
 		{

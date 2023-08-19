@@ -1194,11 +1194,17 @@ struct FglTFRuntimePrimitive
 	int64 AdditionalBufferView;
 	int32 Mode;
 	bool bHasMaterial;
+	bool bHighPrecisionUVs;
+	bool bHighPrecisionWeights;
 
 	FglTFRuntimePrimitive()
 	{
 		AdditionalBufferView = INDEX_NONE;
 		bHasMaterial = false;
+		bHighPrecisionUVs = false;
+		bHighPrecisionWeights = false;
+		Material = nullptr;
+		Mode = 4;
 	}
 };
 
@@ -2133,7 +2139,7 @@ public:
 	}
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -2158,6 +2164,11 @@ public:
 		if (!SupportedTypes.Contains(ComponentType))
 		{
 			return false;
+		}
+
+		if (ComponentTypePtr)
+		{
+			*ComponentTypePtr = ComponentType;
 		}
 
 		Data.AddUninitialized(Count);
@@ -2224,7 +2235,7 @@ public:
 	}
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -2249,6 +2260,11 @@ public:
 		if (!SupportedTypes.Contains(ComponentType))
 		{
 			return false;
+		}
+
+		if (ComponentTypePtr)
+		{
+			*ComponentTypePtr = ComponentType;
 		}
 
 		Data.AddUninitialized(Count);
@@ -2299,15 +2315,15 @@ public:
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
-		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, [&](T InValue) -> T {return InValue; }, AdditionalBufferView, bDefaultNormalized);
+		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, [&](T InValue) -> T {return InValue; }, AdditionalBufferView, bDefaultNormalized, ComponentTypePtr);
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
-		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, [&](T InValue) -> T {return InValue; }, AdditionalBufferView, bDefaultNormalized);
+		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, [&](T InValue) -> T {return InValue; }, AdditionalBufferView, bDefaultNormalized, ComponentTypePtr);
 	}
 
 	template<int32 Num, typename T>

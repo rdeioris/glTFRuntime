@@ -154,6 +154,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		FBox BoundingBox;
 		BoundingBox.Init();
 
+		bool bHighPrecisionUVs = false;
+
 		int32 VertexInstanceBaseIndex = 0;
 
 		const bool bApplyAdditionalTransforms = LOD->Primitives.Num() == LOD->AdditionalTransforms.Num();
@@ -173,6 +175,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			Section.FirstIndex = VertexInstanceBaseIndex;
 			Section.bEnableCollision = true;
 			Section.bCastShadow = true;
+
+			if (Primitive.bHighPrecisionUVs)
+			{
+				bHighPrecisionUVs = true;
+			}
 
 			const int32 SectionIndex = Sections.Num() - 1;
 
@@ -469,7 +476,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		}
 
 		LODResources.VertexBuffers.PositionVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
-		LODResources.VertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(StaticMeshConfig.bUseHighPrecisionUVs);
+		LODResources.VertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bHighPrecisionUVs || StaticMeshConfig.bUseHighPrecisionUVs);
 		LODResources.VertexBuffers.StaticMeshVertexBuffer.Init(StaticMeshBuildVertices, NumUVs, StaticMesh->bAllowCPUAccess);
 		if (bHasVertexColors)
 		{
@@ -480,7 +487,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		{
 			LODResources.IndexBuffer = FRawStaticIndexBuffer(true);
 		}
-		LODResources.IndexBuffer.SetIndices(LODIndices, EIndexBufferStride::Force32Bit);
+		LODResources.IndexBuffer.SetIndices(LODIndices, StaticMeshBuildVertices.Num() > MAX_uint16 ? EIndexBufferStride::Force32Bit : EIndexBufferStride::Force16Bit);
 
 #if WITH_EDITOR
 		if (StaticMeshConfig.bGenerateStaticMeshDescription)
@@ -630,7 +637,7 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	BodySetup->bNeverNeedsCookedCollisionData = !StaticMeshConfig.bBuildComplexCollision;
 
 	BodySetup->bMeshCollideAll = false;
-	BodySetup->bHasCookedCollisionData = false;
+
 	BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
 
 	BodySetup->InvalidatePhysicsData();
