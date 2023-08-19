@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Animation/AnimEnums.h"
 #include "Animation/Skeleton.h"
 #include "Async/Async.h"
