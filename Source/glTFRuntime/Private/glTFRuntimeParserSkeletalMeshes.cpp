@@ -765,7 +765,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences > 0 ? MaxBoneInfluences : 1);
 
 		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneIndex(NumBones > MAX_uint8);
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
 		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneWeight(bUseHighPrecisionWeights);
+#endif
 
 		LodRenderData->SkinWeightVertexBuffer = InWeights;
 #endif
