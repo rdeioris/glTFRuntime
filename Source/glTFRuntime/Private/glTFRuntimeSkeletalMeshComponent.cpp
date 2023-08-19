@@ -1,6 +1,7 @@
 // Copyright 2023, Roberto De Ioris.
 
 #include "glTFRuntimeSkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Rendering/SkeletalMeshRenderData.h"
 
 bool UglTFRuntimeSkeletalMeshComponent::ContainsPhysicsTriMeshData(bool InUseAllTriData) const
