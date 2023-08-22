@@ -2414,7 +2414,11 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 			return false;
 		}
 
-		Primitives.Add(Primitive);
+		// add the primitive only if it has at least one index
+		if (Primitive.Indices.Num() > 0)
+		{
+			Primitives.Add(Primitive);
+		}
 	}
 
 	const TSharedPtr<FJsonObject>* JsonExtrasObject;
