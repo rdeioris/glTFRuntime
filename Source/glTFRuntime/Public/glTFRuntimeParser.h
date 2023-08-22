@@ -972,6 +972,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bReverseTangents;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAutoGeneratePhysicsAsset;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -995,6 +998,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		NormalsGenerationStrategy = EglTFRuntimeNormalsGenerationStrategy::IfMissing;
 		TangentsGenerationStrategy = EglTFRuntimeTangentsGenerationStrategy::IfMissing;
 		bReverseTangents = false;
+		bAutoGeneratePhysicsAsset = false;
 	}
 };
 
@@ -1222,7 +1226,7 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 
 	FBox BoundingBox;
 
-	TMap<int32, FBox> PerBoneBoundingBox;
+	TMap<int32, FBox> PerBoneBoundingBoxCache;
 
 	// here we cache per-context LODs
 	TArray<FglTFRuntimeMeshLOD> CachedRuntimeMeshLODs;
@@ -1280,31 +1284,38 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 		Collector.AddReferencedObject(SkeletalMesh);
 	}
 
-	int32 GetBoneIndex(const FString& BoneName) const
+	const FReferenceSkeleton& GetRefSkeleton() const
 	{
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-		return SkeletalMesh->GetRefSkeleton().FindBoneIndex(*BoneName);
+		return SkeletalMesh->GetRefSkeleton();
 #else
-		return SkeletalMesh->RefSkeleton.FindBoneIndex(*BoneName);
+		return SkeletalMesh->RefSkeleton;
 #endif
+	}
+
+	int32 GetBoneIndex(const FString& BoneName) const
+	{
+		return GetRefSkeleton().FindBoneIndex(*BoneName);
+	}
+
+	int32 GetNumBones() const
+	{
+		return GetRefSkeleton().GetNum();
 	}
 
 	int32 GetBoneParentIndex(const int32 BoneIndex) const
 	{
-#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-		return SkeletalMesh->GetRefSkeleton().GetParentIndex(BoneIndex);
-#else
-		return SkeletalMesh->RefSkeleton.GetParentIndex(BoneIndex);
-#endif
+		return GetRefSkeleton().GetParentIndex(BoneIndex);
+	}
+
+	FName GetBoneName(const int32 BoneIndex) const
+	{
+		return GetRefSkeleton().GetBoneName(BoneIndex);
 	}
 
 	FTransform GetBoneLocalTransform(const int32 BoneIndex) const
 	{
-#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-		return SkeletalMesh->GetRefSkeleton().GetRefBonePose()[BoneIndex];
-#else
-		return SkeletalMesh->Skeleton->GetReferenceSkeleton().GetRefBonePose()[BoneIndex];
-#endif
+		return GetRefSkeleton().GetRefBonePose()[BoneIndex];
 	}
 
 	FTransform GetBoneWorldTransform(const int32 BoneIndex) const
@@ -1331,6 +1342,8 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 		}
 		return ContextLODs[NewIndex];
 	}
+
+	const FBox& GetBoneBox(const int32 BoneIndex);
 };
 
 USTRUCT(BlueprintType)

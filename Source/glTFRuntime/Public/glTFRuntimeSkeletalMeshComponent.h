@@ -9,7 +9,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(Blueprintable, meta = (BlueprintSpawnableComponent))
 class GLTFRUNTIME_API UglTFRuntimeSkeletalMeshComponent : public USkeletalMeshComponent
 {
 	GENERATED_BODY()
