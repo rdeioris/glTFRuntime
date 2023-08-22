@@ -1,10 +1,16 @@
 // Copyright 2023, Roberto De Ioris.
 
 #include "glTFRuntimeSkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Rendering/SkeletalMeshRenderData.h"
 
 bool UglTFRuntimeSkeletalMeshComponent::ContainsPhysicsTriMeshData(bool InUseAllTriData) const
 {
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
 	USkeletalMesh* CurrentSkeletalMeshAsset = GetSkeletalMeshAsset();
+#else
+	USkeletalMesh* CurrentSkeletalMeshAsset = SkeletalMesh;
+#endif
 	if (!CurrentSkeletalMeshAsset)
 	{
 		return false;
@@ -15,7 +21,11 @@ bool UglTFRuntimeSkeletalMeshComponent::ContainsPhysicsTriMeshData(bool InUseAll
 
 bool UglTFRuntimeSkeletalMeshComponent::GetPhysicsTriMeshData(struct FTriMeshCollisionData* CollisionData, bool InUseAllTriData)
 {
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
 	USkeletalMesh* CurrentSkeletalMeshAsset = GetSkeletalMeshAsset();
+#else
+	USkeletalMesh* CurrentSkeletalMeshAsset = SkeletalMesh;
+#endif
 	if (!CurrentSkeletalMeshAsset)
 	{
 		return false;
