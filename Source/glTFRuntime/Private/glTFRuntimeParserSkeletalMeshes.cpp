@@ -2083,7 +2083,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
 	// hack for calling GenerateTransientData()
-	AnimSequence->GetDataModel()->PostDuplicate(false);
+	// AnimSequence->GetDataModel()->PostDuplicate(false);
 #else
 	AnimSequence->PostProcessSequence();
 #endif

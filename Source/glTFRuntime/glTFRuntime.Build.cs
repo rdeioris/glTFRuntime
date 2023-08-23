@@ -36,6 +36,7 @@ public class glTFRuntime : ModuleRules
         PrivateDependencyModuleNames.AddRange(
             new string[]
             {
+                "AudioExtensions",
                 "CoreUObject",
                 "Engine",
                 "Json",
