@@ -94,6 +94,14 @@ enum class EglTFRuntimeMorphTargetsDuplicateStrategy : uint8
 	AppendDuplicateCounter
 };
 
+UENUM()
+enum class EglTFRuntimePhysicsAssetAutoBodyCollisionType : uint8
+{
+	Capsule,
+	Sphere,
+	Box
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeBasisMatrix
 {
@@ -843,6 +851,12 @@ struct FglTFRuntimePhysicsConstraint
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FVector ConstraintPos2;
+
+	FglTFRuntimePhysicsConstraint()
+	{
+		ConstraintPos1 = FVector::ZeroVector;
+		ConstraintPos2 = FVector::ZeroVector;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -875,7 +889,10 @@ struct FglTFRuntimePhysicsBody
 	bool bBoxAutoCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TArray<FglTFRuntimePhysicsConstraint> Constraints;
+	bool bCapsuleAutoCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float CollisionScale;
 
 	FglTFRuntimePhysicsBody()
 	{
@@ -884,6 +901,50 @@ struct FglTFRuntimePhysicsBody
 		bConsiderForBounds = true;
 		bSphereAutoCollision = false;
 		bBoxAutoCollision = false;
+		bCapsuleAutoCollision = false;
+		CollisionScale = 1.01;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimePhysicsAssetAutoBodyConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimePhysicsAssetAutoBodyCollisionType CollisionType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float MinBoneSize;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bDisableOverlappingCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bDisableAllCollisions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<ECollisionTraceFlag> CollisionTraceFlag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<EPhysicsType> PhysicsType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bConsiderForBounds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float CollisionScale;
+
+	FglTFRuntimePhysicsAssetAutoBodyConfig()
+	{
+		CollisionType = EglTFRuntimePhysicsAssetAutoBodyCollisionType::Capsule;
+		MinBoneSize = 20;
+		bDisableOverlappingCollisions = true;
+		bDisableAllCollisions = false;
+		CollisionTraceFlag = ECollisionTraceFlag::CTF_UseDefault;
+		PhysicsType = EPhysicsType::PhysType_Default;
+		bConsiderForBounds = true;
+		CollisionScale = 1.01;
 	}
 };
 
@@ -974,7 +1035,16 @@ struct FglTFRuntimeSkeletalMeshConfig
 	bool bReverseTangents;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bAutoGeneratePhysicsAsset;
+	bool bAutoGeneratePhysicsAssetBodies;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimePhysicsAssetAutoBodyConfig PhysicsAssetAutoBodyConfig;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAutoGeneratePhysicsAssetConstraints;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FglTFRuntimePhysicsConstraint> PhysicsConstraints;
 
 	FglTFRuntimeSkeletalMeshConfig()
 	{
@@ -999,7 +1069,8 @@ struct FglTFRuntimeSkeletalMeshConfig
 		NormalsGenerationStrategy = EglTFRuntimeNormalsGenerationStrategy::IfMissing;
 		TangentsGenerationStrategy = EglTFRuntimeTangentsGenerationStrategy::IfMissing;
 		bReverseTangents = false;
-		bAutoGeneratePhysicsAsset = false;
+		bAutoGeneratePhysicsAssetBodies = false;
+		bAutoGeneratePhysicsAssetConstraints = false;
 	}
 };
 
@@ -1294,9 +1365,23 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 #endif
 	}
 
+	USkeleton* GetSkeleton() const
+	{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+		return SkeletalMesh->GetSkeleton();
+#else
+		return SkeletalMesh->Skeleton;
+#endif
+	}
+
 	int32 GetBoneIndex(const FString& BoneName) const
 	{
 		return GetRefSkeleton().FindBoneIndex(*BoneName);
+	}
+
+	int32 GetBoneIndex(const FName& BoneName) const
+	{
+		return GetRefSkeleton().FindBoneIndex(BoneName);
 	}
 
 	int32 GetNumBones() const
@@ -1331,6 +1416,18 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 		return Transform;
 	}
 
+	FTransform GetBoneDeltaTransform(const int32 BoneIndex, const int32 InParentIndex) const
+	{
+		FTransform Transform = GetBoneLocalTransform(BoneIndex);
+		int32 ParentIndex = GetBoneParentIndex(BoneIndex);
+		while (ParentIndex > INDEX_NONE && ParentIndex != InParentIndex)
+		{
+			Transform *= GetBoneLocalTransform(ParentIndex);
+			ParentIndex = GetBoneParentIndex(ParentIndex);
+		}
+		return Transform;
+	}
+
 	FglTFRuntimeMeshLOD& AddContextLOD()
 	{
 		const int32 NewIndex = ContextLODs.AddDefaulted();
@@ -1342,6 +1439,33 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 			LODs[Pair.Value] = &ContextLODs[Pair.Key];
 		}
 		return ContextLODs[NewIndex];
+	}
+
+	bool BoneHasChildren(const int32 BoneIndex) const
+	{
+		const int32 NumBones = GetNumBones();
+		for (int32 CurrentBoneIndex = 0; CurrentBoneIndex < NumBones; CurrentBoneIndex++)
+		{
+			if (GetBoneParentIndex(CurrentBoneIndex) == BoneIndex)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool BoneIsChildOf(const int32 BoneIndex, const int32 BoneParentIndex) const
+	{
+		int32 ParentIndex = GetBoneParentIndex(BoneIndex);
+		while (ParentIndex > INDEX_NONE)
+		{
+			if (ParentIndex == BoneParentIndex)
+			{
+				return true;
+			}
+			ParentIndex = GetBoneParentIndex(ParentIndex);
+		}
+		return false;
 	}
 
 	const FBox& GetBoneBox(const int32 BoneIndex);
@@ -2076,6 +2200,8 @@ protected:
 	int32 FindCommonRoot(const TArray<int32>& NodeIndices);
 	int32 FindTopRoot(int32 NodeIndex);
 	bool HasRoot(int32 NodeIndex, int32 RootIndex);
+
+	void GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshContextRef SkeletalMeshContext);
 
 public:
 	UMaterialInterface* BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors);
