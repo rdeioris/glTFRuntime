@@ -629,13 +629,13 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 			//normals with NaNs are incorrectly handled on Android
 			auto FixVectorIfNan = [](FVector& Tangent, int32 Index)
-			{
-				if (Tangent.ContainsNaN() && Index >= 0 && Index < 3)
 				{
-					Tangent.Set(0.0, 0.0, 0.0);
-					Tangent[Index] = 1.0;
-				}
-			};
+					if (Tangent.ContainsNaN() && Index >= 0 && Index < 3)
+					{
+						Tangent.Set(0.0, 0.0, 0.0);
+						Tangent[Index] = 1.0;
+					}
+				};
 
 			for (int32 VertexIndex = 0; VertexIndex < TotalVertexIndex; VertexIndex += 3)
 			{
@@ -1183,7 +1183,15 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 			FVector BoxCenter(0, 0, 0), BoxExtent(0, 0, 0);
 			const FBox& Box = Pair.Value;
 
-			Box.GetCenterAndExtents(BoxCenter, BoxExtent);
+			if (SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Filter.IsBound())
+			{
+				const FBox BoxBounds = SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Filter.Execute(SkeletalMeshContext->GetBoneName(BoneIndex).ToString(), Box, SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Context);
+				BoxBounds.GetCenterAndExtents(BoxCenter, BoxExtent);
+			}
+			else
+			{
+				Box.GetCenterAndExtents(BoxCenter, BoxExtent);
+			}
 
 			USkeletalBodySetup* NewBodySetup = NewObject<USkeletalBodySetup>(PhysicsAsset, NAME_None, RF_Public);
 			NewBodySetup->CollisionTraceFlag = SkeletalMeshContext->SkeletalMeshConfig.PhysicsAssetAutoBodyConfig.CollisionTraceFlag;
@@ -1252,6 +1260,7 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 		PhysicsAsset->UpdateBoundsBodiesArray();
 	}
 
+	TSet<int32> DisabledBodyCollisions;
 	for (const TPair<FString, FglTFRuntimePhysicsBody>& PhysicsBody : SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies)
 	{
 		if (PhysicsBody.Key.IsEmpty())
@@ -1305,7 +1314,15 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 			FVector BoxCenter(0, 0, 0), BoxExtent(0, 0, 0);
 			const FBox& Box = SkeletalMeshContext->GetBoneBox(CollisionBoneIndex);
 
-			Box.GetCenterAndExtents(BoxCenter, BoxExtent);
+			if (SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Filter.IsBound())
+			{
+				const FBox BoxBounds = SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Filter.Execute(PhysicsBody.Key, Box, SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Context);
+				BoxBounds.GetCenterAndExtents(BoxCenter, BoxExtent);
+			}
+			else
+			{
+				Box.GetCenterAndExtents(BoxCenter, BoxExtent);
+			}
 
 			FTransform BoneTransform = FTransform::Identity;
 			BoneTransform.SetTranslation(BoxCenter);
@@ -1323,7 +1340,15 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 			FVector BoxCenter(0, 0, 0), BoxExtent(0, 0, 0);
 			const FBox& Box = SkeletalMeshContext->GetBoneBox(CollisionBoneIndex);
 
-			Box.GetCenterAndExtents(BoxCenter, BoxExtent);
+			if (SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Filter.IsBound())
+			{
+				const FBox BoxBounds = SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Filter.Execute(PhysicsBody.Key, Box, SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Context);
+				BoxBounds.GetCenterAndExtents(BoxCenter, BoxExtent);
+			}
+			else
+			{
+				Box.GetCenterAndExtents(BoxCenter, BoxExtent);
+			}
 
 			FTransform BoneTransform = FTransform::Identity;
 			BoneTransform.SetTranslation(BoxCenter);
@@ -1343,7 +1368,15 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 			FVector BoxCenter(0, 0, 0), BoxExtent(0, 0, 0);
 			const FBox& Box = SkeletalMeshContext->GetBoneBox(CollisionBoneIndex);
 
-			Box.GetCenterAndExtents(BoxCenter, BoxExtent);
+			if (SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Filter.IsBound())
+			{
+				const FBox BoxBounds = SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Filter.Execute(PhysicsBody.Key, Box, SkeletalMeshContext->SkeletalMeshConfig.BoneBoundsFilter.Context);
+				BoxBounds.GetCenterAndExtents(BoxCenter, BoxExtent);
+			}
+			else
+			{
+				Box.GetCenterAndExtents(BoxCenter, BoxExtent);
+			}
 
 			FTransform BoneTransform = FTransform::Identity;
 			BoneTransform.SetTranslation(BoxCenter);
@@ -1374,7 +1407,11 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 			NewBodySetup->AggGeom.SphylElems.Add(Capsule);
 		}
 
-		PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
+		const int32 NewBodyIndex = PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
+		if (PhysicsBody.Value.bDisableCollision)
+		{
+			DisabledBodyCollisions.Add(NewBodyIndex);
+		}
 	}
 
 	PhysicsAsset->UpdateBodySetupIndexMap();
@@ -1494,6 +1531,17 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 				{
 					PhysicsAsset->DisableCollision(BodyIndex, OtherBodyIndex);
 				}
+			}
+		}
+	}
+
+	if (DisabledBodyCollisions.Num() > 0)
+	{
+		for (int32 BodyIndex = 0; BodyIndex < PhysicsAsset->SkeletalBodySetups.Num(); BodyIndex++)
+		{
+			for (const int32 OtherBodyIndex : DisabledBodyCollisions)
+			{
+				PhysicsAsset->DisableCollision(BodyIndex, OtherBodyIndex);
 			}
 		}
 	}
@@ -2706,318 +2754,318 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 	}
 
 	auto RetargetQuat = [&](const FQuat LocalAnimQuat, const FQuat WorldPoseQuat, const FQuat WorldParentPoseQuat, const FQuat WorldRetargetPoseQuat, const FQuat WorldRetargetParentPoseQuat) -> FQuat
-	{
-
-		FQuat WorldPoseToRetarget = WorldPoseQuat.Inverse() * WorldRetargetPoseQuat;
-
-		FQuat WorldAnimQuat = WorldParentPoseQuat * LocalAnimQuat;
-
-		// check for singularity
-		if ((WorldAnimQuat | WorldPoseQuat) < 0)
 		{
-			WorldAnimQuat *= WorldPoseToRetarget * -1;
-		}
-		else
-		{
-			WorldAnimQuat *= WorldPoseToRetarget;
-		}
 
-		return WorldRetargetParentPoseQuat.Inverse() * WorldAnimQuat;
-	};
+			FQuat WorldPoseToRetarget = WorldPoseQuat.Inverse() * WorldRetargetPoseQuat;
+
+			FQuat WorldAnimQuat = WorldParentPoseQuat * LocalAnimQuat;
+
+			// check for singularity
+			if ((WorldAnimQuat | WorldPoseQuat) < 0)
+			{
+				WorldAnimQuat *= WorldPoseToRetarget * -1;
+			}
+			else
+			{
+				WorldAnimQuat *= WorldPoseToRetarget;
+			}
+
+			return WorldRetargetParentPoseQuat.Inverse() * WorldAnimQuat;
+		};
 
 	auto RetargetTransform = [&](const FTransform& LocalAnimTransform, const FTransform& WorldPoseTransform, const FTransform& WorldParentPoseTransform, const FTransform& WorldRetargetPoseTransform, const FTransform& WorldRetargetParentPoseTransform) -> FTransform
-	{
+		{
 
-		FMatrix WorldAnimMatrix = LocalAnimTransform.ToMatrixWithScale() * WorldParentPoseTransform.ToMatrixWithScale();
+			FMatrix WorldAnimMatrix = LocalAnimTransform.ToMatrixWithScale() * WorldParentPoseTransform.ToMatrixWithScale();
 
-		FMatrix DeltaMatrix = WorldAnimMatrix * WorldPoseTransform.ToMatrixWithScale().Inverse();
+			FMatrix DeltaMatrix = WorldAnimMatrix * WorldPoseTransform.ToMatrixWithScale().Inverse();
 
-		FMatrix WorldRetargetMatrix = DeltaMatrix * WorldRetargetPoseTransform.ToMatrixWithScale();
+			FMatrix WorldRetargetMatrix = DeltaMatrix * WorldRetargetPoseTransform.ToMatrixWithScale();
 
-		return FTransform(WorldRetargetMatrix * WorldRetargetParentPoseTransform.ToMatrixWithScale().Inverse());
-	};
+			return FTransform(WorldRetargetMatrix * WorldRetargetParentPoseTransform.ToMatrixWithScale().Inverse());
+		};
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
-	{
-		FString TrackName = Node.Name;
-
-		if (SkeletalAnimationConfig.CurvesNameMap.Contains(TrackName))
 		{
-			TrackName = SkeletalAnimationConfig.CurvesNameMap[TrackName];
-		}
+			FString TrackName = Node.Name;
 
-		if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
-		{
-			TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(Node.Index, TrackName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
-		}
-
-		if (SkeletalAnimationConfig.RemoveTracks.Contains(TrackName))
-		{
-			return;
-		}
-
-		int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
-
-		float FrameDelta = 1.f / SkeletalAnimationConfig.FramesPerSecond;
-
-		if (Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
-		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
+			if (SkeletalAnimationConfig.CurvesNameMap.Contains(TrackName))
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+				TrackName = SkeletalAnimationConfig.CurvesNameMap[TrackName];
+			}
+
+			if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
+			{
+				TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(Node.Index, TrackName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
+			}
+
+			if (SkeletalAnimationConfig.RemoveTracks.Contains(TrackName))
+			{
 				return;
 			}
 
-			if (!Tracks.Contains(TrackName))
+			int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
+
+			float FrameDelta = 1.f / SkeletalAnimationConfig.FramesPerSecond;
+
+			if (Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
 			{
-				Tracks.Add(TrackName, FRawAnimSequenceTrack());
-			}
-
-			FRawAnimSequenceTrack& Track = Tracks[TrackName];
-
-			for (int32 Frame = 0; Frame < NumFrames; Frame++)
-			{
-				const float FrameBase = FrameDelta * Frame;
-				FQuat AnimQuat;
-				int32 FirstIndex;
-				int32 SecondIndex;
-				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 FirstQuatV = Curve.Values[FirstIndex];
-				FVector4 SecondQuatV = Curve.Values[SecondIndex];
-				FQuat FirstQuat = FQuat(FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W).GetNormalized();
-				FQuat SecondQuat = FQuat(SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W).GetNormalized();
-
-				// cubic spline ?
-				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+				if (Curve.Timeline.Num() != Curve.Values.Num())
 				{
-					FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], FirstQuatV, Curve.OutTangents[FirstIndex], SecondQuatV, Curve.InTangents[SecondIndex]);
-
-					AnimQuat = { CubicValue.X, CubicValue.Y, CubicValue.Z, CubicValue.W };
-
-					FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(AnimQuat.GetNormalized()) * SceneBasis;
-
-					AnimQuat = RotationMatrix.ToQuat();
-				}
-				else if (FirstIndex == SecondIndex)
-				{
-					FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
-
-					AnimQuat = RotationMatrix.ToQuat();
-				}
-				else
-				{
-
-					FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
-					FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
-					FirstQuat = FirstMatrix.ToQuat();
-					SecondQuat = SecondMatrix.ToQuat();
-					AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
 				}
 
-				if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
+				if (!Tracks.Contains(TrackName))
 				{
-					const int32 RetargetBoneIndex = RetargetRefSkeleton.FindBoneIndex(*TrackName);
-					if (RetargetBoneIndex > INDEX_NONE)
+					Tracks.Add(TrackName, FRawAnimSequenceTrack());
+				}
+
+				FRawAnimSequenceTrack& Track = Tracks[TrackName];
+
+				for (int32 Frame = 0; Frame < NumFrames; Frame++)
+				{
+					const float FrameBase = FrameDelta * Frame;
+					FQuat AnimQuat;
+					int32 FirstIndex;
+					int32 SecondIndex;
+					float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+					FVector4 FirstQuatV = Curve.Values[FirstIndex];
+					FVector4 SecondQuatV = Curve.Values[SecondIndex];
+					FQuat FirstQuat = FQuat(FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W).GetNormalized();
+					FQuat SecondQuat = FQuat(SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W).GetNormalized();
+
+					// cubic spline ?
+					if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
 					{
-						const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
+						FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], FirstQuatV, Curve.OutTangents[FirstIndex], SecondQuatV, Curve.InTangents[SecondIndex]);
 
-						if (AnimWorldTransforms.Num() > 0)
+						AnimQuat = { CubicValue.X, CubicValue.Y, CubicValue.Z, CubicValue.W };
+
+						FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(AnimQuat.GetNormalized()) * SceneBasis;
+
+						AnimQuat = RotationMatrix.ToQuat();
+					}
+					else if (FirstIndex == SecondIndex)
+					{
+						FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+
+						AnimQuat = RotationMatrix.ToQuat();
+					}
+					else
+					{
+
+						FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+						FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
+						FirstQuat = FirstMatrix.ToQuat();
+						SecondQuat = SecondMatrix.ToQuat();
+						AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+					}
+
+					if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
+					{
+						const int32 RetargetBoneIndex = RetargetRefSkeleton.FindBoneIndex(*TrackName);
+						if (RetargetBoneIndex > INDEX_NONE)
 						{
-							const int32 AnimBoneIndex = AnimRefSkeleton.FindBoneIndex(*Node.Name);
-							if (AnimBoneIndex > INDEX_NONE)
-							{
-								const int32 AnimParentBoneIndex = AnimRefSkeleton.GetParentIndex(AnimBoneIndex);
+							const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
 
+							if (AnimWorldTransforms.Num() > 0)
+							{
+								const int32 AnimBoneIndex = AnimRefSkeleton.FindBoneIndex(*Node.Name);
+								if (AnimBoneIndex > INDEX_NONE)
+								{
+									const int32 AnimParentBoneIndex = AnimRefSkeleton.GetParentIndex(AnimBoneIndex);
+
+									AnimQuat = RetargetQuat(AnimQuat,
+										AnimWorldTransforms[AnimBoneIndex].GetRotation(),
+										AnimParentBoneIndex > INDEX_NONE ? AnimWorldTransforms[AnimParentBoneIndex].GetRotation() : FQuat::Identity,
+										RetargetWorldTransforms[RetargetBoneIndex].GetRotation(),
+										RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex].GetRotation() : FQuat::Identity
+									).GetNormalized();
+								}
+							}
+							else
+							{
 								AnimQuat = RetargetQuat(AnimQuat,
-									AnimWorldTransforms[AnimBoneIndex].GetRotation(),
-									AnimParentBoneIndex > INDEX_NONE ? AnimWorldTransforms[AnimParentBoneIndex].GetRotation() : FQuat::Identity,
+									GetNodeWorldTransform(Node).GetRotation(),
+									GetParentNodeWorldTransform(Node).GetRotation(),
 									RetargetWorldTransforms[RetargetBoneIndex].GetRotation(),
 									RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex].GetRotation() : FQuat::Identity
 								).GetNormalized();
 							}
 						}
-						else
-						{
-							AnimQuat = RetargetQuat(AnimQuat,
-								GetNodeWorldTransform(Node).GetRotation(),
-								GetParentNodeWorldTransform(Node).GetRotation(),
-								RetargetWorldTransforms[RetargetBoneIndex].GetRotation(),
-								RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex].GetRotation() : FQuat::Identity
-							).GetNormalized();
-						}
 					}
-				}
 
-				if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
-				{
-					AnimQuat = SkeletalAnimationConfig.TransformPose[TrackName].TransformRotation(AnimQuat);
-				}
+					if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
+					{
+						AnimQuat = SkeletalAnimationConfig.TransformPose[TrackName].TransformRotation(AnimQuat);
+					}
 
-				if (SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound())
-				{
-					AnimQuat = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.Execute(TrackName, Frame, AnimQuat.Rotator(), SkeletalAnimationConfig.FrameRotationRemapper.Context).Quaternion();
-				}
+					if (SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound())
+					{
+						AnimQuat = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.Execute(TrackName, Frame, AnimQuat.Rotator(), SkeletalAnimationConfig.FrameRotationRemapper.Context).Quaternion();
+					}
 
 #if ENGINE_MAJOR_VERSION > 4
-				Track.RotKeys.Add(FQuat4f(AnimQuat));
+					Track.RotKeys.Add(FQuat4f(AnimQuat));
 #else
-				Track.RotKeys.Add(AnimQuat);
+					Track.RotKeys.Add(AnimQuat);
 #endif
-			}
-		}
-		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
-		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
-			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
-				return;
-			}
-
-			if (!Tracks.Contains(TrackName))
-			{
-				Tracks.Add(TrackName, FRawAnimSequenceTrack());
-			}
-
-			FRawAnimSequenceTrack& Track = Tracks[TrackName];
-
-			for (int32 Frame = 0; Frame < NumFrames; Frame++)
-			{
-				const float FrameBase = FrameDelta * Frame;
-				FVector AnimLocation;
-				int32 FirstIndex;
-				int32 SecondIndex;
-				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 First = Curve.Values[FirstIndex];
-				FVector4 Second = Curve.Values[SecondIndex];
-
-				// cubic spline ?
-				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
-				{
-					FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], First, Curve.OutTangents[FirstIndex], Second, Curve.InTangents[SecondIndex]);
-
-					AnimLocation = SceneBasis.TransformPosition(CubicValue) * SceneScale;
 				}
-				else
+			}
+			else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
+			{
+				if (Curve.Timeline.Num() != Curve.Values.Num())
 				{
-					AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
 				}
 
-				if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
+				if (!Tracks.Contains(TrackName))
 				{
-					const int32 RetargetBoneIndex = RetargetRefSkeleton.FindBoneIndex(*TrackName);
-					if (RetargetBoneIndex > INDEX_NONE)
+					Tracks.Add(TrackName, FRawAnimSequenceTrack());
+				}
+
+				FRawAnimSequenceTrack& Track = Tracks[TrackName];
+
+				for (int32 Frame = 0; Frame < NumFrames; Frame++)
+				{
+					const float FrameBase = FrameDelta * Frame;
+					FVector AnimLocation;
+					int32 FirstIndex;
+					int32 SecondIndex;
+					float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+					FVector4 First = Curve.Values[FirstIndex];
+					FVector4 Second = Curve.Values[SecondIndex];
+
+					// cubic spline ?
+					if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
 					{
-						const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
+						FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], First, Curve.OutTangents[FirstIndex], Second, Curve.InTangents[SecondIndex]);
 
-						if (AnimWorldTransforms.Num() > 0)
+						AnimLocation = SceneBasis.TransformPosition(CubicValue) * SceneScale;
+					}
+					else
+					{
+						AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+					}
+
+					if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
+					{
+						const int32 RetargetBoneIndex = RetargetRefSkeleton.FindBoneIndex(*TrackName);
+						if (RetargetBoneIndex > INDEX_NONE)
 						{
-							const int32 AnimBoneIndex = AnimRefSkeleton.FindBoneIndex(*Node.Name);
-							if (AnimBoneIndex > INDEX_NONE)
-							{
-								const int32 AnimParentBoneIndex = AnimRefSkeleton.GetParentIndex(AnimBoneIndex);
+							const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
 
-								FTransform LocalAnimTransform = AnimRefSkeleton.GetRefBonePose()[AnimBoneIndex];
+							if (AnimWorldTransforms.Num() > 0)
+							{
+								const int32 AnimBoneIndex = AnimRefSkeleton.FindBoneIndex(*Node.Name);
+								if (AnimBoneIndex > INDEX_NONE)
+								{
+									const int32 AnimParentBoneIndex = AnimRefSkeleton.GetParentIndex(AnimBoneIndex);
+
+									FTransform LocalAnimTransform = AnimRefSkeleton.GetRefBonePose()[AnimBoneIndex];
+									LocalAnimTransform.SetLocation(AnimLocation);
+
+									AnimLocation = RetargetTransform(LocalAnimTransform,
+										AnimWorldTransforms[AnimBoneIndex],
+										AnimParentBoneIndex > INDEX_NONE ? AnimWorldTransforms[AnimParentBoneIndex] : FTransform::Identity,
+										RetargetWorldTransforms[RetargetBoneIndex],
+										RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex] : FTransform::Identity
+									).GetLocation();
+								}
+							}
+							else
+							{
+								FTransform LocalAnimTransform = Node.Transform;
 								LocalAnimTransform.SetLocation(AnimLocation);
 
 								AnimLocation = RetargetTransform(LocalAnimTransform,
-									AnimWorldTransforms[AnimBoneIndex],
-									AnimParentBoneIndex > INDEX_NONE ? AnimWorldTransforms[AnimParentBoneIndex] : FTransform::Identity,
+									GetNodeWorldTransform(Node),
+									GetParentNodeWorldTransform(Node),
 									RetargetWorldTransforms[RetargetBoneIndex],
 									RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex] : FTransform::Identity
 								).GetLocation();
 							}
 						}
-						else
-						{
-							FTransform LocalAnimTransform = Node.Transform;
-							LocalAnimTransform.SetLocation(AnimLocation);
-
-							AnimLocation = RetargetTransform(LocalAnimTransform,
-								GetNodeWorldTransform(Node),
-								GetParentNodeWorldTransform(Node),
-								RetargetWorldTransforms[RetargetBoneIndex],
-								RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneIndex] : FTransform::Identity
-							).GetLocation();
-						}
 					}
-				}
 
-				if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
-				{
-					AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
-				}
+					if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
+					{
+						AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
+					}
 
-				if (SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.IsBound())
-				{
-					AnimLocation = SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.Execute(TrackName, Frame, AnimLocation, SkeletalAnimationConfig.FrameRotationRemapper.Context);
-				}
+					if (SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.IsBound())
+					{
+						AnimLocation = SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.Execute(TrackName, Frame, AnimLocation, SkeletalAnimationConfig.FrameRotationRemapper.Context);
+					}
 
 #if ENGINE_MAJOR_VERSION > 4
-				Track.PosKeys.Add(FVector3f(AnimLocation));
+					Track.PosKeys.Add(FVector3f(AnimLocation));
 #else
-				Track.PosKeys.Add(AnimLocation);
+					Track.PosKeys.Add(AnimLocation);
 #endif
-			}
-		}
-		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
-		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
-			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
-				return;
-			}
-
-			if (!Tracks.Contains(TrackName))
-			{
-				Tracks.Add(TrackName, FRawAnimSequenceTrack());
-			}
-
-			FRawAnimSequenceTrack& Track = Tracks[TrackName];
-
-			for (int32 Frame = 0; Frame < NumFrames; Frame++)
-			{
-				const float FrameBase = FrameDelta * Frame;
-				int32 FirstIndex;
-				int32 SecondIndex;
-				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 First = Curve.Values[FirstIndex];
-				FVector4 Second = Curve.Values[SecondIndex];
-#if ENGINE_MAJOR_VERSION > 4
-				Track.ScaleKeys.Add(FVector3f((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling()));
-#else
-				Track.ScaleKeys.Add((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling());
-#endif
-			}
-		}
-		else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
-		{
-			TArray<FName> MorphTargetNames;
-			if (!GetMorphTargetNames(Node.MeshIndex, MorphTargetNames))
-			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Mesh %d has no MorphTargets"), Node.Index));
-				return;
-			}
-
-			if (Curve.Timeline.Num() * MorphTargetNames.Num() != Curve.Values.Num())
-			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for weights on node %d"), Curve.Timeline.Num(), Curve.Values.Num() / MorphTargetNames.Num(), Node.Index));
-				return;
-			}
-
-			for (int32 MorphTargetIndex = 0; MorphTargetIndex < MorphTargetNames.Num(); MorphTargetIndex++)
-			{
-				FName MorphTargetName = MorphTargetNames[MorphTargetIndex];
-				TArray<TPair<float, float>> Curves;
-
-				for (int32 TimelineIndex = 0; TimelineIndex < Curve.Timeline.Num(); TimelineIndex++)
-				{
-					TPair<float, float> NewCurve = TPair<float, float>(Curve.Timeline[TimelineIndex], Curve.Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
-					Curves.Add(NewCurve);
 				}
-				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
-		}
-	};
+			else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
+			{
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+
+				if (!Tracks.Contains(TrackName))
+				{
+					Tracks.Add(TrackName, FRawAnimSequenceTrack());
+				}
+
+				FRawAnimSequenceTrack& Track = Tracks[TrackName];
+
+				for (int32 Frame = 0; Frame < NumFrames; Frame++)
+				{
+					const float FrameBase = FrameDelta * Frame;
+					int32 FirstIndex;
+					int32 SecondIndex;
+					float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+					FVector4 First = Curve.Values[FirstIndex];
+					FVector4 Second = Curve.Values[SecondIndex];
+#if ENGINE_MAJOR_VERSION > 4
+					Track.ScaleKeys.Add(FVector3f((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling()));
+#else
+					Track.ScaleKeys.Add((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling());
+#endif
+				}
+			}
+			else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
+			{
+				TArray<FName> MorphTargetNames;
+				if (!GetMorphTargetNames(Node.MeshIndex, MorphTargetNames))
+				{
+					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Mesh %d has no MorphTargets"), Node.Index));
+					return;
+				}
+
+				if (Curve.Timeline.Num() * MorphTargetNames.Num() != Curve.Values.Num())
+				{
+					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for weights on node %d"), Curve.Timeline.Num(), Curve.Values.Num() / MorphTargetNames.Num(), Node.Index));
+					return;
+				}
+
+				for (int32 MorphTargetIndex = 0; MorphTargetIndex < MorphTargetNames.Num(); MorphTargetIndex++)
+				{
+					FName MorphTargetName = MorphTargetNames[MorphTargetIndex];
+					TArray<TPair<float, float>> Curves;
+
+					for (int32 TimelineIndex = 0; TimelineIndex < Curve.Timeline.Num(); TimelineIndex++)
+					{
+						TPair<float, float> NewCurve = TPair<float, float>(Curve.Timeline[TimelineIndex], Curve.Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
+						Curves.Add(NewCurve);
+					}
+					MorphTargetCurves.Add(MorphTargetName, Curves);
+				}
+			}
+		};
 
 	FString IgnoredName;
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
@@ -3309,16 +3357,16 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 	SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLODs[0]));
 
 	auto ContainsBone = [BaseBoneMap](FName BoneName) -> bool
-	{
-		for (const TPair<int32, FName>& Pair : BaseBoneMap)
 		{
-			if (Pair.Value == BoneName)
+			for (const TPair<int32, FName>& Pair : BaseBoneMap)
 			{
-				return true;
+				if (Pair.Value == BoneName)
+				{
+					return true;
+				}
 			}
-		}
-		return false;
-	};
+			return false;
+		};
 
 	for (int32 LODIndex = 1; LODIndex < RuntimeLODs.Num(); LODIndex++)
 	{

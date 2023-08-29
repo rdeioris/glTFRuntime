@@ -1409,48 +1409,48 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 	bool bAnimationFound = false;
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
-	{
-		if (Path == "translation")
 		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
+			if (Path == "translation")
 			{
-				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
-				return;
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					AnimationCurve->AddLocationValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+				}
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+			else if (Path == "rotation")
 			{
-				AnimationCurve->AddLocationValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					FVector4 RotationValue = Curve.Values[TimeIndex];
+					FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
+					FVector Euler = Quat.Euler();
+					AnimationCurve->AddRotationValue(Curve.Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
+				}
 			}
-		}
-		else if (Path == "rotation")
-		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
+			else if (Path == "scale")
 			{
-				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
-				return;
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					AnimationCurve->AddScaleValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
+				}
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
-			{
-				FVector4 RotationValue = Curve.Values[TimeIndex];
-				FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
-				FVector Euler = Quat.Euler();
-				AnimationCurve->AddRotationValue(Curve.Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
-			}
-		}
-		else if (Path == "scale")
-		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
-			{
-				AddError("LoadNodeAnimationCurve()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
-				return;
-			}
-			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
-			{
-				AnimationCurve->AddScaleValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
-			}
-		}
-		bAnimationFound = true;
-	};
+			bAnimationFound = true;
+		};
 
 	for (int32 JsonAnimationIndex = 0; JsonAnimationIndex < JsonAnimations->Num(); JsonAnimationIndex++)
 	{
@@ -1502,48 +1502,48 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 	bool bAnimationFound = false;
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
-	{
-		if (Path == "translation")
 		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
+			if (Path == "translation")
 			{
-				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
-				return;
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					AnimationCurve->AddLocationValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+				}
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+			else if (Path == "rotation")
 			{
-				AnimationCurve->AddLocationValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					FVector4 RotationValue = Curve.Values[TimeIndex];
+					FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
+					FVector Euler = Quat.Euler();
+					AnimationCurve->AddRotationValue(Curve.Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
+				}
 			}
-		}
-		else if (Path == "rotation")
-		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
+			else if (Path == "scale")
 			{
-				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
-				return;
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					AnimationCurve->AddScaleValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
+				}
 			}
-			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
-			{
-				FVector4 RotationValue = Curve.Values[TimeIndex];
-				FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
-				FVector Euler = Quat.Euler();
-				AnimationCurve->AddRotationValue(Curve.Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
-			}
-		}
-		else if (Path == "scale")
-		{
-			if (Curve.Timeline.Num() != Curve.Values.Num())
-			{
-				AddError("LoadAllNodeAnimationCurves()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
-				return;
-			}
-			for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
-			{
-				AnimationCurve->AddScaleValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
-			}
-		}
-		bAnimationFound = true;
-	};
+			bAnimationFound = true;
+		};
 
 	for (int32 JsonAnimationIndex = 0; JsonAnimationIndex < JsonAnimations->Num(); JsonAnimationIndex++)
 	{
@@ -2159,7 +2159,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 	FName BoneName = FName(*Node.Name);
 	if (SkeletonConfig.BoneRemapper.Remapper.IsBound())
 	{
-		BoneName = FName(SkeletonConfig.BoneRemapper.Remapper.Execute(Node.Index, Node.Name));
+		BoneName = FName(SkeletonConfig.BoneRemapper.Remapper.Execute(Node.Index, Node.Name, SkeletonConfig.BoneRemapper.Context));
 	}
 
 	if (SkeletonConfig.BonesNameMap.Contains(BoneName.ToString()))
@@ -2328,6 +2328,43 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, co
 		}
 	}
 
+	if (SkeletonConfig.bApplyUnmappedBonesTransforms && Parent > INDEX_NONE && SkeletonConfig.BonesNameMap.Contains(Node.Name))
+	{
+		// climb the hierarchy til a mapped joint is found
+		int32 CurrentParentIndex = Node.ParentIndex;
+		while (CurrentParentIndex > INDEX_NONE)
+		{
+			FglTFRuntimeNode ParentNode;
+			if (!LoadNode(CurrentParentIndex, ParentNode))
+			{
+				return false;
+			}
+
+			if (SkeletonConfig.BonesNameMap.Contains(ParentNode.Name))
+			{
+				break;
+			}
+
+			FTransform ParentTransform = ParentNode.Transform;
+
+			// do we have an inverse bind matrix ?
+			if (InverseBindMatricesMap.Contains(CurrentParentIndex))
+			{
+				FMatrix ParentMatrix = InverseBindMatricesMap[CurrentParentIndex].Inverse();
+				// do we have a valid parent matrix for it?
+				if (InverseBindMatricesMap.Contains(ParentNode.ParentIndex))
+				{
+					ParentMatrix *= InverseBindMatricesMap[ParentNode.ParentIndex];
+				}
+				ParentMatrix.ScaleTranslation(FVector(SceneScale, SceneScale, SceneScale));
+				ParentTransform = FTransform(SceneBasis.Inverse() * ParentMatrix * SceneBasis);
+			}
+
+			Transform *= ParentTransform;
+			CurrentParentIndex = ParentNode.ParentIndex;
+		}
+	}
+
 	Modifier.Add(FMeshBoneInfo(BoneName, Node.Name, Parent), Transform);
 
 	int32 NewParentIndex = Modifier.FindBoneIndex(BoneName);
@@ -2428,22 +2465,22 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 		if ((*JsonExtrasObject)->TryGetArrayField("targetNames", JsonTargetNamesArray))
 		{
 			auto ApplyTargetName = [FirstPrimitive](TArray<FglTFRuntimePrimitive>& Primitives, const int32 TargetNameIndex, const FString& TargetName)
-			{
-				for (int32 PrimitiveIndex = FirstPrimitive; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
 				{
-					int32 MorphTargetCounter = 0;
-					FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
-					for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
+					for (int32 PrimitiveIndex = FirstPrimitive; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
 					{
-						if (MorphTargetCounter == TargetNameIndex)
+						int32 MorphTargetCounter = 0;
+						FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
+						for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
 						{
-							MorphTarget.Name = TargetName;
-							break;
+							if (MorphTargetCounter == TargetNameIndex)
+							{
+								MorphTarget.Name = TargetName;
+								break;
+							}
+							MorphTargetCounter++;
 						}
-						MorphTargetCounter++;
 					}
-				}
-			};
+				};
 			for (int32 TargetNameIndex = 0; TargetNameIndex < JsonTargetNamesArray->Num(); TargetNameIndex++)
 			{
 				const FString TargetName = (*JsonTargetNamesArray)[TargetNameIndex]->AsString();
@@ -4227,9 +4264,9 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeObject(const int32 NodeIndex)
 bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, const int64 Stride, const int64 Elements, const FString& Mode, const FString& Filter, TArray64<uint8>& UncompressedBytes)
 {
 	auto DecodeZigZag = [](uint8 V)
-	{
-		return ((V & 1) != 0) ? ~(V >> 1) : (V >> 1);
-	};
+		{
+			return ((V & 1) != 0) ? ~(V >> 1) : (V >> 1);
+		};
 
 	if (Mode == "ATTRIBUTES" && Blob.Num > 32 && Blob.Data[0] == 0xa0)
 	{
@@ -4424,61 +4461,61 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		UncompressedBytes.AddUninitialized(Elements * Stride);
 
 		auto EmitTriangle = [Stride, &TriangleOffset, &UncompressedBytes](const uint32 A, const uint32 B, const uint32 C)
-		{
-			if (Stride == 2)
 			{
-				const uint16 AShort = A;
-				const uint16 BShort = B;
-				const uint16 CShort = C;
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&AShort)[0];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&AShort)[1];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&BShort)[0];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&BShort)[1];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&CShort)[0];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&CShort)[1];
+				if (Stride == 2)
+				{
+					const uint16 AShort = A;
+					const uint16 BShort = B;
+					const uint16 CShort = C;
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&AShort)[0];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&AShort)[1];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&BShort)[0];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&BShort)[1];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&CShort)[0];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&CShort)[1];
 
-			}
-			else
-			{
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[0];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[1];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[2];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[3];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[0];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[1];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[2];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[3];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[0];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[1];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[2];
-				UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[3];
-			}
-		};
+				}
+				else
+				{
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[0];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[1];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[2];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&A)[3];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[0];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[1];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[2];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&B)[3];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[0];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[1];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[2];
+					UncompressedBytes[TriangleOffset++] = reinterpret_cast<const uint8*>(&C)[3];
+				}
+			};
 
 		auto DecodeIndex = [&Blob, &DataOffset, &Last, Limit]() -> bool
-		{
-			uint32 V = 0;
-			for (int32 Shift = 0; ; Shift += 7)
 			{
-				if (DataOffset >= Limit)
+				uint32 V = 0;
+				for (int32 Shift = 0; ; Shift += 7)
 				{
-					return false;
+					if (DataOffset >= Limit)
+					{
+						return false;
+					}
+
+					const uint32 Byte = Blob.Data[DataOffset++];
+					V |= (Byte & 0x7F) << Shift;
+
+					if (Byte < 0x80)
+					{
+						break;
+					}
 				}
 
-				const uint32 Byte = Blob.Data[DataOffset++];
-				V |= (Byte & 0x7F) << Shift;
+				int32 Delta = ((V & 1) != 0) ? ~(V >> 1) : (V >> 1);
 
-				if (Byte < 0x80)
-				{
-					break;
-				}
-			}
-
-			int32 Delta = ((V & 1) != 0) ? ~(V >> 1) : (V >> 1);
-
-			Last += Delta;
-			return true;
-		};
+				Last += Delta;
+				return true;
+			};
 
 		for (uint32 TriangleIndex = 0; TriangleIndex < TrianglesNum; TriangleIndex++)
 		{

@@ -66,7 +66,8 @@ enum class EglTFRuntimeTransformBaseType : uint8
 	BasisMatrix,
 	Identity,
 	LeftHanded,
-	IdentityXInverted
+	IdentityXInverted,
+	ForwardInverted
 };
 
 UENUM()
@@ -242,6 +243,11 @@ struct FglTFRuntimeConfig
 		if (TransformBaseType == EglTFRuntimeTransformBaseType::IdentityXInverted)
 		{
 			return FBasisVectorMatrix(FVector(-1, 0, 0), FVector(0, 1, 0), FVector(0, 0, 1), FVector::ZeroVector);
+		}
+
+		if (TransformBaseType == EglTFRuntimeTransformBaseType::ForwardInverted)
+		{
+			return FBasisVectorMatrix(FVector(0, 0, 1), FVector(-1, 0, 0), FVector(0, 1, 0), FVector::ZeroVector);
 		}
 
 		return DefaultMatrix;
@@ -694,7 +700,7 @@ struct FglTFRuntimeLightConfig
 	}
 };
 
-DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(FString, FglTFRuntimeBoneRemapper, const int32, NodeIndex, const FString&, BoneName);
+DECLARE_DYNAMIC_DELEGATE_RetVal_ThreeParams(FString, FglTFRuntimeBoneRemapper, const int32, NodeIndex, const FString&, BoneName, UObject*, Context);
 
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletonBoneRemapperHook
@@ -772,6 +778,9 @@ struct FglTFRuntimeSkeletonConfig
 	int32 MaxNodesTreeDepth;
 
 	int32 CachedNodeIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bApplyUnmappedBonesTransforms;
 	
 	FglTFRuntimeSkeletonConfig()
 	{
@@ -788,6 +797,7 @@ struct FglTFRuntimeSkeletonConfig
 		bApplyParentNodesTransformsToRoot = false;
 		CachedNodeIndex = INDEX_NONE;
 		MaxNodesTreeDepth = -1;
+		bApplyUnmappedBonesTransforms = false;
 	}
 };
 
@@ -894,6 +904,9 @@ struct FglTFRuntimePhysicsBody
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	float CollisionScale;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bDisableCollision;
+
 	FglTFRuntimePhysicsBody()
 	{
 		CollisionTraceFlag = ECollisionTraceFlag::CTF_UseDefault;
@@ -903,6 +916,7 @@ struct FglTFRuntimePhysicsBody
 		bBoxAutoCollision = false;
 		bCapsuleAutoCollision = false;
 		CollisionScale = 1.01;
+		bDisableCollision = false;
 	}
 };
 
@@ -946,6 +960,20 @@ struct FglTFRuntimePhysicsAssetAutoBodyConfig
 		bConsiderForBounds = true;
 		CollisionScale = 1.01;
 	}
+};
+
+DECLARE_DYNAMIC_DELEGATE_RetVal_ThreeParams(FBox, FglTFRuntimeBoneBoundsFilter, const FString&, BoneName, const FBox&, Box, UObject*, Context);
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeBoneBoundsFilterHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeBoneBoundsFilter Filter;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -1045,6 +1073,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FglTFRuntimePhysicsConstraint> PhysicsConstraints;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeBoneBoundsFilterHook BoneBoundsFilter;
 
 	FglTFRuntimeSkeletalMeshConfig()
 	{
