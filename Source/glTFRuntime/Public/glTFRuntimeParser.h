@@ -781,6 +781,9 @@ struct FglTFRuntimeSkeletonConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bApplyUnmappedBonesTransforms;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, FTransform> NodeBonesDeltaTransformMap;
 	
 	FglTFRuntimeSkeletonConfig()
 	{

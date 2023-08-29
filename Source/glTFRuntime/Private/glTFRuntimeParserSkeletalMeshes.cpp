@@ -3197,13 +3197,24 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 				FglTFRuntimeNode CurrentNode = ChildNode;
 				FTransform AdditionalTransform = CurrentNode.Transform;
 
+				if (SkeletonConfig.NodeBonesDeltaTransformMap.Contains(ChildNode.Name))
+				{
+					AdditionalTransform.Accumulate(SkeletonConfig.NodeBonesDeltaTransformMap[ChildNode.Name]);
+				}
+
 				while (CurrentNode.ParentIndex > INDEX_NONE)
 				{
 					if (!LoadNode(CurrentNode.ParentIndex, CurrentNode))
 					{
 						return false;
 					}
+
 					AdditionalTransform *= CurrentNode.Transform;
+
+					if (SkeletonConfig.NodeBonesDeltaTransformMap.Contains(CurrentNode.Name))
+					{
+						AdditionalTransform.Accumulate(SkeletonConfig.NodeBonesDeltaTransformMap[CurrentNode.Name]);
+					}
 				}
 
 				// transform primitives in bone space
