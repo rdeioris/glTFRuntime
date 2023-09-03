@@ -1517,12 +1517,14 @@ struct FglTFRuntimeMeshLOD
 	bool bHasNormals;
 	bool bHasTangents;
 	bool bHasUV;
+	bool bHasVertexColors;
 
 	FglTFRuntimeMeshLOD()
 	{
 		bHasNormals = false;
 		bHasTangents = false;
 		bHasUV = false;
+		bHasVertexColors = false;
 	}
 };
 

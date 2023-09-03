@@ -353,6 +353,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	{
 		LOD->bHasTangents = true;
 		LOD->bHasNormals = true;
+		LOD->bHasVertexColors = false;
 
 		FSkeletalMeshLODRenderData* LodRenderData = new FSkeletalMeshLODRenderData();
 		int32 LODIndex = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData.Add(LodRenderData);
@@ -374,11 +375,19 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			{
 				bUseHighPrecisionWeights = true;
 			}
+			if (LOD->Primitives[PrimitiveIndex].Colors.Num() > 0)
+			{
+				LOD->bHasVertexColors = true;
+			}
 		}
 
 		LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumIndices);
 		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bUseHighPrecisionUVs || SkeletalMeshContext->SkeletalMeshConfig.bUseHighPrecisionUVs);
 		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumIndices, 1);
+		if (LOD->bHasVertexColors)
+		{
+			LodRenderData->StaticVertexBuffers.ColorVertexBuffer.Init(NumIndices);
+		}
 
 		int32 NumBones = RefSkeleton.GetNum();
 
@@ -462,7 +471,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 					ModelVertex.TangentX = Primitive.Tangents[Index];
 #endif
-
 				}
 				else
 				{
@@ -494,10 +502,19 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 				FVector TangentY = ComputeTangentYWithW(ModelVertex.TangentZ, ModelVertex.TangentX, TangentXW * TangentsDirection);
 #endif
+				FColor Color = FColor::White;
+				if (Index < Primitive.Colors.Num())
+				{
+					Color = FLinearColor(Primitive.Colors[Index]).ToFColor(true);
+				}
 
 				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
 				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, TangentY, ModelVertex.TangentZ);
 				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
+				if (LOD->bHasVertexColors)
+				{
+					LodRenderData->StaticVertexBuffers.ColorVertexBuffer.VertexColor(TotalVertexIndex) = Color;
+				}
 
 				TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : MainBoneMap;
 				TMap<int32, int32>& BonesCacheInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.BonesCache : MainBonesCache;
@@ -810,8 +827,16 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	bool bHasMorphTargets = false;
 	int32 MorphTargetIndex = 0;
 
+	bool bHasVertexColors = false;
+
 	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
 	{
+
+		// vertex colors?
+		if (SkeletalMeshContext->LODs[LODIndex]->bHasVertexColors)
+		{
+			bHasVertexColors = true;
+		}
 
 		// LOD tuning
 		if (SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Always)
@@ -1047,9 +1072,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	SkeletalMeshContext->SkeletalMesh->SetImportedBounds(FBoxSphereBounds(SkeletalMeshContext->BoundingBox));
 
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-	SkeletalMeshContext->SkeletalMesh->SetHasVertexColors(false);
+	SkeletalMeshContext->SkeletalMesh->SetHasVertexColors(bHasVertexColors);
 #else
-	SkeletalMeshContext->SkeletalMesh->bHasVertexColors = false;
+	SkeletalMeshContext->SkeletalMesh->bHasVertexColors = bHasVertexColors;
 #endif
 
 	if (SkeletalMeshContext->SkeletalMeshConfig.Skeleton)
