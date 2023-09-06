@@ -322,18 +322,18 @@ void UglTFRuntimeAsset::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32
 	Parser->LoadSkeletalMeshAsync(MeshIndex, SkinIndex, AsyncCallback, SkeletalMeshConfig);
 }
 
-USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
-	return Parser->LoadSkeletalMeshRecursive(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, SkeletalMeshConfig);
+	return Parser->LoadSkeletalMeshRecursive(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, SkeletalMeshConfig, TransformApplyRecursiveMode);
 }
 
-void UglTFRuntimeAsset::LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+void UglTFRuntimeAsset::LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
 {
 	GLTF_CHECK_PARSER_VOID();
 
-	Parser->LoadSkeletalMeshRecursiveAsync(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, AsyncCallback, SkeletalMeshConfig);
+	Parser->LoadSkeletalMeshRecursiveAsync(NodeName, SkeletalMeshConfig.OverrideSkinIndex, ExcludeNodes, AsyncCallback, SkeletalMeshConfig, TransformApplyRecursiveMode);
 }
 
 void UglTFRuntimeAsset::LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
@@ -871,155 +871,155 @@ UTextureCube* UglTFRuntimeAsset::LoadCubeMapFromBlob(const bool bSpherical, cons
 #else
 			auto GetCubemapFace = [Resolution, Width, Height, PixelFormat](const TArray64<uint8>& Pixels, const FVector Start, const FVector Right, const FVector Up, TArray64<uint8>& OutPixels)
 #endif
-			{
-				const int64 Pitch = Resolution * GPixelFormats[PixelFormat].BlockBytes;
-				OutPixels.AddUninitialized(Pitch * Resolution);
-
-				for (int32 PixelY = 0; PixelY < Resolution; PixelY++)
 				{
-					for (int32 PixelX = 0; PixelX < Resolution; PixelX++)
+					const int64 Pitch = Resolution * GPixelFormats[PixelFormat].BlockBytes;
+					OutPixels.AddUninitialized(Pitch * Resolution);
+
+					for (int32 PixelY = 0; PixelY < Resolution; PixelY++)
 					{
-						const int64 Offset = PixelY * Pitch + (PixelX * GPixelFormats[PixelFormat].BlockBytes);
-
-						float PX = Start.X + (PixelX * 2 + 0.5) / Resolution * Right.X + (PixelY * 2 + 0.5) / Resolution * Up.X;
-						float PY = Start.Y + (PixelX * 2 + 0.5) / Resolution * Right.Y + (PixelY * 2 + 0.5) / Resolution * Up.Y;
-						float PZ = Start.Z + (PixelX * 2 + 0.5) / Resolution * Right.Z + (PixelY * 2 + 0.5) / Resolution * Up.Z;
-
-						float Azimuth = FMath::Atan2(PX, -PZ) + PI;
-						float Elevation = FMath::Atan(PY / FMath::Sqrt(PX * PX + PZ * PZ)) + PI / 2;
-
-						float X1 = (Azimuth / PI / 2) * Width;
-						float Y1 = (Elevation / PI) * Height;
-
-						float IX;
-						float FX = FMath::Modf(X1 - 0.5, &IX);
-
-						float IY;
-						float FY = FMath::Modf(Y1 - 0.5, &IY);
-
-						int32 X2 = static_cast<int32>(IX);
-						int32 Y2 = static_cast<int32>(IY);
-						int32 X3 = 0;
-						int32 Y3 = 0;
-
-						if (FX < 0)
+						for (int32 PixelX = 0; PixelX < Resolution; PixelX++)
 						{
-							X3 = Width - 1;
-						}
-						else if (X2 == Width - 1)
-						{
-							X3 = 0;
-						}
-						else
-						{
-							X3 = X2 + 1;
-						}
+							const int64 Offset = PixelY * Pitch + (PixelX * GPixelFormats[PixelFormat].BlockBytes);
 
-						if (FY < 0)
-						{
-							Y3 = Height - 1;
-						}
-						else if (Y2 == Height - 1)
-						{
-							Y3 = 0;
-						}
-						else
-						{
-							Y3 = Y2 + 1;
-						}
+							float PX = Start.X + (PixelX * 2 + 0.5) / Resolution * Right.X + (PixelY * 2 + 0.5) / Resolution * Up.X;
+							float PY = Start.Y + (PixelX * 2 + 0.5) / Resolution * Right.Y + (PixelY * 2 + 0.5) / Resolution * Up.Y;
+							float PZ = Start.Z + (PixelX * 2 + 0.5) / Resolution * Right.Z + (PixelY * 2 + 0.5) / Resolution * Up.Z;
 
-						FX = FMath::Abs(FX);
-						FY = FMath::Abs(FY);
+							float Azimuth = FMath::Atan2(PX, -PZ) + PI;
+							float Elevation = FMath::Atan(PY / FMath::Sqrt(PX * PX + PZ * PZ)) + PI / 2;
+
+							float X1 = (Azimuth / PI / 2) * Width;
+							float Y1 = (Elevation / PI) * Height;
+
+							float IX;
+							float FX = FMath::Modf(X1 - 0.5, &IX);
+
+							float IY;
+							float FY = FMath::Modf(Y1 - 0.5, &IY);
+
+							int32 X2 = static_cast<int32>(IX);
+							int32 Y2 = static_cast<int32>(IY);
+							int32 X3 = 0;
+							int32 Y3 = 0;
+
+							if (FX < 0)
+							{
+								X3 = Width - 1;
+							}
+							else if (X2 == Width - 1)
+							{
+								X3 = 0;
+							}
+							else
+							{
+								X3 = X2 + 1;
+							}
+
+							if (FY < 0)
+							{
+								Y3 = Height - 1;
+							}
+							else if (Y2 == Height - 1)
+							{
+								Y3 = 0;
+							}
+							else
+							{
+								Y3 = Y2 + 1;
+							}
+
+							FX = FMath::Abs(FX);
+							FY = FMath::Abs(FY);
 
 #if ENGINE_MAJOR_VERSION >= 5
-						if (PixelFormat == EPixelFormat::PF_FloatRGB)
-						{
-							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
-							const int64 Offset00 = Y2 * (Width * 3) + (X2 * 3);
-							const FVector3f Color00 = FVector3f(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2]);
-							const int64 Offset10 = Y2 * (Width * 3) + (X3 * 3);
-							const FVector3f Color10 = FVector3f(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2]);
+							if (PixelFormat == EPixelFormat::PF_FloatRGB)
+							{
+								const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
+								const int64 Offset00 = Y2 * (Width * 3) + (X2 * 3);
+								const FVector3f Color00 = FVector3f(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2]);
+								const int64 Offset10 = Y2 * (Width * 3) + (X3 * 3);
+								const FVector3f Color10 = FVector3f(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2]);
 
-							const int64 Offset01 = Y3 * (Width * 3) + (X2 * 3);
-							const FVector3f Color01 = FVector3f(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2]);
-							const int64 Offset11 = Y3 * (Width * 3) + (X3 * 3);
-							const FVector3f Color11 = FVector3f(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2]);
+								const int64 Offset01 = Y3 * (Width * 3) + (X2 * 3);
+								const FVector3f Color01 = FVector3f(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2]);
+								const int64 Offset11 = Y3 * (Width * 3) + (X3 * 3);
+								const FVector3f Color11 = FVector3f(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2]);
 
-							FVector3f Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
+								FVector3f Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
 
-							FFloat16Color Color16 = FLinearColor(Color);
+								FFloat16Color Color16 = FLinearColor(Color);
 
 
-							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 3);
-						}
-						else if (PixelFormat == EPixelFormat::PF_FloatRGBA)
-						{
-							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
-							const int64 Offset00 = Y2 * (Width * 4) + (X2 * 4);
-							const FVector4f Color00 = FVector4f(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2], Colors[Offset00 + 3]);
-							const int64 Offset10 = Y2 * (Width * 4) + (X3 * 4);
-							const FVector4f Color10 = FVector4f(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2], Colors[Offset10 + 3]);
+								FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 3);
+							}
+							else if (PixelFormat == EPixelFormat::PF_FloatRGBA)
+							{
+								const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
+								const int64 Offset00 = Y2 * (Width * 4) + (X2 * 4);
+								const FVector4f Color00 = FVector4f(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2], Colors[Offset00 + 3]);
+								const int64 Offset10 = Y2 * (Width * 4) + (X3 * 4);
+								const FVector4f Color10 = FVector4f(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2], Colors[Offset10 + 3]);
 
-							const int64 Offset01 = Y3 * (Width * 4) + (X2 * 4);
-							const FVector4f Color01 = FVector4f(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2], Colors[Offset01 + 3]);
-							const int64 Offset11 = Y3 * (Width * 4) + (X3 * 4);
-							const FVector4f Color11 = FVector4f(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2], Colors[Offset11 + 3]);
+								const int64 Offset01 = Y3 * (Width * 4) + (X2 * 4);
+								const FVector4f Color01 = FVector4f(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2], Colors[Offset01 + 3]);
+								const int64 Offset11 = Y3 * (Width * 4) + (X3 * 4);
+								const FVector4f Color11 = FVector4f(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2], Colors[Offset11 + 3]);
 
-							FVector4f Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
+								FVector4f Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
 
-							FFloat16Color Color16 = FLinearColor(Color);
+								FFloat16Color Color16 = FLinearColor(Color);
 
-							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 4);
-						}
+								FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 4);
+							}
 
 #else
-						if (PixelFormat == EPixelFormat::PF_FloatRGB)
-						{
-							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
-							const int64 Offset00 = Y2 * (Width * 3) + (X2 * 3);
-							const FVector Color00 = FVector(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2]);
-							const int64 Offset10 = Y2 * (Width * 3) + (X3 * 3);
-							const FVector Color10 = FVector(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2]);
+							if (PixelFormat == EPixelFormat::PF_FloatRGB)
+							{
+								const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
+								const int64 Offset00 = Y2 * (Width * 3) + (X2 * 3);
+								const FVector Color00 = FVector(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2]);
+								const int64 Offset10 = Y2 * (Width * 3) + (X3 * 3);
+								const FVector Color10 = FVector(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2]);
 
-							const int64 Offset01 = Y3 * (Width * 3) + (X2 * 3);
-							const FVector Color01 = FVector(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2]);
-							const int64 Offset11 = Y3 * (Width * 3) + (X3 * 3);
-							const FVector Color11 = FVector(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2]);
+								const int64 Offset01 = Y3 * (Width * 3) + (X2 * 3);
+								const FVector Color01 = FVector(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2]);
+								const int64 Offset11 = Y3 * (Width * 3) + (X3 * 3);
+								const FVector Color11 = FVector(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2]);
 
-							FVector Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
+								FVector Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
 
-							FFloat16Color Color16 = FLinearColor(Color);
+								FFloat16Color Color16 = FLinearColor(Color);
 
 
-							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 3);
-						}
-						else if (PixelFormat == EPixelFormat::PF_FloatRGBA)
-						{
-							const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
-							const int64 Offset00 = Y2 * (Width * 4) + (X2 * 4);
-							const FVector4 Color00 = FVector4(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2], Colors[Offset00 + 3]);
-							const int64 Offset10 = Y2 * (Width * 4) + (X3 * 4);
-							const FVector4 Color10 = FVector4(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2], Colors[Offset10 + 3]);
+								FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 3);
+							}
+							else if (PixelFormat == EPixelFormat::PF_FloatRGBA)
+							{
+								const FFloat16* Colors = reinterpret_cast<const FFloat16*>(Pixels.GetData());
+								const int64 Offset00 = Y2 * (Width * 4) + (X2 * 4);
+								const FVector4 Color00 = FVector4(Colors[Offset00], Colors[Offset00 + 1], Colors[Offset00 + 2], Colors[Offset00 + 3]);
+								const int64 Offset10 = Y2 * (Width * 4) + (X3 * 4);
+								const FVector4 Color10 = FVector4(Colors[Offset10], Colors[Offset10 + 1], Colors[Offset10 + 2], Colors[Offset10 + 3]);
 
-							const int64 Offset01 = Y3 * (Width * 4) + (X2 * 4);
-							const FVector4 Color01 = FVector4(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2], Colors[Offset01 + 3]);
-							const int64 Offset11 = Y3 * (Width * 4) + (X3 * 4);
-							const FVector4 Color11 = FVector4(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2], Colors[Offset11 + 3]);
+								const int64 Offset01 = Y3 * (Width * 4) + (X2 * 4);
+								const FVector4 Color01 = FVector4(Colors[Offset01], Colors[Offset01 + 1], Colors[Offset01 + 2], Colors[Offset01 + 3]);
+								const int64 Offset11 = Y3 * (Width * 4) + (X3 * 4);
+								const FVector4 Color11 = FVector4(Colors[Offset11], Colors[Offset11 + 1], Colors[Offset11 + 2], Colors[Offset11 + 3]);
 
-							FVector4 Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
+								FVector4 Color = FMath::BiLerp(Color00, Color10, Color01, Color11, FX, FY);
 
-							FFloat16Color Color16 = FLinearColor(Color);
+								FFloat16Color Color16 = FLinearColor(Color);
 
-							FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 4);
-						}
+								FMemory::Memcpy(OutPixels.GetData() + Offset, &Color16, sizeof(FFloat16) * 4);
+							}
 #endif
-						else
-						{
+							else
+							{
 
+							}
 						}
 					}
-				}
-			};
+				};
 
 			FglTFRuntimeMipMap MipXP(-1, PixelFormat, Resolution, Resolution);
 			GetCubemapFace(UncompressedBytes, { 1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, MipXP.Pixels);
@@ -1126,11 +1126,11 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODs(const TArray<FglTF
 	return Parser->LoadStaticMeshFromRuntimeLODs(RuntimeLODs, StaticMeshConfig);
 }
 
-bool UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, int32& SkinIndex, const int32 OverrideSkinIndex)
+bool UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, int32& SkinIndex, const int32 OverrideSkinIndex, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
 {
 	GLTF_CHECK_PARSER(false);
 	SkinIndex = OverrideSkinIndex;
-	return Parser->LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, SkinIndex, ExcludeNodes, RuntimeLOD, MaterialsConfig, SkeletonConfig);
+	return Parser->LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, SkinIndex, ExcludeNodes, RuntimeLOD, MaterialsConfig, SkeletonConfig, TransformApplyRecursiveMode);
 }
 
 USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
