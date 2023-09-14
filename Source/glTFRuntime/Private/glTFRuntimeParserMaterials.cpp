@@ -255,6 +255,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			{
 				RuntimeMaterial.BaseSpecularFactor = 1;
 			}
+			GetMaterialTexture(JsonMaterialSpecular->ToSharedRef(), "specularTexture", false, RuntimeMaterial.SpecularTextureCache, RuntimeMaterial.SpecularTextureMips, RuntimeMaterial.SpecularTransform, RuntimeMaterial.SpecularSampler, false);
+			RuntimeMaterial.bKHR_materials_specular = true;
 		}
 
 		// KHR_materials_clearcoat
@@ -289,7 +291,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			{
 				return;
 			}
-	Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+			Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 		}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 
@@ -585,6 +587,14 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			TextureCompressionSettings::TC_Default, false);
 	}
 
+	if (RuntimeMaterial.bKHR_materials_specular)
+	{
+		ApplyMaterialTexture("specularTexture", RuntimeMaterial.SpecularTextureCache, RuntimeMaterial.SpecularTextureMips,
+			RuntimeMaterial.SpecularSampler,
+			"specular", RuntimeMaterial.SpecularTransform,
+			TextureCompressionSettings::TC_Default, false);
+	}
+
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
 	Material->SetScalarParameterValue("AlphaMask", RuntimeMaterial.bMasked ? 1.0f : 0.0f);
 
@@ -619,7 +629,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	return Material;
 }
 
-bool FglTFRuntimeParser::LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig)
+bool FglTFRuntimeParser::LoadImageFromBlob(const TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, EPixelFormat& PixelFormat, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	OnTexturePixels.Broadcast(AsShared(), JsonImageObject, Blob, Width, Height, PixelFormat, UncompressedBytes, ImagesConfig);
 
@@ -803,116 +813,10 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		return nullptr;
 	}
 
-	if (MaterialsConfig.bLoadMipMaps)
+	if (!LoadBlobToMips(TextureIndex, JsonTextureObject.ToSharedRef(), JsonImageObject.ToSharedRef(), CompressedBytes, Mips, sRGB, MaterialsConfig))
 	{
-		OnTextureMips.Broadcast(AsShared(), TextureIndex, JsonTextureObject.ToSharedRef(), JsonImageObject.ToSharedRef(), CompressedBytes, Mips, MaterialsConfig.ImagesConfig);
-		// if no Mips have been loaded, attempt parsing a DDS asset
-		if (Mips.Num() == 0)
-		{
-			if (FglTFRuntimeDDS::IsDDS(CompressedBytes))
-			{
-				FglTFRuntimeDDS DDS(CompressedBytes);
-				DDS.LoadMips(TextureIndex, Mips, 0, MaterialsConfig.ImagesConfig);
-			}
-		}
+		return nullptr;
 	}
-
-	// if no Mips have been generated, load it as a plain image and (eventually) generate them
-	if (Mips.Num() == 0)
-	{
-		TArray64<uint8> UncompressedBytes;
-		int32 Width = 0;
-		int32 Height = 0;
-		EPixelFormat PixelFormat;
-		if (!LoadImageFromBlob(CompressedBytes, JsonImageObject.ToSharedRef(), UncompressedBytes, Width, Height, PixelFormat, MaterialsConfig.ImagesConfig))
-		{
-			return nullptr;
-		}
-
-		OnLoadedTexturePixels.Broadcast(AsShared(), JsonTextureObject.ToSharedRef(), Width, Height, reinterpret_cast<FColor*>(UncompressedBytes.GetData()));
-
-		if (Width > 0 && Height > 0 &&
-			(Width % GPixelFormats[PixelFormat].BlockSizeX) == 0 &&
-			(Height % GPixelFormats[PixelFormat].BlockSizeY) == 0)
-		{
-
-			// limit image size
-			if ((MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0) && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
-			{
-				const int32 NewWidth = MaterialsConfig.ImagesConfig.MaxWidth > 0 ? MaterialsConfig.ImagesConfig.MaxWidth : Width;
-				const int32 NewHeight = MaterialsConfig.ImagesConfig.MaxHeight > 0 ? MaterialsConfig.ImagesConfig.MaxHeight : Height;
-				TArray64<FColor> ResizedPixels;
-				ResizedPixels.AddUninitialized(NewWidth * NewHeight);
-#if ENGINE_MAJOR_VERSION >= 5
-				FImageUtils::ImageResize(Width, Height, TArrayView<FColor>(reinterpret_cast<FColor*>(UncompressedBytes.GetData()), UncompressedBytes.Num()), NewWidth, NewHeight, ResizedPixels, sRGB, false);
-#else
-				FImageUtils::ImageResize(Width, Height, TArrayView<FColor>(reinterpret_cast<FColor*>(UncompressedBytes.GetData()), UncompressedBytes.Num()), NewWidth, NewHeight, ResizedPixels, sRGB);
-#endif
-				Width = NewWidth;
-				Height = NewHeight;
-				UncompressedBytes.Empty(ResizedPixels.Num() * 4);
-				UncompressedBytes.Append(reinterpret_cast<uint8*>(ResizedPixels.GetData()), ResizedPixels.Num() * 4);
-			}
-
-			int32 NumOfMips = 1;
-
-			TArray64<FColor> UncompressedColors;
-
-			if (MaterialsConfig.bGeneratesMipMaps && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1 && FMath::IsPowerOfTwo(Width) && FMath::IsPowerOfTwo(Height))
-			{
-				NumOfMips = FMath::FloorLog2(FMath::Max(Width, Height)) + 1;
-
-				for (int32 MipY = 0; MipY < Height; MipY++)
-				{
-					for (int32 MipX = 0; MipX < Width; MipX++)
-					{
-						int64 MipColorIndex = ((MipY * Width) + MipX) * 4;
-						uint8 MipColorB = UncompressedBytes[MipColorIndex];
-						uint8 MipColorG = UncompressedBytes[MipColorIndex + 1];
-						uint8 MipColorR = UncompressedBytes[MipColorIndex + 2];
-						uint8 MipColorA = UncompressedBytes[MipColorIndex + 3];
-						UncompressedColors.Add(FColor(MipColorR, MipColorG, MipColorB, MipColorA));
-					}
-				}
-			}
-
-			int32 MipWidth = Width;
-			int32 MipHeight = Height;
-
-			for (int32 MipIndex = 0; MipIndex < NumOfMips; MipIndex++)
-			{
-				FglTFRuntimeMipMap MipMap(TextureIndex);
-				MipMap.Width = MipWidth;
-				MipMap.Height = MipHeight;
-
-				// Resize Image
-				if (MipIndex > 0)
-				{
-					TArray64<FColor> ResizedMipData;
-					ResizedMipData.AddUninitialized(MipWidth * MipHeight);
-					FImageUtils::ImageResize(Width, Height, UncompressedColors, MipWidth, MipHeight, ResizedMipData, sRGB);
-					for (FColor& Color : ResizedMipData)
-					{
-						MipMap.Pixels.Add(Color.B);
-						MipMap.Pixels.Add(Color.G);
-						MipMap.Pixels.Add(Color.R);
-						MipMap.Pixels.Add(Color.A);
-					}
-				}
-				else
-				{
-					MipMap.Pixels = UncompressedBytes;
-				}
-
-				Mips.Add(MipMap);
-
-				MipWidth = FMath::Max(MipWidth / 2, 1);
-				MipHeight = FMath::Max(MipHeight / 2, 1);
-			}
-		}
-	}
-
-	OnTextureFilterMips.Broadcast(AsShared(), Mips, MaterialsConfig.ImagesConfig);
 
 	int64 SamplerIndex;
 	if (JsonTextureObject->TryGetNumberField("sampler", SamplerIndex))
@@ -980,6 +884,123 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	}
 
 	return nullptr;
+}
+
+bool FglTFRuntimeParser::LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJsonObject> JsonTextureObject, TSharedRef<FJsonObject> JsonImageObject, const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	if (MaterialsConfig.bLoadMipMaps)
+	{
+		OnTextureMips.Broadcast(AsShared(), TextureIndex, JsonTextureObject, JsonImageObject, Blob, Mips, MaterialsConfig.ImagesConfig);
+		// if no Mips have been loaded, attempt parsing a DDS asset
+		if (Mips.Num() == 0)
+		{
+			if (FglTFRuntimeDDS::IsDDS(Blob))
+			{
+				FglTFRuntimeDDS DDS(Blob);
+				DDS.LoadMips(TextureIndex, Mips, 0, MaterialsConfig.ImagesConfig);
+			}
+		}
+	}
+
+	// if no Mips have been generated, load it as a plain image and (eventually) generate them
+	if (Mips.Num() == 0)
+	{
+		TArray64<uint8> UncompressedBytes;
+		int32 Width = 0;
+		int32 Height = 0;
+		EPixelFormat PixelFormat;
+		if (!LoadImageFromBlob(Blob, JsonImageObject, UncompressedBytes, Width, Height, PixelFormat, MaterialsConfig.ImagesConfig))
+		{
+			return false;
+		}
+
+		OnLoadedTexturePixels.Broadcast(AsShared(), JsonTextureObject, Width, Height, reinterpret_cast<FColor*>(UncompressedBytes.GetData()));
+
+		if (Width > 0 && Height > 0 &&
+			(Width % GPixelFormats[PixelFormat].BlockSizeX) == 0 &&
+			(Height % GPixelFormats[PixelFormat].BlockSizeY) == 0)
+		{
+
+			// limit image size (currently only PF_B8G8R8A8 is supported)
+			if (PixelFormat == EPixelFormat::PF_B8G8R8A8 && (MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0) && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
+			{
+				const int32 NewWidth = MaterialsConfig.ImagesConfig.MaxWidth > 0 ? MaterialsConfig.ImagesConfig.MaxWidth : Width;
+				const int32 NewHeight = MaterialsConfig.ImagesConfig.MaxHeight > 0 ? MaterialsConfig.ImagesConfig.MaxHeight : Height;
+				TArray64<FColor> ResizedPixels;
+				ResizedPixels.AddUninitialized(NewWidth * NewHeight);
+#if ENGINE_MAJOR_VERSION >= 5
+				FImageUtils::ImageResize(Width, Height, TArrayView<FColor>(reinterpret_cast<FColor*>(UncompressedBytes.GetData()), UncompressedBytes.Num()), NewWidth, NewHeight, ResizedPixels, sRGB, false);
+#else
+				FImageUtils::ImageResize(Width, Height, TArrayView<FColor>(reinterpret_cast<FColor*>(UncompressedBytes.GetData()), UncompressedBytes.Num()), NewWidth, NewHeight, ResizedPixels, sRGB);
+#endif
+				Width = NewWidth;
+				Height = NewHeight;
+				UncompressedBytes.Empty(ResizedPixels.Num() * 4);
+				UncompressedBytes.Append(reinterpret_cast<uint8*>(ResizedPixels.GetData()), ResizedPixels.Num() * 4);
+			}
+
+			int32 NumOfMips = 1;
+
+			TArray64<FColor> UncompressedColors;
+
+			if (MaterialsConfig.bGeneratesMipMaps && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1 && FMath::IsPowerOfTwo(Width) && FMath::IsPowerOfTwo(Height))
+			{
+				NumOfMips = FMath::FloorLog2(FMath::Max(Width, Height)) + 1;
+
+				for (int32 MipY = 0; MipY < Height; MipY++)
+				{
+					for (int32 MipX = 0; MipX < Width; MipX++)
+					{
+						int64 MipColorIndex = ((MipY * Width) + MipX) * 4;
+						uint8 MipColorB = UncompressedBytes[MipColorIndex];
+						uint8 MipColorG = UncompressedBytes[MipColorIndex + 1];
+						uint8 MipColorR = UncompressedBytes[MipColorIndex + 2];
+						uint8 MipColorA = UncompressedBytes[MipColorIndex + 3];
+						UncompressedColors.Add(FColor(MipColorR, MipColorG, MipColorB, MipColorA));
+					}
+				}
+			}
+
+			int32 MipWidth = Width;
+			int32 MipHeight = Height;
+
+			for (int32 MipIndex = 0; MipIndex < NumOfMips; MipIndex++)
+			{
+				FglTFRuntimeMipMap MipMap(TextureIndex);
+				MipMap.Width = MipWidth;
+				MipMap.Height = MipHeight;
+				MipMap.PixelFormat = PixelFormat;
+
+				// Resize Image
+				if (MipIndex > 0)
+				{
+					TArray64<FColor> ResizedMipData;
+					ResizedMipData.AddUninitialized(MipWidth * MipHeight);
+					FImageUtils::ImageResize(Width, Height, UncompressedColors, MipWidth, MipHeight, ResizedMipData, sRGB);
+					for (FColor& Color : ResizedMipData)
+					{
+						MipMap.Pixels.Add(Color.B);
+						MipMap.Pixels.Add(Color.G);
+						MipMap.Pixels.Add(Color.R);
+						MipMap.Pixels.Add(Color.A);
+					}
+				}
+				else
+				{
+					MipMap.Pixels = UncompressedBytes;
+				}
+
+				Mips.Add(MipMap);
+
+				MipWidth = FMath::Max(MipWidth / 2, 1);
+				MipHeight = FMath::Max(MipHeight / 2, 1);
+			}
+		}
+	}
+
+	OnTextureFilterMips.Broadcast(AsShared(), Mips, MaterialsConfig.ImagesConfig);
+
+	return true;
 }
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName)
@@ -1435,4 +1456,9 @@ int32 FglTFRuntimeTextureMipDataProvider::GetMips(const FTextureUpdateContext& C
 
 	AdvanceTo(ETickState::CleanUp, ETickThread::Async);
 	return CurrentFirstLODIdx;
+}
+
+bool FglTFRuntimeParser::LoadBlobToMips(const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	return LoadBlobToMips(-1, MakeShared<FJsonObject>(), MakeShared<FJsonObject>(), Blob, Mips, sRGB, MaterialsConfig);
 }

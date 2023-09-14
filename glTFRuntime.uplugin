@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
   "Version": 1,
-  "VersionName": "20230706",
+  "VersionName": "20230907",
   "FriendlyName": "glTFRuntime",
   "Description": "Manage glTF files at runtime",
   "Category": "Runtime",
@@ -19,7 +19,7 @@
       "Name": "glTFRuntime",
       "Type": "Runtime",
       "LoadingPhase": "Default",
-      "WhitelistPlatforms": [ "Win64", "Mac", "Linux", "Android", "IOS", "Hololens" ]
+      "WhitelistPlatforms": [ "Win64", "Mac", "Linux", "Android", "IOS" ]
     },
     {
       "Name": "glTFRuntimeEditor",

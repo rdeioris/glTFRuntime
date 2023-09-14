@@ -61,18 +61,18 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& 
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename, OverrideConfig);
 
 
-	FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
-		{
-			if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
-			{
-				Completed.ExecuteIfBound(Asset);
-			}
-			else
-			{
-				Completed.ExecuteIfBound(nullptr);
-			}
-		}, TStatId(), nullptr, ENamedThreads::GameThread);
-	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset);
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
 }
 
@@ -108,14 +108,20 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const
 		HttpRequest->AppendToHeader(Header.Key, Header.Value);
 	}
 
-	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+	float StartTime = FPlatformTime::Seconds();
+
+	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 		{
 			UglTFRuntimeAsset* Asset = nullptr;
-	if (bSuccess)
-	{
-		Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
-	}
-	Completed.ExecuteIfBound(Asset);
+			if (bSuccess)
+			{
+				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+				if (Asset)
+				{
+					Asset->GetParser()->SetDownloadTime(FPlatformTime::Seconds() - StartTime);
+				}
+			}
+			Completed.ExecuteIfBound(Asset);
 		}, Completed, LoaderConfig);
 
 	HttpRequest->ProcessRequest();
@@ -137,21 +143,21 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString
 	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 		{
 			UglTFRuntimeAsset* Asset = nullptr;
-	if (bSuccess)
-	{
-		Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
-	}
-	Completed.ExecuteIfBound(Asset);
+			if (bSuccess)
+			{
+				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+			}
+			Completed.ExecuteIfBound(Asset);
 		}, Completed, LoaderConfig);
 
 	HttpRequest->OnRequestProgress().BindLambda([](FHttpRequestPtr RequestPtr, int32 BytesSent, int32 BytesReceived, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
 		{
 			int32 ContentLength = 0;
-	if (RequestPtr->GetResponse().IsValid())
-	{
-		ContentLength = RequestPtr->GetResponse()->GetContentLength();
-	}
-	Progress.ExecuteIfBound(LoaderConfig, BytesReceived, ContentLength);
+			if (RequestPtr->GetResponse().IsValid())
+			{
+				ContentLength = RequestPtr->GetResponse()->GetContentLength();
+			}
+			Progress.ExecuteIfBound(LoaderConfig, BytesReceived, ContentLength);
 		}, Progress, LoaderConfig);
 
 	HttpRequest->ProcessRequest();

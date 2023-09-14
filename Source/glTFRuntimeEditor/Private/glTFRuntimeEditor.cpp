@@ -27,7 +27,7 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 			LoadGLTFText.ToString(),
 			"",
 			"",
-			"GLTF Files|*.gltf;*.glb;*.zip;*.gz;*.lz4;*.tar;*.glxf|",
+			"GLTF Files|*.gltf;*.glb;*.zip;*.gz;*.lz4;*.tar;*.glxf;*.vrm|",
 			EFileDialogFlags::Type::None,
 			OutFilenames) && OutFilenames.Num() > 0)
 		{
@@ -40,6 +40,7 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 				AglTFRuntimeAssetActor* NewActor = LevelEditorModule.GetFirstLevelEditor()->GetWorld()->SpawnActorDeferred<AglTFRuntimeAssetActor>(AglTFRuntimeAssetActor::StaticClass(), Transform);
 				if (NewActor)
 				{
+                    NewActor->SetFlags(RF_Transient);
 					NewActor->Asset = Asset;
 					NewActor->bAllowSkeletalAnimations = false;
 					NewActor->bAllowNodeAnimations = false;
