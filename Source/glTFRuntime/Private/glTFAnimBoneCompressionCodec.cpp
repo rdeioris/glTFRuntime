@@ -15,7 +15,7 @@ FQuat UglTFAnimBoneCompressionCodec::GetTrackRotation(FAnimSequenceDecompression
 	int32 FrameA = 0;
 	int32 FrameB = 0;
 
-	float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].RotKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+	float Alpha = TimeToIndex(DecompContext.GetPlayableLength(), DecompContext.RelativePos, Tracks[TrackIndex].RotKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
 #if ENGINE_MAJOR_VERSION > 4
 	return FQuat::Slerp(FQuat(Tracks[TrackIndex].RotKeys[FrameA]), FQuat(Tracks[TrackIndex].RotKeys[FrameB]), Alpha);
 #else
@@ -28,7 +28,7 @@ FVector UglTFAnimBoneCompressionCodec::GetTrackLocation(FAnimSequenceDecompressi
 	int32 FrameA = 0;
 	int32 FrameB = 0;
 
-	float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].PosKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+	float Alpha = TimeToIndex(DecompContext.GetPlayableLength(), DecompContext.RelativePos, Tracks[TrackIndex].PosKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
 #if ENGINE_MAJOR_VERSION > 4
 	return FMath::Lerp(FVector(Tracks[TrackIndex].PosKeys[FrameA]), FVector(Tracks[TrackIndex].PosKeys[FrameB]), Alpha);
 #else
@@ -41,7 +41,7 @@ FVector UglTFAnimBoneCompressionCodec::GetTrackScale(FAnimSequenceDecompressionC
 	int32 FrameA = 0;
 	int32 FrameB = 0;
 
-	float Alpha = TimeToIndex(DecompContext.SequenceLength, DecompContext.RelativePos, Tracks[TrackIndex].ScaleKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
+	float Alpha = TimeToIndex(DecompContext.GetPlayableLength(), DecompContext.RelativePos, Tracks[TrackIndex].ScaleKeys.Num(), DecompContext.Interpolation, FrameA, FrameB);
 #if ENGINE_MAJOR_VERSION > 4
 	return FMath::Lerp(FVector(Tracks[TrackIndex].ScaleKeys[FrameA]), FVector(Tracks[TrackIndex].ScaleKeys[FrameB]), Alpha);
 #else
