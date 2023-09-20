@@ -325,9 +325,18 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		if (SkeletalMeshContext->SkeletalMeshConfig.bOverwriteRefSkeleton)
 		{
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-			SkeletalMeshContext->SkeletalMesh->SetRefSkeleton(SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton());
+			FReferenceSkeleton OrigRefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
 #else
-			SkeletalMeshContext->SkeletalMesh->RefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
+			FReferenceSkeleton OrigRefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
+#endif
+			if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.BonesDeltaTransformMap.Num() > 0)
+			{
+				AddSkeletonDeltaTranforms(OrigRefSkeleton, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.BonesDeltaTransformMap);
+			}
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+			SkeletalMeshContext->SkeletalMesh->SetRefSkeleton(OrigRefSkeleton);
+#else
+			SkeletalMeshContext->SkeletalMesh->RefSkeleton = OrigRefSkeleton;
 #endif
 		}
 		else if (SkeletalMeshContext->SkeletalMeshConfig.bAddVirtualBones)
