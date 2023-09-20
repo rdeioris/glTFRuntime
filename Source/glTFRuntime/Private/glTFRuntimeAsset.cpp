@@ -620,6 +620,13 @@ int32 UglTFRuntimeAsset::GetNumImages() const
 	return Parser->GetNumImages();
 }
 
+int32 UglTFRuntimeAsset::GetNumAnimations() const
+{
+	GLTF_CHECK_PARSER(0);
+
+	return Parser->GetNumAnimations();
+}
+
 UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
@@ -1392,4 +1399,11 @@ float UglTFRuntimeAsset::GetDownloadTime() const
 	GLTF_CHECK_PARSER(0);
 
 	return Parser->GetDownloadTime();
+}
+
+TArray<FString> UglTFRuntimeAsset::GetAnimationsNames() const
+{
+	GLTF_CHECK_PARSER(TArray<FString>());
+
+	return Parser->GetAnimationsNames();
 }

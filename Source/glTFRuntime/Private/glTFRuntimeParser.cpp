@@ -660,6 +660,16 @@ int32 FglTFRuntimeParser::GetNumImages() const
 	return 0;
 }
 
+int32 FglTFRuntimeParser::GetNumAnimations() const
+{
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (Root->TryGetArrayField("animations", JsonArray))
+	{
+		return JsonArray->Num();
+	}
+	return 0;
+}
+
 bool FglTFRuntimeParser::LoadScenes(TArray<FglTFRuntimeScene>& Scenes)
 {
 	const TArray<TSharedPtr<FJsonValue>>* JsonScenes;
@@ -5014,4 +5024,42 @@ void FglTFRuntimeParser::SetDownloadTime(const float Value)
 float FglTFRuntimeParser::GetDownloadTime() const
 {
 	return DownloadTime;
+}
+
+TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetAnimations() const
+{
+	TArray<TSharedRef<FJsonObject>> Animations;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (Root->TryGetArrayField("animations", JsonArray))
+	{
+		for (TSharedPtr<FJsonValue> JsonValue : *JsonArray)
+		{
+			const TSharedPtr<FJsonObject>* JsonObject;
+			if (JsonValue->TryGetObject(JsonObject))
+			{
+				Animations.Add(JsonObject->ToSharedRef());
+			}
+		}
+	}
+
+	return Animations;
+}
+
+TArray<FString> FglTFRuntimeParser::GetAnimationsNames() const
+{
+	TArray<FString> Names;
+	const TArray<TSharedRef<FJsonObject>> Animations = GetAnimations();
+	for (const TSharedRef<FJsonObject> Animation : Animations)
+	{
+		FString Name;
+		if (Animation->TryGetStringField("name", Name))
+		{
+			if (!Name.IsEmpty())
+			{
+				Names.Add(Name);
+			}
+		}
+	}
+	return Names;
 }
