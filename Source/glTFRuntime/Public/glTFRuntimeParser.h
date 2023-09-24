@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "Animation/AnimEnums.h"
+#include "Animation/PoseAsset.h"
 #include "Animation/Skeleton.h"
 #include "Async/Async.h"
 #include "Dom/JsonValue.h"
@@ -1240,6 +1241,9 @@ struct FglTFRuntimeSkeletalAnimationConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	int32 RetargetSkinIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UPoseAsset* PoseForRetargeting;
 
 	FglTFRuntimeSkeletalAnimationConfig()
 	{

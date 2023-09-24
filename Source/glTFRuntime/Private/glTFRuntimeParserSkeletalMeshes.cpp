@@ -2816,14 +2816,83 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 		RetargetRefSkeleton = SkeletalAnimationConfig.RetargetTo ? SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton() : SkeletalAnimationConfig.RetargetToSkeletalMesh->RefSkeleton;
 #endif
 		const TArray<FTransform>& BonesTransforms = RetargetRefSkeleton.GetRefBonePose();
+
+		TArray<FTransform> PoseTransforms;
+		TArray<FTransform> PoseDeltaWorldTransforms;
+		TArray<FPoseAssetInfluences> PoseAssetInfluences;
+		if (SkeletalAnimationConfig.PoseForRetargeting)
+		{
+			FStructProperty* Property = CastField<FStructProperty>(UPoseAsset::StaticClass()->FindPropertyByName("PoseContainer"));
+			FPoseDataContainer* PoseDataContainer = Property->ContainerPtrToValuePtr<FPoseDataContainer>(SkeletalAnimationConfig.PoseForRetargeting);
+			FArrayProperty* Poses = CastField<FArrayProperty>(FPoseDataContainer::StaticStruct()->FindPropertyByName("Poses"));
+			{
+				FScriptArrayHelper_InContainer ArrayHelper(Poses, PoseDataContainer);
+				FPoseData* PoseData = Poses->Inner->ContainerPtrToValuePtr<FPoseData>(ArrayHelper.GetRawPtr(0));
+				PoseTransforms = PoseData->LocalSpacePose;
+			}
+			FArrayProperty* TrackPoseInfluenceIndices = CastField<FArrayProperty>(FPoseDataContainer::StaticStruct()->FindPropertyByName("TrackPoseInfluenceIndices"));
+			{
+				FScriptArrayHelper_InContainer ArrayHelper(TrackPoseInfluenceIndices, PoseDataContainer);
+				for (int32 TrackIndex = 0; TrackIndex < ArrayHelper.Num(); TrackIndex++)
+				{
+					FPoseAssetInfluences* PoseAssetMapping = TrackPoseInfluenceIndices->Inner->ContainerPtrToValuePtr<FPoseAssetInfluences>(ArrayHelper.GetRawPtr(TrackIndex));
+					PoseAssetInfluences.Add(*PoseAssetMapping);
+				}
+			}
+			PoseDeltaWorldTransforms.AddDefaulted(BonesTransforms.Num());
+		}
+
+		auto GetPoseIndex = [&](const FName& BoneName) -> int32
+			{
+				const TArray<FPoseAssetInfluence>& Influences = PoseAssetInfluences[SkeletalAnimationConfig.PoseForRetargeting->GetTrackIndexByName(BoneName)].Influences;
+				if (Influences.Num() > 0 && Influences[0].PoseIndex == 0)
+				{
+					return Influences[0].BoneTransformIndex;
+				}
+				return INDEX_NONE;
+			};
+
 		for (int32 BoneIndex = 0; BoneIndex < RetargetRefSkeleton.GetNum(); BoneIndex++)
 		{
 			RetargetWorldTransforms.Add(BonesTransforms[BoneIndex]);
+			int32 PoseIndex = INDEX_NONE;
+			if (SkeletalAnimationConfig.PoseForRetargeting)
+			{
+				const FName& BoneName = RetargetRefSkeleton.GetBoneName(BoneIndex);
+				PoseIndex = GetPoseIndex(BoneName);
+				if (PoseIndex > INDEX_NONE)
+				{
+					PoseDeltaWorldTransforms[BoneIndex] = PoseTransforms[PoseIndex];
+				}
+				else
+				{
+					PoseDeltaWorldTransforms[BoneIndex] = BonesTransforms[BoneIndex];
+				}
+			}
 			int32 RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(BoneIndex);
 			while (RetargetParentIndex > INDEX_NONE)
 			{
 				RetargetWorldTransforms[BoneIndex] *= BonesTransforms[RetargetParentIndex];
+				if (SkeletalAnimationConfig.PoseForRetargeting)
+				{
+					const FName& ParentBoneName = RetargetRefSkeleton.GetBoneName(RetargetParentIndex);
+					const int32 ParentPoseIndex = GetPoseIndex(ParentBoneName);
+					if (ParentPoseIndex > INDEX_NONE)
+					{
+						PoseDeltaWorldTransforms[BoneIndex] *= PoseTransforms[ParentPoseIndex];
+					}
+					else
+					{
+						PoseDeltaWorldTransforms[BoneIndex] *= BonesTransforms[RetargetParentIndex];
+					}
+				}
 				RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(RetargetParentIndex);
+			}
+
+			if (SkeletalAnimationConfig.PoseForRetargeting)
+			{
+				FTransform DeltaTransform = RetargetWorldTransforms[BoneIndex].GetRelativeTransformReverse(PoseDeltaWorldTransforms[BoneIndex]);
+				RetargetWorldTransforms[BoneIndex] *= DeltaTransform;
 			}
 		}
 	}
@@ -2872,6 +2941,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
 			{
 				TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(Node.Index, TrackName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
+				// discard empty tracks
+				if (TrackName.IsEmpty())
+				{
+					return;
+				}
 			}
 
 			if (SkeletalAnimationConfig.RemoveTracks.Contains(TrackName))
@@ -2943,7 +3017,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 						if (RetargetBoneIndex > INDEX_NONE)
 						{
 							const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
-
 							if (AnimWorldTransforms.Num() > 0)
 							{
 								const int32 AnimBoneIndex = AnimRefSkeleton.FindBoneIndex(*Node.Name);
