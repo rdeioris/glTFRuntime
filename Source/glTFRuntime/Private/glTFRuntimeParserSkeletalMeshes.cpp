@@ -2817,6 +2817,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #endif
 		const TArray<FTransform>& BonesTransforms = RetargetRefSkeleton.GetRefBonePose();
 
+#if ENGINE_MAJOR_VERSION >= 5
 		TArray<FTransform> PoseTransforms;
 		TArray<FTransform> PoseDeltaWorldTransforms;
 		TArray<FPoseAssetInfluences> PoseAssetInfluences;
@@ -2851,10 +2852,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				}
 				return INDEX_NONE;
 			};
+#endif
 
 		for (int32 BoneIndex = 0; BoneIndex < RetargetRefSkeleton.GetNum(); BoneIndex++)
 		{
 			RetargetWorldTransforms.Add(BonesTransforms[BoneIndex]);
+#if ENGINE_MAJOR_VERSION >= 5
 			int32 PoseIndex = INDEX_NONE;
 			if (SkeletalAnimationConfig.PoseForRetargeting)
 			{
@@ -2869,10 +2872,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					PoseDeltaWorldTransforms[BoneIndex] = BonesTransforms[BoneIndex];
 				}
 			}
+#endif
 			int32 RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(BoneIndex);
 			while (RetargetParentIndex > INDEX_NONE)
 			{
 				RetargetWorldTransforms[BoneIndex] *= BonesTransforms[RetargetParentIndex];
+#if ENGINE_MAJOR_VERSION >= 5
 				if (SkeletalAnimationConfig.PoseForRetargeting)
 				{
 					const FName& ParentBoneName = RetargetRefSkeleton.GetBoneName(RetargetParentIndex);
@@ -2886,14 +2891,17 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 						PoseDeltaWorldTransforms[BoneIndex] *= BonesTransforms[RetargetParentIndex];
 					}
 				}
+#endif
 				RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(RetargetParentIndex);
 			}
 
+#if ENGINE_MAJOR_VERSION >= 5
 			if (SkeletalAnimationConfig.PoseForRetargeting)
 			{
 				FTransform DeltaTransform = RetargetWorldTransforms[BoneIndex].GetRelativeTransformReverse(PoseDeltaWorldTransforms[BoneIndex]);
 				RetargetWorldTransforms[BoneIndex] *= DeltaTransform;
 			}
+#endif
 		}
 	}
 
