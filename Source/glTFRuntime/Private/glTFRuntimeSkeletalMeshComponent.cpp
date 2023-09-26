@@ -16,7 +16,11 @@ bool UglTFRuntimeSkeletalMeshComponent::ContainsPhysicsTriMeshData(bool InUseAll
 		return false;
 	}
 
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
 	return bEnablePerPolyCollision && CurrentSkeletalMeshAsset->GetEnablePerPolyCollision();
+#else
+	return bEnablePerPolyCollision && CurrentSkeletalMeshAsset->bEnablePerPolyCollision;
+#endif
 }
 
 bool UglTFRuntimeSkeletalMeshComponent::GetPhysicsTriMeshData(struct FTriMeshCollisionData* CollisionData, bool InUseAllTriData)

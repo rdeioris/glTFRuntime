@@ -3614,6 +3614,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 
 const FBox& FglTFRuntimeSkeletalMeshContext::GetBoneBox(const int32 BoneIndex)
 {
+	// unfortunately we need access to SkinWeightVertexBuffer.GetBoneIndex (and it is not available in 4.25)
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 	if (PerBoneBoundingBoxCache.Contains(BoneIndex))
 	{
 		return PerBoneBoundingBoxCache[BoneIndex];
@@ -3646,8 +3648,15 @@ const FBox& FglTFRuntimeSkeletalMeshContext::GetBoneBox(const int32 BoneIndex)
 		if (BestBoneIndex == BoneIndex)
 		{
 			Box += FVector(SkeletalMesh->GetRefBasesInvMatrix()[BoneIndex].TransformPosition(LOD0.StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex)));
+			Box += FVector(SkeletalMesh->RefBasesInvMatrix[BoneIndex].TransformPosition(LOD0.StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex)));
 		}
 	}
 
 	return PerBoneBoundingBoxCache[BoneIndex];
+#else
+	// dummy logic
+	FBox& Box = PerBoneBoundingBoxCache.Add(BoneIndex);
+	Box.Init();
+	return PerBoneBoundingBoxCache[BoneIndex];
+#endif
 }
