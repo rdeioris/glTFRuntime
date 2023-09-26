@@ -42,4 +42,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (DisplayName = "Make glTFRuntime PathItem Array from JSONPath String"), Category = "glTFRuntime")
 	static TArray<FglTFRuntimePathItem> glTFRuntimePathItemArrayFromJSONPath(const FString& JSONPath);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Get an array of bytes containing the glTF Runtime LOD indices"), Category = "glTFRuntime")
+	static bool GetIndicesAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Get an array of bytes containing the glTF Runtime LOD positions"), Category = "glTFRuntime")
+	static bool GetPositionsAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Get an array of bytes containing the glTF Runtime LOD normals"), Category = "glTFRuntime")
+	static bool GetNormalsAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes);
 };
