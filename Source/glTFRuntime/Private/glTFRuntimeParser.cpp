@@ -5050,7 +5050,7 @@ TArray<FString> FglTFRuntimeParser::GetAnimationsNames() const
 {
 	TArray<FString> Names;
 	const TArray<TSharedRef<FJsonObject>> Animations = GetAnimations();
-	for (const TSharedRef<FJsonObject> Animation : Animations)
+	for (const TSharedRef<FJsonObject>& Animation : Animations)
 	{
 		FString Name;
 		if (Animation->TryGetStringField("name", Name))
