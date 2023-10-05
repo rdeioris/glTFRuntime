@@ -38,6 +38,12 @@ protected:
 	TMap<USceneComponent*, FName> SocketMapping;
 	TArray<USkeletalMeshComponent*> DiscoveredSkeletalMeshComponents;
 
+	TMap<USkeletalMeshComponent*, TMap<FString, UAnimSequence*>> DiscoveredSkeletalAnimations;
+
+	// required for avoiding GC
+	UPROPERTY()
+	TArray<UAnimSequence*> AllSkeletalAnimations;
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -93,10 +99,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	int32 RootNodeIndex;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	bool bLoadAllSkeletalAnimations;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	bool bAutoPlayAnimations;
+
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeAssetActorNodeProcessed, const FglTFRuntimeNode&, USceneComponent*);
 	FglTFRuntimeAssetActorNodeProcessed OnNodeProcessed;
 
 	virtual void PostUnregisterAllComponents() override;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	UAnimSequence* GetSkeletalAnimationByName(USkeletalMeshComponent* SkeletalMeshComponent, const FString& AnimationName) const;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")

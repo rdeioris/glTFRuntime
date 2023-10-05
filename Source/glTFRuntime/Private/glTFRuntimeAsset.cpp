@@ -498,6 +498,14 @@ UAnimSequence* UglTFRuntimeAsset::LoadNodeSkeletalAnimation(USkeletalMesh* Skele
 	return Parser->LoadNodeSkeletalAnimation(SkeletalMesh, NodeIndex, SkeletalAnimationConfig);
 }
 
+TMap<FString, UAnimSequence*> UglTFRuntimeAsset::LoadNodeSkeletalAnimationsMap(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	TMap<FString, UAnimSequence*> EmptyMap;
+	GLTF_CHECK_PARSER(EmptyMap);
+
+	return Parser->LoadNodeSkeletalAnimationsMap(SkeletalMesh, NodeIndex, SkeletalAnimationConfig);
+}
+
 bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32>& NodeIndices, const FString& NodeName, FglTFRuntimeNode& Node)
 {
 	GLTF_CHECK_PARSER(false);

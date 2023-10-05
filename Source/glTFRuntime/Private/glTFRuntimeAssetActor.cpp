@@ -25,6 +25,8 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 	bAllowLights = true;
 	bForceSkinnedMeshToRoot = false;
 	RootNodeIndex = INDEX_NONE;
+	bLoadAllSkeletalAnimations = false;
+	bAutoPlayAnimations = true;
 }
 
 // Called when the game starts or when spawned
@@ -338,28 +340,56 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(NewComponent);
 		if (bAllowSkeletalAnimations)
 		{
+			UAnimSequence* SkeletalAnimation = nullptr;
+			if (bLoadAllSkeletalAnimations)
+			{
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
-			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
-			if (!SkeletalAnimation && bAllowPoseAnimations)
-			{
-				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfig, Node.SkinIndex);
-			}
+				TMap<FString, UAnimSequence*> SkeletalAnimationsMap = Asset->LoadNodeSkeletalAnimationsMap(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
 #else
-			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+				TMap<FString, UAnimSequence*> SkeletalAnimationsMap = Asset->LoadNodeSkeletalAnimationsMap(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+#endif
+				if (SkeletalAnimationsMap.Num() > 0)
+				{
+					DiscoveredSkeletalAnimations.Add(SkeletalMeshComponent, SkeletalAnimationsMap);
+					
+					for (const TPair<FString, UAnimSequence*>& Pair : SkeletalAnimationsMap)
+					{
+						AllSkeletalAnimations.Add(Pair.Value);
+						// set the first animation (TODO: allow this to be configurable)
+						if (!SkeletalAnimation)
+						{
+							SkeletalAnimation = Pair.Value;
+						}
+					}
+				}
+			}
+			else
+			{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
+				SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
+#else
+				SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+#endif
+			}
+
 			if (!SkeletalAnimation && bAllowPoseAnimations)
 			{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
+				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfig, Node.SkinIndex);
+#else
 				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->SkeletalMesh, SkeletalAnimationConfig, Node.SkinIndex);
-			}
 #endif
+			}
+
 			if (SkeletalAnimation)
 			{
 				SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;
 				SkeletalMeshComponent->AnimationData.bSavedLooping = true;
-				SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
+				SkeletalMeshComponent->AnimationData.bSavedPlaying = bAutoPlayAnimations;
 				SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 			}
+		}
 	}
-}
 
 	OnNodeProcessed.Broadcast(Node, NewComponent);
 
@@ -449,4 +479,28 @@ void AglTFRuntimeAssetActor::PostUnregisterAllComponents()
 		Asset = nullptr;
 	}
 	Super::PostUnregisterAllComponents();
+}
+
+UAnimSequence* AglTFRuntimeAssetActor::GetSkeletalAnimationByName(USkeletalMeshComponent* SkeletalMeshComponent, const FString& AnimationName) const
+{
+	if (!SkeletalMeshComponent)
+	{
+		return nullptr;
+	}
+
+	if (!DiscoveredSkeletalAnimations.Contains(SkeletalMeshComponent))
+	{
+		return nullptr;
+	}
+
+	for (const TPair<FString, UAnimSequence*>& Pair : DiscoveredSkeletalAnimations[SkeletalMeshComponent])
+	{
+		if (Pair.Key == AnimationName)
+		{
+			SkeletalMeshComponent->AnimationData.AnimToPlay = Pair.Value;
+			return Pair.Value;
+		}
+	}
+
+	return nullptr;
 }
