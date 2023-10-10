@@ -793,6 +793,9 @@ struct FglTFRuntimeSkeletonConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, FTransform> NodeBonesDeltaTransformMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAddRootNodeIfMissing;
 	
 	FglTFRuntimeSkeletonConfig()
 	{
@@ -810,6 +813,7 @@ struct FglTFRuntimeSkeletonConfig
 		CachedNodeIndex = INDEX_NONE;
 		MaxNodesTreeDepth = -1;
 		bApplyUnmappedBonesTransforms = false;
+		bAddRootNodeIfMissing = false;
 	}
 };
 
@@ -1987,6 +1991,7 @@ public:
 	bool LoadNodeByName(const FString& NodeName, FglTFRuntimeNode& Node);
 	bool LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes);
 	bool LoadJointByName(const int64 RootBoneIndex, const FString& Name, FglTFRuntimeNode& Node);
+	int32 AddFakeRootNode(const FString& BaseName);
 
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene);
