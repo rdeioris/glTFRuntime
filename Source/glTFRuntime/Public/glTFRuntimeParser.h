@@ -2206,6 +2206,8 @@ public:
 
 	void ClearCache();
 
+	void MergePrimitivesByMaterial(TArray<FglTFRuntimePrimitive>& Primitives);
+
 protected:
 	void LoadAndFillBaseMaterials();
 	TSharedRef<FJsonObject> Root;

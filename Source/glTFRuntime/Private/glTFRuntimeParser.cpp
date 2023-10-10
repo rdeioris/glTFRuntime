@@ -2501,44 +2501,48 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 
 	if (MaterialsConfig.bMergeSectionsByMaterial)
 	{
-		TMap<UMaterialInterface*, TArray<FglTFRuntimePrimitive>> PrimitivesMap;
-		for (FglTFRuntimePrimitive& Primitive : Primitives)
-		{
-			if (PrimitivesMap.Contains(Primitive.Material))
-			{
-				PrimitivesMap[Primitive.Material].Add(Primitive);
-			}
-			else
-			{
-				TArray<FglTFRuntimePrimitive> NewPrimitives;
-				NewPrimitives.Add(Primitive);
-				PrimitivesMap.Add(Primitive.Material, NewPrimitives);
-			}
-		}
-
-		TArray<FglTFRuntimePrimitive> MergedPrimitives;
-		for (TPair<UMaterialInterface*, TArray<FglTFRuntimePrimitive>>& Pair : PrimitivesMap)
-		{
-			FglTFRuntimePrimitive MergedPrimitive;
-			if (MergePrimitives(Pair.Value, MergedPrimitive))
-			{
-				MergedPrimitives.Add(MergedPrimitive);
-			}
-			else
-			{
-				// unable to merge, just leave as is
-				for (FglTFRuntimePrimitive& Primitive : Pair.Value)
-				{
-					MergedPrimitives.Add(Primitive);
-				}
-			}
-		}
-
-		Primitives = MergedPrimitives;
-
+		MergePrimitivesByMaterial(Primitives);
 	}
 
 	return true;
+}
+
+void FglTFRuntimeParser::MergePrimitivesByMaterial(TArray<FglTFRuntimePrimitive>& Primitives)
+{
+	TMap<UMaterialInterface*, TArray<FglTFRuntimePrimitive>> PrimitivesMap;
+	for (FglTFRuntimePrimitive& Primitive : Primitives)
+	{
+		if (PrimitivesMap.Contains(Primitive.Material))
+		{
+			PrimitivesMap[Primitive.Material].Add(Primitive);
+		}
+		else
+		{
+			TArray<FglTFRuntimePrimitive> NewPrimitives;
+			NewPrimitives.Add(Primitive);
+			PrimitivesMap.Add(Primitive.Material, NewPrimitives);
+		}
+	}
+
+	TArray<FglTFRuntimePrimitive> MergedPrimitives;
+	for (TPair<UMaterialInterface*, TArray<FglTFRuntimePrimitive>>& Pair : PrimitivesMap)
+	{
+		FglTFRuntimePrimitive MergedPrimitive;
+		if (MergePrimitives(Pair.Value, MergedPrimitive))
+		{
+			MergedPrimitives.Add(MergedPrimitive);
+		}
+		else
+		{
+			// unable to merge, just leave as is
+			for (FglTFRuntimePrimitive& Primitive : Pair.Value)
+			{
+				MergedPrimitives.Add(Primitive);
+			}
+		}
+	}
+
+	Primitives = MergedPrimitives;
 }
 
 FVector FglTFRuntimeParser::TransformVector(FVector Vector) const
