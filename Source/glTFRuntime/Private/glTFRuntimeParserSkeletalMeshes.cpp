@@ -13,7 +13,7 @@
 #include "IMeshBuilderModule.h"
 #include "LODUtilities.h"
 #include "MeshUtilities.h"
-#include "AssetRegistryModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #endif
 #include "Engine/SkeletalMeshSocket.h"
 #include "glTFAnimBoneCompressionCodec.h"
