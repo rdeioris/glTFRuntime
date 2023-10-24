@@ -3590,10 +3590,12 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(SkeletonsCache);
 	Collector.AddReferencedObjects(SkeletalMeshesCache);
 	Collector.AddReferencedObjects(TexturesCache);
+	Collector.AddReferencedObjects(MaterialsNameCache);
 	Collector.AddReferencedObjects(MetallicRoughnessMaterialsMap);
 	Collector.AddReferencedObjects(SpecularGlossinessMaterialsMap);
 	Collector.AddReferencedObjects(UnlitMaterialsMap);
 	Collector.AddReferencedObjects(TransmissionMaterialsMap);
+	Collector.AddReferencedObjects(ClearCoatMaterialsMap);
 }
 
 void FglTFRuntimeParser::ClearCache()
@@ -3603,10 +3605,12 @@ void FglTFRuntimeParser::ClearCache()
 	SkeletonsCache.Empty();
 	SkeletalMeshesCache.Empty();
 	TexturesCache.Empty();
+	MaterialsNameCache.Empty();
 	MetallicRoughnessMaterialsMap.Empty();
 	SpecularGlossinessMaterialsMap.Empty();
 	UnlitMaterialsMap.Empty();
 	TransmissionMaterialsMap.Empty();
+	ClearCoatMaterialsMap.Empty();
 }
 
 float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)
