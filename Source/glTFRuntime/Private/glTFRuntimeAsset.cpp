@@ -498,6 +498,14 @@ UAnimSequence* UglTFRuntimeAsset::LoadNodeSkeletalAnimation(USkeletalMesh* Skele
 	return Parser->LoadNodeSkeletalAnimation(SkeletalMesh, NodeIndex, SkeletalAnimationConfig);
 }
 
+TMap<FString, UAnimSequence*> UglTFRuntimeAsset::LoadNodeSkeletalAnimationsMap(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	TMap<FString, UAnimSequence*> EmptyMap;
+	GLTF_CHECK_PARSER(EmptyMap);
+
+	return Parser->LoadNodeSkeletalAnimationsMap(SkeletalMesh, NodeIndex, SkeletalAnimationConfig);
+}
+
 bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32>& NodeIndices, const FString& NodeName, FglTFRuntimeNode& Node)
 {
 	GLTF_CHECK_PARSER(false);
@@ -618,6 +626,13 @@ int32 UglTFRuntimeAsset::GetNumImages() const
 	GLTF_CHECK_PARSER(0);
 
 	return Parser->GetNumImages();
+}
+
+int32 UglTFRuntimeAsset::GetNumAnimations() const
+{
+	GLTF_CHECK_PARSER(0);
+
+	return Parser->GetNumAnimations();
 }
 
 UTexture2D* UglTFRuntimeAsset::LoadImage(const int32 ImageIndex, const FglTFRuntimeImagesConfig& ImagesConfig)
@@ -1392,4 +1407,11 @@ float UglTFRuntimeAsset::GetDownloadTime() const
 	GLTF_CHECK_PARSER(0);
 
 	return Parser->GetDownloadTime();
+}
+
+TArray<FString> UglTFRuntimeAsset::GetAnimationsNames() const
+{
+	GLTF_CHECK_PARSER(TArray<FString>());
+
+	return Parser->GetAnimationsNames();
 }

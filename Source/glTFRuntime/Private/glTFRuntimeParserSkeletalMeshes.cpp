@@ -9,6 +9,7 @@
 #include "Animation/AnimData/IAnimationDataModel.h"
 #endif
 #endif
+#include "Animation/PoseAsset.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Rendering/SkeletalMeshModel.h"
@@ -326,9 +327,18 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		if (SkeletalMeshContext->SkeletalMeshConfig.bOverwriteRefSkeleton)
 		{
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-			SkeletalMeshContext->SkeletalMesh->SetRefSkeleton(SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton());
+			FReferenceSkeleton OrigRefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
 #else
-			SkeletalMeshContext->SkeletalMesh->RefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
+			FReferenceSkeleton OrigRefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
+#endif
+			if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.BonesDeltaTransformMap.Num() > 0)
+			{
+				AddSkeletonDeltaTranforms(OrigRefSkeleton, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.BonesDeltaTransformMap);
+			}
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+			SkeletalMeshContext->SkeletalMesh->SetRefSkeleton(OrigRefSkeleton);
+#else
+			SkeletalMeshContext->SkeletalMesh->RefSkeleton = OrigRefSkeleton;
 #endif
 		}
 		else if (SkeletalMeshContext->SkeletalMeshConfig.bAddVirtualBones)
@@ -1765,7 +1775,6 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 
 UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
-
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1846,6 +1855,102 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 	return nullptr;
 }
 
+TMap<FString, UAnimSequence*> FglTFRuntimeParser::LoadNodeSkeletalAnimationsMap(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	TMap<FString, UAnimSequence*> SkeletalAnimationsMap;
+
+	if (!SkeletalMesh)
+	{
+		return SkeletalAnimationsMap;
+	}
+
+	FglTFRuntimeNode Node;
+	if (!LoadNode(NodeIndex, Node))
+	{
+		return SkeletalAnimationsMap;
+	}
+
+	TArray<int32> Joints;
+
+	// this could be a static mesh read as a skeletal one...
+	if (Node.SkinIndex > INDEX_NONE)
+	{
+		TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", Node.SkinIndex);
+		if (!JsonSkinObject)
+		{
+			AddError("LoadNodeSkeletalAnimation()", "No skins defined in the asset");
+			return SkeletalAnimationsMap;
+		}
+
+		const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+		if (!JsonSkinObject->TryGetArrayField("joints", JsonJoints))
+		{
+			AddError("LoadNodeSkeletalAnimation()", "No joints defined in the skin");
+			return SkeletalAnimationsMap;
+		}
+
+		for (TSharedPtr<FJsonValue> JsonJoint : (*JsonJoints))
+		{
+			int64 JointIndex;
+			if (!JsonJoint->TryGetNumber(JointIndex))
+			{
+				return SkeletalAnimationsMap;
+			}
+			Joints.Add(JointIndex);
+		}
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
+	if (!Root->TryGetArrayField("animations", JsonAnimations))
+	{
+		return SkeletalAnimationsMap;
+	}
+
+	for (int32 JsonAnimationIndex = 0; JsonAnimationIndex < JsonAnimations->Num(); JsonAnimationIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[JsonAnimationIndex]->AsObject();
+		if (!JsonAnimationObject)
+		{
+			continue;
+		}
+
+		FString AnimationName;
+		if (!JsonAnimationObject->TryGetStringField("name", AnimationName))
+		{
+			AnimationName = FString::Printf(TEXT("Animation_%d"), JsonAnimationIndex);
+		}
+
+		float Duration;
+		TMap<FString, FRawAnimSequenceTrack> Tracks;
+		TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
+		bool bAnimationFound = false;
+		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
+			{
+				if (!bAnimationFound)
+				{
+					bAnimationFound = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
+				}
+				return true;
+			}))
+		{
+			continue;
+		}
+
+		if (bAnimationFound || MorphTargetCurves.Num() > 0)
+		{
+			// this is very inefficient as we parse the tracks twice
+			// TODO: refactor it
+			UAnimSequence* NewAnimation = LoadSkeletalAnimation(SkeletalMesh, JsonAnimationIndex, SkeletalAnimationConfig);
+			if (NewAnimation)
+			{
+				UAnimSequence*& AnimationSlot = SkeletalAnimationsMap.FindOrAdd(AnimationName);
+				AnimationSlot = NewAnimation;
+			}
+		}
+	}
+
+	return SkeletalAnimationsMap;
+}
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
@@ -2808,15 +2913,92 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 		RetargetRefSkeleton = SkeletalAnimationConfig.RetargetTo ? SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton() : SkeletalAnimationConfig.RetargetToSkeletalMesh->RefSkeleton;
 #endif
 		const TArray<FTransform>& BonesTransforms = RetargetRefSkeleton.GetRefBonePose();
+
+#if ENGINE_MAJOR_VERSION >= 5
+		TArray<FTransform> PoseTransforms;
+		TArray<FTransform> PoseDeltaWorldTransforms;
+		TArray<FPoseAssetInfluences> PoseAssetInfluences;
+		if (SkeletalAnimationConfig.PoseForRetargeting)
+		{
+			FStructProperty* Property = CastField<FStructProperty>(UPoseAsset::StaticClass()->FindPropertyByName("PoseContainer"));
+			FPoseDataContainer* PoseDataContainer = Property->ContainerPtrToValuePtr<FPoseDataContainer>(SkeletalAnimationConfig.PoseForRetargeting);
+			FArrayProperty* Poses = CastField<FArrayProperty>(FPoseDataContainer::StaticStruct()->FindPropertyByName("Poses"));
+			{
+				FScriptArrayHelper_InContainer ArrayHelper(Poses, PoseDataContainer);
+				FPoseData* PoseData = Poses->Inner->ContainerPtrToValuePtr<FPoseData>(ArrayHelper.GetRawPtr(0));
+				PoseTransforms = PoseData->LocalSpacePose;
+			}
+			FArrayProperty* TrackPoseInfluenceIndices = CastField<FArrayProperty>(FPoseDataContainer::StaticStruct()->FindPropertyByName("TrackPoseInfluenceIndices"));
+			{
+				FScriptArrayHelper_InContainer ArrayHelper(TrackPoseInfluenceIndices, PoseDataContainer);
+				for (int32 TrackIndex = 0; TrackIndex < ArrayHelper.Num(); TrackIndex++)
+				{
+					FPoseAssetInfluences* PoseAssetMapping = TrackPoseInfluenceIndices->Inner->ContainerPtrToValuePtr<FPoseAssetInfluences>(ArrayHelper.GetRawPtr(TrackIndex));
+					PoseAssetInfluences.Add(*PoseAssetMapping);
+				}
+			}
+			PoseDeltaWorldTransforms.AddDefaulted(BonesTransforms.Num());
+		}
+
+		auto GetPoseIndex = [&](const FName& BoneName) -> int32
+			{
+				const TArray<FPoseAssetInfluence>& Influences = PoseAssetInfluences[SkeletalAnimationConfig.PoseForRetargeting->GetTrackIndexByName(BoneName)].Influences;
+				if (Influences.Num() > 0 && Influences[0].PoseIndex == 0)
+				{
+					return Influences[0].BoneTransformIndex;
+				}
+				return INDEX_NONE;
+			};
+#endif
+
 		for (int32 BoneIndex = 0; BoneIndex < RetargetRefSkeleton.GetNum(); BoneIndex++)
 		{
 			RetargetWorldTransforms.Add(BonesTransforms[BoneIndex]);
+#if ENGINE_MAJOR_VERSION >= 5
+			int32 PoseIndex = INDEX_NONE;
+			if (SkeletalAnimationConfig.PoseForRetargeting)
+			{
+				const FName& BoneName = RetargetRefSkeleton.GetBoneName(BoneIndex);
+				PoseIndex = GetPoseIndex(BoneName);
+				if (PoseIndex > INDEX_NONE)
+				{
+					PoseDeltaWorldTransforms[BoneIndex] = PoseTransforms[PoseIndex];
+				}
+				else
+				{
+					PoseDeltaWorldTransforms[BoneIndex] = BonesTransforms[BoneIndex];
+				}
+			}
+#endif
 			int32 RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(BoneIndex);
 			while (RetargetParentIndex > INDEX_NONE)
 			{
 				RetargetWorldTransforms[BoneIndex] *= BonesTransforms[RetargetParentIndex];
+#if ENGINE_MAJOR_VERSION >= 5
+				if (SkeletalAnimationConfig.PoseForRetargeting)
+				{
+					const FName& ParentBoneName = RetargetRefSkeleton.GetBoneName(RetargetParentIndex);
+					const int32 ParentPoseIndex = GetPoseIndex(ParentBoneName);
+					if (ParentPoseIndex > INDEX_NONE)
+					{
+						PoseDeltaWorldTransforms[BoneIndex] *= PoseTransforms[ParentPoseIndex];
+					}
+					else
+					{
+						PoseDeltaWorldTransforms[BoneIndex] *= BonesTransforms[RetargetParentIndex];
+					}
+				}
+#endif
 				RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(RetargetParentIndex);
 			}
+
+#if ENGINE_MAJOR_VERSION >= 5
+			if (SkeletalAnimationConfig.PoseForRetargeting)
+			{
+				FTransform DeltaTransform = RetargetWorldTransforms[BoneIndex].GetRelativeTransformReverse(PoseDeltaWorldTransforms[BoneIndex]);
+				RetargetWorldTransforms[BoneIndex] *= DeltaTransform;
+			}
+#endif
 		}
 	}
 
@@ -2864,6 +3046,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
 			{
 				TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(Node.Index, TrackName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
+				// discard empty tracks
+				if (TrackName.IsEmpty())
+				{
+					return;
+				}
 			}
 
 			if (SkeletalAnimationConfig.RemoveTracks.Contains(TrackName))
@@ -2935,7 +3122,6 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 						if (RetargetBoneIndex > INDEX_NONE)
 						{
 							const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
-
 							if (AnimWorldTransforms.Num() > 0)
 							{
 								const int32 AnimBoneIndex = AnimRefSkeleton.FindBoneIndex(*Node.Name);
@@ -3524,6 +3710,8 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 
 const FBox& FglTFRuntimeSkeletalMeshContext::GetBoneBox(const int32 BoneIndex)
 {
+	// unfortunately we need access to SkinWeightVertexBuffer.GetBoneIndex (and it is not available in 4.25)
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 	if (PerBoneBoundingBoxCache.Contains(BoneIndex))
 	{
 		return PerBoneBoundingBoxCache[BoneIndex];
@@ -3560,4 +3748,10 @@ const FBox& FglTFRuntimeSkeletalMeshContext::GetBoneBox(const int32 BoneIndex)
 	}
 
 	return PerBoneBoundingBoxCache[BoneIndex];
+#else
+	// dummy logic
+	FBox& Box = PerBoneBoundingBoxCache.Add(BoneIndex);
+	Box.Init();
+	return PerBoneBoundingBoxCache[BoneIndex];
+#endif
 }

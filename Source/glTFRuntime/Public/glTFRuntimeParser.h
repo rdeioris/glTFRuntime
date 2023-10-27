@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "Animation/AnimEnums.h"
+#include "Animation/PoseAsset.h"
 #include "Animation/Skeleton.h"
 #include "Async/Async.h"
 #include "Dom/JsonValue.h"
@@ -792,6 +793,9 @@ struct FglTFRuntimeSkeletonConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, FTransform> NodeBonesDeltaTransformMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAddRootNodeIfMissing;
 	
 	FglTFRuntimeSkeletonConfig()
 	{
@@ -809,6 +813,7 @@ struct FglTFRuntimeSkeletonConfig
 		CachedNodeIndex = INDEX_NONE;
 		MaxNodesTreeDepth = -1;
 		bApplyUnmappedBonesTransforms = false;
+		bAddRootNodeIfMissing = false;
 	}
 };
 
@@ -1240,6 +1245,9 @@ struct FglTFRuntimeSkeletalAnimationConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	int32 RetargetSkinIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UPoseAsset* PoseForRetargeting;
 
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
@@ -1983,6 +1991,7 @@ public:
 	bool LoadNodeByName(const FString& NodeName, FglTFRuntimeNode& Node);
 	bool LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes);
 	bool LoadJointByName(const int64 RootBoneIndex, const FString& Name, FglTFRuntimeNode& Node);
+	int32 AddFakeRootNode(const FString& BaseName);
 
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene);
@@ -1992,6 +2001,7 @@ public:
 	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	UAnimSequence* LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+	TMap<FString, UAnimSequence*> LoadNodeSkeletalAnimationsMap(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 	USkeleton* LoadSkeletonFromNode(const FglTFRuntimeNode& Node, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
@@ -2047,6 +2057,7 @@ public:
 
 	int32 GetNumMeshes() const;
 	int32 GetNumImages() const;
+	int32 GetNumAnimations() const;
 
 	FglTFRuntimeError OnError;
 	FglTFRuntimeOnStaticMeshCreated OnStaticMeshCreated;
@@ -2105,12 +2116,16 @@ public:
 
 	UAnimSequence* CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem>& BonesPath, const TArray<FglTFRuntimePathItem>& MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
+	TArray<FString> GetAnimationsNames() const;
+
 	TArray<TSharedRef<FJsonObject>> GetMeshes() const;
 	TArray<TSharedRef<FJsonObject>> GetMeshPrimitives(TSharedRef<FJsonObject> Mesh) const;
 	TSharedPtr<FJsonObject> GetJsonObjectExtras(TSharedRef<FJsonObject> JsonObject) const;
 	TSharedPtr<FJsonObject> GetJsonObjectFromObject(TSharedRef<FJsonObject> JsonObject, const FString& Name) const;
 	TSharedPtr<FJsonObject> GetJsonObjectExtension(TSharedRef<FJsonObject> JsonObject, const FString& Name) const;
 	int64 GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject, const FString& Name) const;
+
+	TArray<TSharedRef<FJsonObject>> GetAnimations() const;
 
 	static FglTFRuntimeOnLoadedPrimitive OnPreLoadedPrimitive;
 	static FglTFRuntimeOnLoadedPrimitive OnLoadedPrimitive;
@@ -2195,6 +2210,8 @@ public:
 	bool GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject, int64& RootBoneIndex, TArray<int32>& Joints, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
 	void ClearCache();
+
+	void MergePrimitivesByMaterial(TArray<FglTFRuntimePrimitive>& Primitives);
 
 protected:
 	void LoadAndFillBaseMaterials();

@@ -247,3 +247,59 @@ TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArr
 
 	return Paths;
 }
+
+bool UglTFRuntimeFunctionLibrary::GetIndicesAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes)
+{
+	if (!RuntimeLOD.Primitives.IsValidIndex(PrimitiveIndex))
+	{
+		return false;
+	}
+
+	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+
+	Bytes.AddUninitialized(Primitive.Indices.Num() * sizeof(uint32));
+	FMemory::Memcpy(Bytes.GetData(), Primitive.Indices.GetData(), Primitive.Indices.Num() * sizeof(uint32));
+	return true;
+}
+
+bool UglTFRuntimeFunctionLibrary::GetPositionsAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes)
+{
+	if (!RuntimeLOD.Primitives.IsValidIndex(PrimitiveIndex))
+	{
+		return false;
+	}
+
+	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+	Bytes.AddUninitialized(Primitive.Positions.Num() * sizeof(float) * 3);
+	for (const FVector& Position : Primitive.Positions)
+	{
+		float X = static_cast<float>(Position.X);
+		float Y = static_cast<float>(Position.Y);
+		float Z = static_cast<float>(Position.Z);
+		Bytes.Append(reinterpret_cast<const uint8*>(&X), sizeof(float));
+		Bytes.Append(reinterpret_cast<const uint8*>(&Y), sizeof(float));
+		Bytes.Append(reinterpret_cast<const uint8*>(&Z), sizeof(float));
+	}
+	return true;
+}
+
+bool UglTFRuntimeFunctionLibrary::GetNormalsAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes)
+{
+	if (!RuntimeLOD.Primitives.IsValidIndex(PrimitiveIndex))
+	{
+		return false;
+	}
+
+	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+	Bytes.AddUninitialized(Primitive.Positions.Num() * sizeof(float) * 3);
+	for (const FVector& Normal : Primitive.Normals)
+	{
+		float X = static_cast<float>(Normal.X);
+		float Y = static_cast<float>(Normal.Y);
+		float Z = static_cast<float>(Normal.Z);
+		Bytes.Append(reinterpret_cast<const uint8*>(&X), sizeof(float));
+		Bytes.Append(reinterpret_cast<const uint8*>(&Y), sizeof(float));
+		Bytes.Append(reinterpret_cast<const uint8*>(&Z), sizeof(float));
+	}
+	return true;
+}
