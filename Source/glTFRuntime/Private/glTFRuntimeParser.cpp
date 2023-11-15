@@ -1014,12 +1014,49 @@ bool FglTFRuntimeParser::GetAllNodes(TArray<FglTFRuntimeNode>& Nodes)
 	if (!bAllNodesCached)
 	{
 		if (!LoadNodes())
+		{
 			return false;
+		}
 	}
 
 	Nodes = AllNodesCache;
 
 	return true;
+}
+
+int32 FglTFRuntimeParser::AddFakeRootNode(const FString& BaseName)
+{
+	TArray<int32> OrphanNodes;
+	TArray<FglTFRuntimeNode> AllNodes;
+
+	if (!GetAllNodes(AllNodes))
+	{
+		return INDEX_NONE;
+	}
+
+	for (int32 NodeIndex = 0; NodeIndex < AllNodes.Num(); NodeIndex++)
+	{
+		FglTFRuntimeNode Node;
+		if (!LoadNode(NodeIndex, Node))
+		{
+			return INDEX_NONE;
+		}
+
+		if (Node.ParentIndex <= INDEX_NONE)
+		{
+			OrphanNodes.Add(NodeIndex);
+			AllNodesCache[NodeIndex].ParentIndex = AllNodes.Num();
+		}
+	}
+
+	FglTFRuntimeNode NewNode;
+	NewNode.Name = BaseName;
+	NewNode.Index = AllNodes.Num();
+	NewNode.ChildrenIndices = OrphanNodes;
+
+	AllNodesCache.Add(NewNode);
+
+	return NewNode.Index;
 }
 
 bool FglTFRuntimeParser::LoadNode(const int32 Index, FglTFRuntimeNode& Node)
@@ -1586,18 +1623,27 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)
 {
 	if (Index == RootIndex)
+	{
 		return true;
+	}
 
 	FglTFRuntimeNode Node;
 	if (!LoadNode(Index, Node))
+	{
 		return false;
+	}
 
 	while (Node.ParentIndex != INDEX_NONE)
 	{
 		if (!LoadNode(Node.ParentIndex, Node))
+		{
 			return false;
+		}
+
 		if (Node.Index == RootIndex)
+		{
 			return true;
+		}
 	}
 
 	return false;
@@ -1622,11 +1668,13 @@ int32 FglTFRuntimeParser::FindCommonRoot(const TArray<int32>& Indices)
 	int32 CurrentRootIndex = Indices[0];
 	bool bTryNextParent = true;
 
-	while (bTryNextParent)
+	while (bTryNextParent && CurrentRootIndex > INDEX_NONE)
 	{
 		FglTFRuntimeNode Node;
 		if (!LoadNode(CurrentRootIndex, Node))
+		{
 			return INDEX_NONE;
+		}
 
 		bTryNextParent = false;
 		for (int32 Index : Indices)
@@ -2057,9 +2105,13 @@ bool FglTFRuntimeParser::GetRootBoneIndex(TSharedRef<FJsonObject> JsonSkinObject
 	else
 	{
 		RootBoneIndex = FindCommonRoot(Joints);
+		if (RootBoneIndex < 0 && SkeletonConfig.bAddRootNodeIfMissing)
+		{
+			RootBoneIndex = AddFakeRootNode(SkeletonConfig.RootBoneName.IsEmpty() ? "root" : SkeletonConfig.RootBoneName);
+		}
 	}
 
-	if (RootBoneIndex == INDEX_NONE)
+	if (RootBoneIndex <= INDEX_NONE)
 	{
 		AddError("GetRootBoneIndex()", "Unable to find root node.");
 		return false;
@@ -2080,7 +2132,6 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 
 	// fill the root bone
 	FglTFRuntimeNode RootNode;
-
 	if (!LoadNode(RootBoneIndex, RootNode))
 	{
 		AddError("FillReferenceSkeleton()", "Unable to load joint node.");
@@ -2501,44 +2552,48 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 
 	if (MaterialsConfig.bMergeSectionsByMaterial)
 	{
-		TMap<UMaterialInterface*, TArray<FglTFRuntimePrimitive>> PrimitivesMap;
-		for (FglTFRuntimePrimitive& Primitive : Primitives)
-		{
-			if (PrimitivesMap.Contains(Primitive.Material))
-			{
-				PrimitivesMap[Primitive.Material].Add(Primitive);
-			}
-			else
-			{
-				TArray<FglTFRuntimePrimitive> NewPrimitives;
-				NewPrimitives.Add(Primitive);
-				PrimitivesMap.Add(Primitive.Material, NewPrimitives);
-			}
-		}
-
-		TArray<FglTFRuntimePrimitive> MergedPrimitives;
-		for (TPair<UMaterialInterface*, TArray<FglTFRuntimePrimitive>>& Pair : PrimitivesMap)
-		{
-			FglTFRuntimePrimitive MergedPrimitive;
-			if (MergePrimitives(Pair.Value, MergedPrimitive))
-			{
-				MergedPrimitives.Add(MergedPrimitive);
-			}
-			else
-			{
-				// unable to merge, just leave as is
-				for (FglTFRuntimePrimitive& Primitive : Pair.Value)
-				{
-					MergedPrimitives.Add(Primitive);
-				}
-			}
-		}
-
-		Primitives = MergedPrimitives;
-
+		MergePrimitivesByMaterial(Primitives);
 	}
 
 	return true;
+}
+
+void FglTFRuntimeParser::MergePrimitivesByMaterial(TArray<FglTFRuntimePrimitive>& Primitives)
+{
+	TMap<UMaterialInterface*, TArray<FglTFRuntimePrimitive>> PrimitivesMap;
+	for (FglTFRuntimePrimitive& Primitive : Primitives)
+	{
+		if (PrimitivesMap.Contains(Primitive.Material))
+		{
+			PrimitivesMap[Primitive.Material].Add(Primitive);
+		}
+		else
+		{
+			TArray<FglTFRuntimePrimitive> NewPrimitives;
+			NewPrimitives.Add(Primitive);
+			PrimitivesMap.Add(Primitive.Material, NewPrimitives);
+		}
+	}
+
+	TArray<FglTFRuntimePrimitive> MergedPrimitives;
+	for (TPair<UMaterialInterface*, TArray<FglTFRuntimePrimitive>>& Pair : PrimitivesMap)
+	{
+		FglTFRuntimePrimitive MergedPrimitive;
+		if (MergePrimitives(Pair.Value, MergedPrimitive))
+		{
+			MergedPrimitives.Add(MergedPrimitive);
+		}
+		else
+		{
+			// unable to merge, just leave as is
+			for (FglTFRuntimePrimitive& Primitive : Pair.Value)
+			{
+				MergedPrimitives.Add(Primitive);
+			}
+		}
+	}
+
+	Primitives = MergedPrimitives;
 }
 
 FVector FglTFRuntimeParser::TransformVector(FVector Vector) const
@@ -3535,10 +3590,12 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(SkeletonsCache);
 	Collector.AddReferencedObjects(SkeletalMeshesCache);
 	Collector.AddReferencedObjects(TexturesCache);
+	Collector.AddReferencedObjects(MaterialsNameCache);
 	Collector.AddReferencedObjects(MetallicRoughnessMaterialsMap);
 	Collector.AddReferencedObjects(SpecularGlossinessMaterialsMap);
 	Collector.AddReferencedObjects(UnlitMaterialsMap);
 	Collector.AddReferencedObjects(TransmissionMaterialsMap);
+	Collector.AddReferencedObjects(ClearCoatMaterialsMap);
 }
 
 void FglTFRuntimeParser::ClearCache()
@@ -3548,10 +3605,12 @@ void FglTFRuntimeParser::ClearCache()
 	SkeletonsCache.Empty();
 	SkeletalMeshesCache.Empty();
 	TexturesCache.Empty();
+	MaterialsNameCache.Empty();
 	MetallicRoughnessMaterialsMap.Empty();
 	SpecularGlossinessMaterialsMap.Empty();
 	UnlitMaterialsMap.Empty();
 	TransmissionMaterialsMap.Empty();
+	ClearCoatMaterialsMap.Empty();
 }
 
 float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)

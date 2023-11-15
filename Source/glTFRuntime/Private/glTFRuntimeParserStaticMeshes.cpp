@@ -477,7 +477,13 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 		LODResources.VertexBuffers.PositionVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
 		LODResources.VertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bHighPrecisionUVs || StaticMeshConfig.bUseHighPrecisionUVs);
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 3
+		LODResources.VertexBuffers.StaticMeshVertexBuffer.Init(0, NumUVs, StaticMesh->bAllowCPUAccess);
+		LODResources.VertexBuffers.StaticMeshVertexBuffer.AppendVertices(StaticMeshBuildVertices.GetData(), StaticMeshBuildVertices.Num());
+#else
 		LODResources.VertexBuffers.StaticMeshVertexBuffer.Init(StaticMeshBuildVertices, NumUVs, StaticMesh->bAllowCPUAccess);
+#endif
+
 		if (bHasVertexColors)
 		{
 			LODResources.VertexBuffers.ColorVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
