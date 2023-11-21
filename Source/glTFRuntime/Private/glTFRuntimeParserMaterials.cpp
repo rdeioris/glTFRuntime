@@ -976,7 +976,7 @@ bool FglTFRuntimeParser::LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJs
 				{
 					TArray64<FColor> ResizedMipData;
 					ResizedMipData.AddUninitialized(MipWidth * MipHeight);
-					FImageUtils::ImageResize(Width, Height, UncompressedColors, MipWidth, MipHeight, ResizedMipData, sRGB);
+					FImageUtils::ImageResize(Width, Height, UncompressedColors, MipWidth, MipHeight, ResizedMipData, sRGB, false);
 					for (FColor& Color : ResizedMipData)
 					{
 						MipMap.Pixels.Add(Color.B);
