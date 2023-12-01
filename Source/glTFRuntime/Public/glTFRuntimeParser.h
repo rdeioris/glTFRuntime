@@ -2320,6 +2320,7 @@ protected:
 	TArray<FString> Errors;
 
 	FString BaseDirectory;
+	FString BaseFilename;
 
 	TArray64<uint8> AsBlob;
 
@@ -2602,6 +2603,7 @@ public:
 	TMap<FString, TSharedPtr<FglTFRuntimePluginCacheData>> PluginsCacheData;
 
 	const FString& GetBaseDirectory() const { return BaseDirectory; }
+	const FString& GetBaseFilename() const { return BaseFilename; }
 
 	bool LoadPathToBlob(const FString& Path, TArray64<uint8>& Blob);
 

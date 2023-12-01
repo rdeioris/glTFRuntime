@@ -90,6 +90,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 		Parser->BaseDirectory = FPaths::GetPath(TruePath);
 	}
 
+	Parser->BaseFilename = FPaths::GetBaseFilename(TruePath);
+
 	return Parser;
 }
 
