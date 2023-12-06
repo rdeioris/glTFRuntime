@@ -388,6 +388,95 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	return Texture;
 }
 
+UVolumeTexture* FglTFRuntimeParser::BuildVolumeTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const int32 TileX, const int32 TileY, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler)
+{
+	if (Mips.Num() == 0)
+	{
+		return nullptr;
+	}
+
+	UVolumeTexture* Texture = NewObject<UVolumeTexture>(Outer, NAME_None, RF_Public);
+	FTexturePlatformData* PlatformData = new FTexturePlatformData();
+	PlatformData->SizeX = Mips[0].Width;
+	PlatformData->SizeY = Mips[0].Height;
+	PlatformData->PixelFormat = Mips[0].PixelFormat;
+
+#if ENGINE_MAJOR_VERSION > 4
+	Texture->SetPlatformData(PlatformData);
+#else
+	Texture->PlatformData = PlatformData;
+#endif
+
+	Texture->LODBias = (ImagesConfig.LODBias >= 0 && ImagesConfig.LODBias < (Mips.Num() - 1)) ? ImagesConfig.LODBias : 0;
+	Texture->NeverStream = !ImagesConfig.bStreaming;
+
+	if (ImagesConfig.bStreaming)
+	{
+		Texture->AddAssetUserData(NewObject<UglTFRuntimeTextureMipDataProviderFactory>());
+	}
+
+	for (const FglTFRuntimeMipMap& MipMap : Mips)
+	{
+		FTexture2DMipMap* Mip = new FTexture2DMipMap();
+		PlatformData->Mips.Add(Mip);
+		Mip->SizeX = MipMap.Width;
+		Mip->SizeY = MipMap.Height;
+
+#if !WITH_EDITOR
+#if !NO_LOGGING
+		ELogVerbosity::Type CurrentLogSerializationVerbosity = LogSerialization.GetVerbosity();
+		bool bResetLogVerbosity = false;
+		if (CurrentLogSerializationVerbosity >= ELogVerbosity::Warning)
+		{
+			LogSerialization.SetVerbosity(ELogVerbosity::Error);
+			bResetLogVerbosity = true;
+		}
+#endif
+#endif
+
+#if !WITH_EDITOR
+		// this is a hack for allowing texture streaming without messing around with deriveddata
+		Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeperateFile);
+#endif
+		Mip->BulkData.Lock(LOCK_READ_WRITE);
+
+#if !WITH_EDITOR
+#if !NO_LOGGING
+		if (bResetLogVerbosity)
+		{
+			LogSerialization.SetVerbosity(CurrentLogSerializationVerbosity);
+		}
+#endif
+#endif
+		void* Data = Mip->BulkData.Realloc(MipMap.Pixels.Num());
+		FMemory::Memcpy(Data, MipMap.Pixels.GetData(), MipMap.Pixels.Num());
+		Mip->BulkData.Unlock();
+	}
+
+
+	Texture->CompressionSettings = ImagesConfig.Compression;
+	Texture->LODGroup = ImagesConfig.Group;
+	Texture->SRGB = ImagesConfig.bSRGB;
+
+	if (Sampler.MinFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MinFilter;
+	}
+
+	if (Sampler.MagFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MagFilter;
+	}
+
+	Texture->Source2DTileSizeX = TileX;
+	Texture->Source2DTileSizeY = TileY;
+
+	Texture->UpdateResource();
+
+	return Texture;
+}
+
+
 UMaterialInterface* FglTFRuntimeParser::BuildVertexColorOnlyMaterial(const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	UMaterialInterface* BaseMaterial = MetallicRoughnessMaterialsMap[EglTFRuntimeMaterialType::TwoSided];
