@@ -2106,7 +2106,7 @@ public:
 	UTexture2D* BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 	UTextureCube* BuildTextureCube(UObject* Outer, const TArray<FglTFRuntimeMipMap>& MipsXP, const TArray<FglTFRuntimeMipMap>& MipsXN, const TArray<FglTFRuntimeMipMap>& MipsYP, const TArray<FglTFRuntimeMipMap>& MipsYN, const TArray<FglTFRuntimeMipMap>& MipsZP, const TArray<FglTFRuntimeMipMap>& MipsZN, const bool bAutoRotate, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 	UTexture2DArray* BuildTextureArray(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips,const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
-	UVolumeTexture* BuildVolumeTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const int32 TileX, const int32 TileY, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
+	UVolumeTexture* BuildVolumeTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const int32 TileZ, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler);
 
 
 	TArray<FString> MaterialsVariants;
