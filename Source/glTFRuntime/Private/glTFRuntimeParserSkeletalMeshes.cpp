@@ -3642,11 +3642,11 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 		return nullptr;
 	}
 
-	if (RuntimeLODs[0].Primitives[0].OverrideBoneMap.Num() < 1)
+	/*if (RuntimeLODs[0].Primitives[0].OverrideBoneMap.Num() < 1)
 	{
 		AddError("LoadSkeletalMeshFromRuntimeLODs()", "Empty Primitive OverrideBoneMap");
 		return nullptr;
-	}
+	}*/
 
 	const TMap<int32, FName>& BaseBoneMap = RuntimeLODs[0].Primitives[0].OverrideBoneMap;
 
@@ -3677,11 +3677,11 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 
 		for (const FglTFRuntimePrimitive& Primitive : RuntimeLODs[LODIndex].Primitives)
 		{
-			if (Primitive.OverrideBoneMap.Num() < 1)
+			/*if (Primitive.OverrideBoneMap.Num() < 1)
 			{
 				AddError("LoadSkeletalMeshFromRuntimeLODs()", "Empty Primitive OverrideBoneMap");
 				return nullptr;
-			}
+			}*/
 
 			FglTFRuntimePrimitive& NonConstPrimitive = const_cast<FglTFRuntimePrimitive&>(Primitive);
 
@@ -3700,7 +3700,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 
 	if (!CreateSkeletalMeshFromLODs(SkeletalMeshContext))
 	{
-		AddError("LoadSkeletalMesh()", "Unable to load SkeletalMesh.");
+		AddError("LoadSkeletalMeshFromRuntimeLODs()", "Unable to load SkeletalMesh.");
 		return nullptr;
 	}
 
