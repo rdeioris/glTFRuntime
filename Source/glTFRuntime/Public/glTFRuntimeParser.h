@@ -1543,6 +1543,11 @@ struct FglTFRuntimeMeshLOD
 		bHasUV = false;
 		bHasVertexColors = false;
 	}
+
+	void Empty()
+	{
+		Primitives.Empty();
+	}
 };
 
 struct FglTFRuntimeStaticMeshContext : public FGCObject
