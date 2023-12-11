@@ -3,13 +3,14 @@
 #include "glTFRuntimeParser.h"
 #include "glTFDataAsset.h"
 #include "glTFRuntime.h"
-#include "Misc/FileHelper.h"
-#include "Serialization/JsonSerializer.h"
+#include "MaterialDomain.h"
 #include "Animation/Skeleton.h"
+#include "Interfaces/IPluginManager.h"
 #include "Materials/Material.h"
 #include "Misc/Base64.h"
 #include "Misc/Compression.h"
-#include "Interfaces/IPluginManager.h"
+#include "Misc/FileHelper.h"
+#include "Serialization/JsonSerializer.h"
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 

@@ -22,6 +22,7 @@
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
 #include "Animation/AnimCurveTypes.h"
+#include "Engine/SkinnedAssetCommon.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
 #include "UObject/SavePackage.h"
