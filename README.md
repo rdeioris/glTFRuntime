@@ -20,3 +20,19 @@ To support our development, you can [buy glTFRuntime](https://www.unrealengine.c
 - [Assign existing animations to a GLTF SkeletalMesh](https://github.com/rdeioris/glTFRuntime-docs/blob/master/Tutorials/SkeletonRemapping.md) 
 - [Runtime animation retargeting](https://github.com/rdeioris/glTFRuntime-docs/blob/master/Tutorials/RetargetingRPMAndMixamo.md)
 
+### Plugins
+
+glTFRuntime can be extended with support for more file formats.
+
+This is an incomplete list of available plugins:
+
+* https://github.com/rdeioris/glTFRuntimeSTL (STL files support)
+* https://github.com/rdeioris/glTFRuntimeOBJ (OBJ files support)
+* https://github.com/rdeioris/glTFRuntimeVox (MagicaVoxel/Vox files support)
+* https://github.com/rdeioris/glTFRuntimeWebP (WebP textures support)
+* https://github.com/rdeioris/glTFRuntimePointCloud (PointCloud support for glTF, XYZ, PCD)
+* https://github.com/rdeioris/glTFRuntimeKTX2 (KTX2 textures support)
+* https://github.com/rdeioris/glTFRuntimeSTBImage (STB supported images, included HDR) 
+* https://github.com/rdeioris/glTFRuntimeConvexCollisions (Support for convex collisions)
+* https://github.com/rdeioris/glTFRuntimeDraco (Draco compression support)
+* https://github.com/rdeioris/glTFRuntimeAudio (Audio file formats support, WAV, Ogg/Opus, Ogg/Vorbis, Mp3)
