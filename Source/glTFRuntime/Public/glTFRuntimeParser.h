@@ -2610,6 +2610,7 @@ public:
 	}
 
 	TMap<FString, TSharedPtr<FglTFRuntimePluginCacheData>> PluginsCacheData;
+	FCriticalSection PluginsCacheDataLock;
 
 	const FString& GetBaseDirectory() const { return BaseDirectory; }
 	const FString& GetBaseFilename() const { return BaseFilename; }
