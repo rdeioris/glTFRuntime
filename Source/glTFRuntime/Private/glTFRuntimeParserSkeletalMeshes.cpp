@@ -1044,13 +1044,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 
 #if WITH_EDITOR
-	SkeletalMeshContext->SkeletalMesh->SetLODSettings(NewObject<USkeletalMeshLODSettings>());
-
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
-	SkeletalMeshContext->SkeletalMesh->GetLODSettings()->SetLODSettingsFromMesh(SkeletalMeshContext->SkeletalMesh);
-#else
-	SkeletalMeshContext->SkeletalMesh->LODSettings->SetLODSettingsFromMesh(SkeletalMeshContext->SkeletalMesh);
-#endif
+	USkeletalMeshLODSettings* LODSettings = NewObject<USkeletalMeshLODSettings>();
+	LODSettings->SetLODSettingsFromMesh(SkeletalMeshContext->SkeletalMesh);
+	SkeletalMeshContext->SkeletalMesh->SetLODSettings(LODSettings);
 
 	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
 	{
