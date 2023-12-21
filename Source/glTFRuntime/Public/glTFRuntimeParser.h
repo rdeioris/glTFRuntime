@@ -1547,6 +1547,8 @@ struct FglTFRuntimeMeshLOD
 	void Empty()
 	{
 		Primitives.Empty();
+		AdditionalTransforms.Empty();
+		Skeleton.Empty();
 	}
 };
 
@@ -2012,6 +2014,8 @@ public:
 	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 	USkeleton* LoadSkeletonFromNode(const FglTFRuntimeNode& Node, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
+	UAnimSequence* LoadSkeletalAnimationFromTracksAndMorphTargets(USkeletalMesh* SkeletalMesh, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
 	void LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	void LoadStaticMeshAsync(const int32 MeshIndex, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
@@ -2335,9 +2339,10 @@ protected:
 
 public:
 
-	FVector TransformVector(FVector Vector) const;
-	FVector TransformPosition(FVector Position) const;
-	FVector4 TransformVector4(FVector4 Vector) const;
+	FVector TransformVector(const FVector Vector) const;
+	FVector TransformPosition(const FVector Position) const;
+	FVector4 TransformVector4(const FVector4 Vector) const;
+	FTransform TransformTransform(const FTransform& Transform) const;
 
 	const TArray64<uint8>& GetBlob() const { return AsBlob; }
 	TArray64<uint8>& GetBlob() { return AsBlob; }

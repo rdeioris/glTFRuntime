@@ -2598,19 +2598,27 @@ void FglTFRuntimeParser::MergePrimitivesByMaterial(TArray<FglTFRuntimePrimitive>
 	Primitives = MergedPrimitives;
 }
 
-FVector FglTFRuntimeParser::TransformVector(FVector Vector) const
+FVector FglTFRuntimeParser::TransformVector(const FVector Vector) const
 {
 	return SceneBasis.TransformVector(Vector);
 }
 
-FVector FglTFRuntimeParser::TransformPosition(FVector Position) const
+FVector FglTFRuntimeParser::TransformPosition(const FVector Position) const
 {
 	return SceneBasis.TransformPosition(Position) * SceneScale;
 }
 
-FVector4 FglTFRuntimeParser::TransformVector4(FVector4 Vector) const
+FVector4 FglTFRuntimeParser::TransformVector4(const FVector4 Vector) const
 {
 	return SceneBasis.TransformFVector4(Vector);
+}
+
+FTransform FglTFRuntimeParser::TransformTransform(const FTransform& Transform) const
+{
+	FTransform NewTransform = FTransform(SceneBasis.Inverse() * Transform.ToMatrixWithScale() * SceneBasis);
+	NewTransform.ScaleTranslation(SceneScale);
+
+	return NewTransform;
 }
 
 bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
