@@ -217,69 +217,79 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			LODIndices.AddUninitialized(NumVertexInstancesPerSection);
 
 			// Geometry generation
-			for (int32 VertexInstanceSectionIndex = 0; VertexInstanceSectionIndex < NumVertexInstancesPerSection; VertexInstanceSectionIndex++)
+			ParallelFor(NumVertexInstancesPerSection, [&](const int32 VertexInstanceSectionIndex)
+				{
+					uint32 VertexIndex = Primitive.Indices[VertexInstanceSectionIndex];
+					LODIndices[VertexInstanceBaseIndex + VertexInstanceSectionIndex] = VertexInstanceBaseIndex + VertexInstanceSectionIndex;
+
+					FStaticMeshBuildVertex& StaticMeshVertex = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
+
+#if ENGINE_MAJOR_VERSION > 4
+					StaticMeshVertex.Position = FVector3f(GetSafeValue(Primitive.Positions, VertexIndex, FVector::ZeroVector, bMissingIgnore));
+#else
+					StaticMeshVertex.Position = GetSafeValue(Primitive.Positions, VertexIndex, FVector::ZeroVector, bMissingIgnore);
+#endif
+
+					FVector4 TangentX = GetSafeValue(Primitive.Tangents, VertexIndex, FVector4(0, 0, 0, 1), bMissingTangents);
+#if ENGINE_MAJOR_VERSION > 4
+					StaticMeshVertex.TangentX = FVector4f(TangentX);
+					StaticMeshVertex.TangentZ = FVector3f(GetSafeValue(Primitive.Normals, VertexIndex, FVector::ZeroVector, bMissingNormals));
+					StaticMeshVertex.TangentY = FVector3f(ComputeTangentYWithW(FVector(StaticMeshVertex.TangentZ), FVector(StaticMeshVertex.TangentX), TangentX.W * TangentsDirection));
+#else
+					StaticMeshVertex.TangentX = TangentX;
+					StaticMeshVertex.TangentZ = GetSafeValue(Primitive.Normals, VertexIndex, FVector::ZeroVector, bMissingNormals);
+					StaticMeshVertex.TangentY = ComputeTangentYWithW(StaticMeshVertex.TangentZ, StaticMeshVertex.TangentX, TangentX.W * TangentsDirection);
+#endif
+
+					for (int32 UVIndex = 0; UVIndex < NumUVs; UVIndex++)
+					{
+						if (UVIndex < Primitive.UVs.Num())
+						{
+#if ENGINE_MAJOR_VERSION > 4
+							StaticMeshVertex.UVs[UVIndex] = FVector2f(GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore));
+#else
+							StaticMeshVertex.UVs[UVIndex] = GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore);
+#endif
+						}
+					}
+
+					if (bHasVertexColors)
+					{
+						if (VertexIndex < static_cast<uint32>(Primitive.Colors.Num()))
+						{
+							StaticMeshVertex.Color = FLinearColor(Primitive.Colors[VertexIndex]).ToFColor(true);
+						}
+						else
+						{
+							StaticMeshVertex.Color = FColor::White;
+						}
+					}
+
+					if (bApplyAdditionalTransforms)
+					{
+#if ENGINE_MAJOR_VERSION > 4
+						StaticMeshVertex.Position = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformPosition(FVector3d(StaticMeshVertex.Position)));
+						StaticMeshVertex.TangentX = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentX)));
+						StaticMeshVertex.TangentY = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentY)));
+						StaticMeshVertex.TangentZ = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentZ)));
+#else
+						StaticMeshVertex.Position = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformPosition(StaticMeshVertex.Position);
+						StaticMeshVertex.TangentX = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentX);
+						StaticMeshVertex.TangentY = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentY);
+						StaticMeshVertex.TangentZ = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentZ);
+#endif
+					}
+
+#if ENGINE_MAJOR_VERSION > 4
+					BoundingBox += FVector(StaticMeshVertex.Position);
+#else
+					BoundingBox += StaticMeshVertex.Position;
+#endif
+				});
+
+			// this is way more fast than doing it in the ParalellFor with a lock
+			for (const FStaticMeshBuildVertex& StaticMeshVertex : StaticMeshBuildVertices)
 			{
-				uint32 VertexIndex = Primitive.Indices[VertexInstanceSectionIndex];
-				LODIndices[VertexInstanceBaseIndex + VertexInstanceSectionIndex] = VertexInstanceBaseIndex + VertexInstanceSectionIndex;
-
-				FStaticMeshBuildVertex& StaticMeshVertex = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
-
-#if ENGINE_MAJOR_VERSION > 4
-				StaticMeshVertex.Position = FVector3f(GetSafeValue(Primitive.Positions, VertexIndex, FVector::ZeroVector, bMissingIgnore));
-#else
-				StaticMeshVertex.Position = GetSafeValue(Primitive.Positions, VertexIndex, FVector::ZeroVector, bMissingIgnore);
-#endif
-
-				FVector4 TangentX = GetSafeValue(Primitive.Tangents, VertexIndex, FVector4(0, 0, 0, 1), bMissingTangents);
-#if ENGINE_MAJOR_VERSION > 4
-				StaticMeshVertex.TangentX = FVector4f(TangentX);
-				StaticMeshVertex.TangentZ = FVector3f(GetSafeValue(Primitive.Normals, VertexIndex, FVector::ZeroVector, bMissingNormals));
-				StaticMeshVertex.TangentY = FVector3f(ComputeTangentYWithW(FVector(StaticMeshVertex.TangentZ), FVector(StaticMeshVertex.TangentX), TangentX.W * TangentsDirection));
-#else
-				StaticMeshVertex.TangentX = TangentX;
-				StaticMeshVertex.TangentZ = GetSafeValue(Primitive.Normals, VertexIndex, FVector::ZeroVector, bMissingNormals);
-				StaticMeshVertex.TangentY = ComputeTangentYWithW(StaticMeshVertex.TangentZ, StaticMeshVertex.TangentX, TangentX.W * TangentsDirection);
-#endif
-
-				for (int32 UVIndex = 0; UVIndex < NumUVs; UVIndex++)
-				{
-					if (UVIndex < Primitive.UVs.Num())
-					{
-#if ENGINE_MAJOR_VERSION > 4
-						StaticMeshVertex.UVs[UVIndex] = FVector2f(GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore));
-#else
-						StaticMeshVertex.UVs[UVIndex] = GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore);
-#endif
-					}
-				}
-
-				if (bHasVertexColors)
-				{
-					if (VertexIndex < static_cast<uint32>(Primitive.Colors.Num()))
-					{
-						StaticMeshVertex.Color = FLinearColor(Primitive.Colors[VertexIndex]).ToFColor(true);
-					}
-					else
-					{
-						StaticMeshVertex.Color = FColor::White;
-					}
-				}
-
-				if (bApplyAdditionalTransforms)
-				{
-#if ENGINE_MAJOR_VERSION > 4
-					StaticMeshVertex.Position = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformPosition(FVector3d(StaticMeshVertex.Position)));
-					StaticMeshVertex.TangentX = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentX)));
-					StaticMeshVertex.TangentY = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentY)));
-					StaticMeshVertex.TangentZ = FVector3f(LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(FVector3d(StaticMeshVertex.TangentZ)));
-#else
-					StaticMeshVertex.Position = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformPosition(StaticMeshVertex.Position);
-					StaticMeshVertex.TangentX = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentX);
-					StaticMeshVertex.TangentY = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentY);
-					StaticMeshVertex.TangentZ = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentZ);
-#endif
-				}
-
 #if ENGINE_MAJOR_VERSION > 4
 				BoundingBox += FVector(StaticMeshVertex.Position);
 #else
@@ -306,32 +316,31 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				StaticMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Always;
 			if (bCanGenerateNormals && (NumVertexInstancesPerSection % 3) == 0)
 			{
-				for (int32 VertexInstanceSectionIndex = 0; VertexInstanceSectionIndex < NumVertexInstancesPerSection; VertexInstanceSectionIndex += 3)
-				{
-					FStaticMeshBuildVertex& StaticMeshVertex0 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
-					FStaticMeshBuildVertex& StaticMeshVertex1 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 1];
-					FStaticMeshBuildVertex& StaticMeshVertex2 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 2];
+				ParallelFor(NumVertexInstancesPerSection / 3, [&](const int32 VertexInstanceSectionTriangleIndex)
+					{
+						const int32 VertexInstanceSectionIndex = VertexInstanceSectionTriangleIndex * 3;
+						FStaticMeshBuildVertex& StaticMeshVertex0 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
+						FStaticMeshBuildVertex& StaticMeshVertex1 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 1];
+						FStaticMeshBuildVertex& StaticMeshVertex2 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 2];
 
 #if ENGINE_MAJOR_VERSION > 4
-					FVector SideA = FVector(StaticMeshVertex1.Position - StaticMeshVertex0.Position);
-					FVector SideB = FVector(StaticMeshVertex2.Position - StaticMeshVertex0.Position);
-					FVector NormalFromCross = FVector::CrossProduct(SideB, SideA).GetSafeNormal();
+						FVector SideA = FVector(StaticMeshVertex1.Position - StaticMeshVertex0.Position);
+						FVector SideB = FVector(StaticMeshVertex2.Position - StaticMeshVertex0.Position);
+						FVector NormalFromCross = FVector::CrossProduct(SideB, SideA).GetSafeNormal();
 
-					StaticMeshVertex0.TangentZ = FVector3f(NormalFromCross);
-					StaticMeshVertex1.TangentZ = FVector3f(NormalFromCross);
-					StaticMeshVertex2.TangentZ = FVector3f(NormalFromCross);
+						StaticMeshVertex0.TangentZ = FVector3f(NormalFromCross);
+						StaticMeshVertex1.TangentZ = FVector3f(NormalFromCross);
+						StaticMeshVertex2.TangentZ = FVector3f(NormalFromCross);
 #else
-					FVector SideA = StaticMeshVertex1.Position - StaticMeshVertex0.Position;
-					FVector SideB = StaticMeshVertex2.Position - StaticMeshVertex0.Position;
-					FVector NormalFromCross = FVector::CrossProduct(SideB, SideA).GetSafeNormal();
+						FVector SideA = StaticMeshVertex1.Position - StaticMeshVertex0.Position;
+						FVector SideB = StaticMeshVertex2.Position - StaticMeshVertex0.Position;
+						FVector NormalFromCross = FVector::CrossProduct(SideB, SideA).GetSafeNormal();
 
-					StaticMeshVertex0.TangentZ = NormalFromCross;
-					StaticMeshVertex1.TangentZ = NormalFromCross;
-					StaticMeshVertex2.TangentZ = NormalFromCross;
+						StaticMeshVertex0.TangentZ = NormalFromCross;
+						StaticMeshVertex1.TangentZ = NormalFromCross;
+						StaticMeshVertex2.TangentZ = NormalFromCross;
 #endif
-
-
-				}
+					});
 				bMissingNormals = false;
 			}
 
@@ -340,89 +349,90 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			// recompute tangents if required (need normals and uvs)
 			if (bCanGenerateTangents && !bMissingNormals && Primitive.UVs.Num() > 0 && (NumVertexInstancesPerSection % 3) == 0)
 			{
-				for (int32 VertexInstanceSectionIndex = 0; VertexInstanceSectionIndex < NumVertexInstancesPerSection; VertexInstanceSectionIndex += 3)
-				{
-					FStaticMeshBuildVertex& StaticMeshVertex0 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
-					FStaticMeshBuildVertex& StaticMeshVertex1 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 1];
-					FStaticMeshBuildVertex& StaticMeshVertex2 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 2];
+				ParallelFor(NumVertexInstancesPerSection / 3, [&](const int32 VertexInstanceSectionTriangleIndex)
+					{
+						const int32 VertexInstanceSectionIndex = VertexInstanceSectionTriangleIndex * 3;
+						FStaticMeshBuildVertex& StaticMeshVertex0 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
+						FStaticMeshBuildVertex& StaticMeshVertex1 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 1];
+						FStaticMeshBuildVertex& StaticMeshVertex2 = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex + 2];
 
 
 #if ENGINE_MAJOR_VERSION > 4
-					FVector Position0 = FVector(StaticMeshVertex0.Position);
-					FVector4 TangentZ0 = FVector(StaticMeshVertex0.TangentZ);
-					FVector2D UV0 = FVector2D(StaticMeshVertex0.UVs[0]);
+						FVector Position0 = FVector(StaticMeshVertex0.Position);
+						FVector4 TangentZ0 = FVector(StaticMeshVertex0.TangentZ);
+						FVector2D UV0 = FVector2D(StaticMeshVertex0.UVs[0]);
 #else
-					FVector Position0 = StaticMeshVertex0.Position;
-					FVector4 TangentZ0 = StaticMeshVertex0.TangentZ;
-					FVector2D UV0 = StaticMeshVertex0.UVs[0];
+						FVector Position0 = StaticMeshVertex0.Position;
+						FVector4 TangentZ0 = StaticMeshVertex0.TangentZ;
+						FVector2D UV0 = StaticMeshVertex0.UVs[0];
 #endif
 
 
 
 #if ENGINE_MAJOR_VERSION > 4
-					FVector Position1 = FVector(StaticMeshVertex1.Position);
-					FVector4 TangentZ1 = FVector(StaticMeshVertex1.TangentZ);
-					FVector2D UV1 = FVector2D(StaticMeshVertex1.UVs[0]);
+						FVector Position1 = FVector(StaticMeshVertex1.Position);
+						FVector4 TangentZ1 = FVector(StaticMeshVertex1.TangentZ);
+						FVector2D UV1 = FVector2D(StaticMeshVertex1.UVs[0]);
 #else
-					FVector Position1 = StaticMeshVertex1.Position;
-					FVector4 TangentZ1 = StaticMeshVertex1.TangentZ;
-					FVector2D UV1 = StaticMeshVertex1.UVs[0];
+						FVector Position1 = StaticMeshVertex1.Position;
+						FVector4 TangentZ1 = StaticMeshVertex1.TangentZ;
+						FVector2D UV1 = StaticMeshVertex1.UVs[0];
 #endif
 
 
 
 #if ENGINE_MAJOR_VERSION > 4
-					FVector Position2 = FVector(StaticMeshVertex2.Position);
-					FVector4 TangentZ2 = FVector(StaticMeshVertex2.TangentZ);
-					FVector2D UV2 = FVector2D(StaticMeshVertex2.UVs[0]);
+						FVector Position2 = FVector(StaticMeshVertex2.Position);
+						FVector4 TangentZ2 = FVector(StaticMeshVertex2.TangentZ);
+						FVector2D UV2 = FVector2D(StaticMeshVertex2.UVs[0]);
 #else
-					FVector Position2 = StaticMeshVertex2.Position;
-					FVector4 TangentZ2 = StaticMeshVertex2.TangentZ;
-					FVector2D UV2 = StaticMeshVertex2.UVs[0];
+						FVector Position2 = StaticMeshVertex2.Position;
+						FVector4 TangentZ2 = StaticMeshVertex2.TangentZ;
+						FVector2D UV2 = StaticMeshVertex2.UVs[0];
 #endif
 
 
-					FVector DeltaPosition0 = Position1 - Position0;
-					FVector DeltaPosition1 = Position2 - Position0;
+						FVector DeltaPosition0 = Position1 - Position0;
+						FVector DeltaPosition1 = Position2 - Position0;
 
-					FVector2D DeltaUV0 = UV1 - UV0;
-					FVector2D DeltaUV1 = UV2 - UV0;
+						FVector2D DeltaUV0 = UV1 - UV0;
+						FVector2D DeltaUV1 = UV2 - UV0;
 
-					float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
+						float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
 
-					FVector TriangleTangentX = ((DeltaPosition0 * DeltaUV1.Y) - (DeltaPosition1 * DeltaUV0.Y)) * Factor;
-					FVector TriangleTangentY = ((DeltaPosition0 * DeltaUV1.X) - (DeltaPosition1 * DeltaUV0.X)) * Factor;
+						FVector TriangleTangentX = ((DeltaPosition0 * DeltaUV1.Y) - (DeltaPosition1 * DeltaUV0.Y)) * Factor;
+						FVector TriangleTangentY = ((DeltaPosition0 * DeltaUV1.X) - (DeltaPosition1 * DeltaUV0.X)) * Factor;
 
-					FVector TangentX0 = TriangleTangentX - (TangentZ0 * FVector::DotProduct(TangentZ0, TriangleTangentX));
-					TangentX0.Normalize();
+						FVector TangentX0 = TriangleTangentX - (TangentZ0 * FVector::DotProduct(TangentZ0, TriangleTangentX));
+						TangentX0.Normalize();
 
-					FVector TangentX1 = TriangleTangentX - (TangentZ1 * FVector::DotProduct(TangentZ1, TriangleTangentX));
-					TangentX1.Normalize();
+						FVector TangentX1 = TriangleTangentX - (TangentZ1 * FVector::DotProduct(TangentZ1, TriangleTangentX));
+						TangentX1.Normalize();
 
-					FVector TangentX2 = TriangleTangentX - (TangentZ2 * FVector::DotProduct(TangentZ2, TriangleTangentX));
-					TangentX2.Normalize();
+						FVector TangentX2 = TriangleTangentX - (TangentZ2 * FVector::DotProduct(TangentZ2, TriangleTangentX));
+						TangentX2.Normalize();
 
 #if ENGINE_MAJOR_VERSION > 4
-					StaticMeshVertex0.TangentX = FVector3f(TangentX0);
-					StaticMeshVertex0.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex0.TangentZ), FVector(StaticMeshVertex0.TangentX)) * TangentsDirection);
+						StaticMeshVertex0.TangentX = FVector3f(TangentX0);
+						StaticMeshVertex0.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex0.TangentZ), FVector(StaticMeshVertex0.TangentX)) * TangentsDirection);
 
-					StaticMeshVertex1.TangentX = FVector3f(TangentX1);
-					StaticMeshVertex1.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex1.TangentZ), FVector(StaticMeshVertex1.TangentX)) * TangentsDirection);
+						StaticMeshVertex1.TangentX = FVector3f(TangentX1);
+						StaticMeshVertex1.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex1.TangentZ), FVector(StaticMeshVertex1.TangentX)) * TangentsDirection);
 
-					StaticMeshVertex2.TangentX = FVector3f(TangentX2);
-					StaticMeshVertex2.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex2.TangentZ), FVector(StaticMeshVertex2.TangentX)) * TangentsDirection);
+						StaticMeshVertex2.TangentX = FVector3f(TangentX2);
+						StaticMeshVertex2.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex2.TangentZ), FVector(StaticMeshVertex2.TangentX)) * TangentsDirection);
 #else
-					StaticMeshVertex0.TangentX = TangentX0;
-					StaticMeshVertex0.TangentY = ComputeTangentY(StaticMeshVertex0.TangentZ, StaticMeshVertex0.TangentX) * TangentsDirection;
+						StaticMeshVertex0.TangentX = TangentX0;
+						StaticMeshVertex0.TangentY = ComputeTangentY(StaticMeshVertex0.TangentZ, StaticMeshVertex0.TangentX) * TangentsDirection;
 
-					StaticMeshVertex1.TangentX = TangentX1;
-					StaticMeshVertex1.TangentY = ComputeTangentY(StaticMeshVertex1.TangentZ, StaticMeshVertex1.TangentX) * TangentsDirection;
+						StaticMeshVertex1.TangentX = TangentX1;
+						StaticMeshVertex1.TangentY = ComputeTangentY(StaticMeshVertex1.TangentZ, StaticMeshVertex1.TangentX) * TangentsDirection;
 
-					StaticMeshVertex2.TangentX = TangentX2;
-					StaticMeshVertex2.TangentY = ComputeTangentY(StaticMeshVertex2.TangentZ, StaticMeshVertex2.TangentX) * TangentsDirection;
+						StaticMeshVertex2.TangentX = TangentX2;
+						StaticMeshVertex2.TangentY = ComputeTangentY(StaticMeshVertex2.TangentZ, StaticMeshVertex2.TangentX) * TangentsDirection;
 #endif
 
-				}
+					});
 			}
 
 			VertexInstanceBaseIndex += NumVertexInstancesPerSection;
