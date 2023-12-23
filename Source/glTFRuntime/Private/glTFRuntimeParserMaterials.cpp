@@ -358,8 +358,26 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 		}
 #endif
 #endif
-		void* Data = Mip->BulkData.Realloc(MipMap.Pixels.Num());
-		FMemory::Memcpy(Data, MipMap.Pixels.GetData(), MipMap.Pixels.Num());
+		uint8* Data = reinterpret_cast<uint8*>(Mip->BulkData.Realloc(MipMap.Pixels.Num()));
+		// ETargetPlatformFeatures::NormalmapLAEncodingMode has been added in 5.3 for mobile platforms
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 3 && (PLATFORM_ANDROID || PLATFORM_IOS)
+		if (ImagesConfig.Compression == TC_Normalmap)
+		{
+			for (int32 PIndex = 0; PIndex < MipMap.Pixels.Num(); PIndex += 4)
+			{
+				Data[PIndex + 0] = 0;
+				Data[PIndex + 1] = 0;
+				Data[PIndex + 2] = MipMap.Pixels[PIndex + 2];
+				Data[PIndex + 3] = MipMap.Pixels[PIndex + 1];
+			}
+		}
+		else
+		{
+#endif
+			FMemory::Memcpy(Data, MipMap.Pixels.GetData(), MipMap.Pixels.Num());
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 3 && (PLATFORM_ANDROID || PLATFORM_IOS)
+		}
+#endif
 		Mip->BulkData.Unlock();
 	}
 
