@@ -4,7 +4,6 @@
 #include "Animation/AnimSequence.h"
 #include "Engine/World.h"
 #include "Runtime/Launch/Resources/Version.h"
-#include "Async/ParallelFor.h"
 
 #define GLTF_CHECK_ERROR_MESSAGE() UE_LOG(LogGLTFRuntime, Error, TEXT("No glTF Asset loaded."))
 
