@@ -1285,7 +1285,7 @@ struct FglTFRuntimeUInt16Vector4
 		W = 0;
 	}
 
-	uint16& operator[](int32 Index)
+	const uint16& operator[](const int32 Index) const
 	{
 		check(Index >= 0 && Index < 4);
 		switch (Index)
@@ -1300,7 +1300,23 @@ struct FglTFRuntimeUInt16Vector4
 		default:
 			return W;
 		}
-		;
+	}
+
+	uint16& operator[](const int32 Index)
+	{
+		check(Index >= 0 && Index < 4);
+		switch (Index)
+		{
+		case 0:
+			return X;
+		case 1:
+			return Y;
+		case 2:
+			return Z;
+		case 3:
+		default:
+			return W;
+		}
 	}
 };
 
