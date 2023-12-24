@@ -222,11 +222,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 		{
 			if ((*JsonMaterialTransmission)->TryGetNumberField("transmissionFactor", RuntimeMaterial.TransmissionFactor))
 			{
-				RuntimeMaterial.bHasTransmissionFactor = true;
+				RuntimeMaterial.bHasTransmissionFactor = (RuntimeMaterial.TransmissionFactor > 0.0);
 			}
 			GetMaterialTexture(JsonMaterialTransmission->ToSharedRef(), "transmissionTexture", false, RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips, RuntimeMaterial.TransmissionTransform, RuntimeMaterial.TransmissionSampler, false);
 
-			RuntimeMaterial.bKHR_materials_transmission = true;
+			RuntimeMaterial.bKHR_materials_transmission = (RuntimeMaterial.TransmissionFactor > 0.0);
 		}
 
 		// KHR_materials_unlit 
