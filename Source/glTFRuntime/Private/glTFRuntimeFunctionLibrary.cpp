@@ -232,7 +232,7 @@ TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArr
 			{
 				if (SquareBracketEnd > SquareBracketStart)
 				{
-					const FString KeyIndex = Key.Mid(SquareBracketStart + 1, SquareBracketEnd - SquareBracketEnd);
+					const FString KeyIndex = Key.Mid(SquareBracketStart + 1, SquareBracketEnd - SquareBracketStart);
 					PathIndex = FCString::Atoi(*KeyIndex);
 					PathKey = Key.Left(SquareBracketStart);
 				}
