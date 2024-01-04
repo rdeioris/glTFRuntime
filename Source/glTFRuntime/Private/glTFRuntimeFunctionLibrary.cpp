@@ -270,7 +270,7 @@ bool UglTFRuntimeFunctionLibrary::GetPositionsAsBytesFromglTFRuntimeLODPrimitive
 	}
 
 	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
-	Bytes.AddUninitialized(Primitive.Positions.Num() * sizeof(float) * 3);
+	Bytes.Reserve(Primitive.Positions.Num() * sizeof(float) * 3);
 	for (const FVector& Position : Primitive.Positions)
 	{
 		float X = static_cast<float>(Position.X);
@@ -291,7 +291,7 @@ bool UglTFRuntimeFunctionLibrary::GetNormalsAsBytesFromglTFRuntimeLODPrimitive(c
 	}
 
 	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
-	Bytes.AddUninitialized(Primitive.Positions.Num() * sizeof(float) * 3);
+	Bytes.Reserve(Primitive.Positions.Num() * sizeof(float) * 3);
 	for (const FVector& Normal : Primitive.Normals)
 	{
 		float X = static_cast<float>(Normal.X);
