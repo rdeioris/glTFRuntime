@@ -541,6 +541,9 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bLoadMipMaps;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UMaterialInterface* ForceMaterial;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -552,6 +555,7 @@ struct FglTFRuntimeMaterialsConfig
 		bSkipLoad = false;
 		VertexColorOnlyMaterial = nullptr;
 		bLoadMipMaps = false;
+		ForceMaterial = nullptr;
 	}
 };
 

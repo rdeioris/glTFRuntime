@@ -564,6 +564,11 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	}
 
+	if (MaterialsConfig.ForceMaterial)
+	{
+		BaseMaterial = MaterialsConfig.ForceMaterial;
+	}
+
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
 		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[RuntimeMaterial.MaterialType];
