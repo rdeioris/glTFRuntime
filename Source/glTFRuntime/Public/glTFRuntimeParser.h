@@ -482,6 +482,33 @@ struct FglTFRuntimeTextureSampler
 	}
 };
 
+UENUM()
+enum class EglTFRuntimePointsTriangulationMode : uint8
+{
+	Triangle,
+	TriangleWithXYInUV1,
+	TriangleWithXYInUV1ZWInUV2,
+	Quad,
+	QuadWithXYInUV1,
+	QuadWithXYInUV1ZWInUV2,
+	Tetrahedron,
+	TetrahedronWithXYInUV1ZWInUV2,
+	OpenedTetrahedron,
+	OpenedTetrahedronWithXYInUV1ZWInUV2,
+	Cube,
+	CubeWithXYInUV1ZWInUV2,
+	Custom
+};
+
+UENUM()
+enum class EglTFRuntimeLinesTriangulationMode : uint8
+{
+	RectangleWithXYInUV1ZWInUV2,
+	TriangularPrismWithXYInUV1ZWInUV2,
+	OpenedTriangularPrismWithXYInUV1ZWInUV2,
+	Custom
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeMaterialsConfig
 {
@@ -544,6 +571,39 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	UMaterialInterface* ForceMaterial;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bSkipPoints;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimePointsTriangulationMode PointsTriangulationMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UMaterialInterface* PointsBaseMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float PointsScaleFactor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bSkipLines;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	EglTFRuntimeLinesTriangulationMode LinesTriangulationMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UMaterialInterface* LinesBaseMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float LinesScaleFactor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, float> CustomScalarParams;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, FLinearColor> CustomVectorParams;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<FString, UTexture*> CustomTextureParams;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -556,6 +616,14 @@ struct FglTFRuntimeMaterialsConfig
 		VertexColorOnlyMaterial = nullptr;
 		bLoadMipMaps = false;
 		ForceMaterial = nullptr;
+		bSkipPoints = false;
+		PointsTriangulationMode = EglTFRuntimePointsTriangulationMode::OpenedTetrahedronWithXYInUV1ZWInUV2;
+		PointsBaseMaterial = nullptr;
+		PointsScaleFactor = 1;
+		bSkipLines = false;
+		LinesTriangulationMode = EglTFRuntimeLinesTriangulationMode::OpenedTriangularPrismWithXYInUV1ZWInUV2;
+		LinesBaseMaterial = nullptr;
+		LinesScaleFactor = 1;
 	}
 };
 
@@ -1345,6 +1413,8 @@ struct FglTFRuntimePrimitive
 	bool bHighPrecisionUVs;
 	bool bHighPrecisionWeights;
 
+	bool bDisableShadows;
+
 	FglTFRuntimePrimitive()
 	{
 		AdditionalBufferView = INDEX_NONE;
@@ -1353,6 +1423,7 @@ struct FglTFRuntimePrimitive
 		bHighPrecisionWeights = false;
 		Material = nullptr;
 		Mode = 4;
+		bDisableShadows = false;
 	}
 };
 
@@ -2013,7 +2084,7 @@ public:
 
 	UStaticMesh* LoadStaticMeshByName(const FString MeshName, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
-	UMaterialInterface* LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName);
+	UMaterialInterface* LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName, UMaterialInterface* ForceBaseMaterial);
 	UTexture2D* LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig, FglTFRuntimeTextureSampler& Sampler);
 
 	bool LoadNodes();
@@ -2076,8 +2147,11 @@ public:
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
 
-	bool LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
-	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	bool LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bTriangulatePointsAndLines);
+	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bTriangulatePointsAndLines);
+	UMaterialInterface* TriangulatePoints(FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UMaterialInterface* TriangulateLines(FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UMaterialInterface* TriangulatePointsAndLines(FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	void AddError(const FString& ErrorContext, const FString& ErrorMessage);
 	void ClearErrors();
@@ -2273,7 +2347,7 @@ protected:
 	bool LoadMeshIntoMeshLOD(TSharedRef<FJsonObject> JsonMeshObject, FglTFRuntimeMeshLOD*& LOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 
 	UStaticMesh* LoadStaticMesh_Internal(TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext);
-	UMaterialInterface* LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors);
+	UMaterialInterface* LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, UMaterialInterface* ForceBaseMaterial);
 	bool LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node);
 
 	bool LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter);
@@ -2299,8 +2373,8 @@ protected:
 	void GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshContextRef SkeletalMeshContext);
 
 public:
-	UMaterialInterface* BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors);
-	UMaterialInterface* BuildVertexColorOnlyMaterial(const FglTFRuntimeMaterialsConfig& MaterialsConfig);
+	UMaterialInterface* BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, UMaterialInterface* ForceBaseMaterial = nullptr);
+	UMaterialInterface* BuildVertexColorOnlyMaterial(const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUnlit);
 
 	bool CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems);
 	bool CheckJsonRootIndex(const FString FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems) { return CheckJsonIndex(Root, FieldName, Index, JsonItems); }

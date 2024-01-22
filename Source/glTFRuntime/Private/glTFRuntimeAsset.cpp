@@ -778,7 +778,7 @@ UMaterialInterface* UglTFRuntimeAsset::LoadMaterial(const int32 MaterialIndex, c
 {
 	GLTF_CHECK_PARSER(nullptr);
 	FString MaterialName;
-	return Parser->LoadMaterial(MaterialIndex, MaterialsConfig, bUseVertexColors, MaterialName);
+	return Parser->LoadMaterial(MaterialIndex, MaterialsConfig, bUseVertexColors, MaterialName, nullptr);
 }
 
 UAnimSequence* UglTFRuntimeAsset::CreateSkeletalAnimationFromPath(USkeletalMesh* SkeletalMesh, const TArray<FglTFRuntimePathItem>& BonesPath, const TArray<FglTFRuntimePathItem>& MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)

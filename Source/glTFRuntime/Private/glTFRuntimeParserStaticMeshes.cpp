@@ -174,7 +174,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			Section.NumTriangles = NumVertexInstancesPerSection / 3;
 			Section.FirstIndex = VertexInstanceBaseIndex;
 			Section.bEnableCollision = true;
-			Section.bCastShadow = true;
+			Section.bCastShadow = !Primitive.bDisableShadows;
 
 			if (Primitive.bHighPrecisionUVs)
 			{
@@ -207,6 +207,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			FMeshSectionInfoMap& SectionInfoMap = StaticMeshContext->StaticMesh->GetSectionInfoMap();
 			FMeshSectionInfo MeshSectionInfo;
 			MeshSectionInfo.MaterialIndex = MaterialIndex;
+			MeshSectionInfo.bCastShadow = Section.bCastShadow;
+			MeshSectionInfo.bEnableCollision = Section.bEnableCollision;
 			SectionInfoMap.Set(CurrentLODIndex, SectionIndex, MeshSectionInfo);
 #endif
 
@@ -780,7 +782,7 @@ bool FglTFRuntimeParser::LoadMeshIntoMeshLOD(TSharedRef<FJsonObject> JsonMeshObj
 	}
 
 	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonMeshObject, Primitives, MaterialsConfig))
+	if (!LoadPrimitives(JsonMeshObject, Primitives, MaterialsConfig, true))
 	{
 		return false;
 	}
@@ -968,7 +970,7 @@ bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 M
 	}
 
 	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, ProceduralMeshConfig.MaterialsConfig))
+	if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, ProceduralMeshConfig.MaterialsConfig, true))
 	{
 		return false;
 	}

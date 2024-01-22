@@ -1,4 +1,4 @@
-// Copyright 2020-2023, Roberto De Ioris.
+// Copyright 2020-2024, Roberto De Ioris.
 
 
 #include "glTFRuntimeFunctionLibrary.h"
@@ -144,7 +144,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const
 	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 		{
 			UglTFRuntimeAsset* Asset = nullptr;
-			if (bSuccess)
+			if (bSuccess && !IsGarbageCollecting())
 			{
 				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
 				if (Asset)
@@ -171,12 +171,18 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString
 		HttpRequest->AppendToHeader(Header.Key, Header.Value);
 	}
 
-	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+	float StartTime = FPlatformTime::Seconds();
+
+	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 		{
 			UglTFRuntimeAsset* Asset = nullptr;
-			if (bSuccess)
+			if (bSuccess && !IsGarbageCollecting())
 			{
 				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+				if (Asset)
+				{
+					Asset->GetParser()->SetDownloadTime(FPlatformTime::Seconds() - StartTime);
+				}
 			}
 			Completed.ExecuteIfBound(Asset);
 		}, Completed, LoaderConfig);
