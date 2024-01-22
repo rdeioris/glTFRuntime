@@ -3341,7 +3341,7 @@ UMaterialInterface* FglTFRuntimeParser::TriangulatePoints(FglTFRuntimePrimitive&
 			{
 				if (Primitive.Normals.IsValidIndex(PointIndex))
 				{
-					const FVector LeftNormal = -Primitive.Normals[PointIndex].Cross(FVector(0, 0, 1)).GetSafeNormal();
+					const FVector LeftNormal = -FVector::CrossProduct(Primitive.Normals[PointIndex], FVector(0, 0, 1)).GetSafeNormal();
 					PointsNormals[Index * NumVertices + 3] = LeftNormal;
 					PointsNormals[Index * NumVertices + 4] = LeftNormal;
 					PointsNormals[Index * NumVertices + 5] = LeftNormal;
@@ -3362,7 +3362,7 @@ UMaterialInterface* FglTFRuntimeParser::TriangulatePoints(FglTFRuntimePrimitive&
 			{
 				if (Primitive.Normals.IsValidIndex(PointIndex))
 				{
-					const FVector RightNormal = Primitive.Normals[PointIndex].Cross(FVector(0, 0, 1)).GetSafeNormal();
+					const FVector RightNormal = FVector::CrossProduct(Primitive.Normals[PointIndex], FVector(0, 0, 1)).GetSafeNormal();
 					PointsNormals[Index * NumVertices + 6] = RightNormal;
 					PointsNormals[Index * NumVertices + 7] = RightNormal;
 					PointsNormals[Index * NumVertices + 8] = RightNormal;
