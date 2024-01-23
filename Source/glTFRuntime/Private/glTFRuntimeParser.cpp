@@ -1258,6 +1258,13 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	return true;
 }
 
+FTransform FglTFRuntimeParser::RawMatrixToRebasedTransform(const FMatrix& Matrix) const
+{
+	FMatrix MatrixCopy = Matrix;
+	MatrixCopy.ScaleTranslation(FVector(SceneScale, SceneScale, SceneScale));
+	return FTransform(SceneBasis.Inverse() * MatrixCopy * SceneBasis);
+}
+
 bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter, const TArray<FglTFRuntimePathItem>& OverrideTrackNameFromExtension)
 {
 	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
@@ -3700,7 +3707,6 @@ UMaterialInterface* FglTFRuntimeParser::TriangulatePoints(FglTFRuntimePrimitive&
 
 UMaterialInterface* FglTFRuntimeParser::TriangulateLines(FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
-#if 0
 	if (Primitive.Mode == 1) // lines
 	{
 		Primitive.Mode = 4;
@@ -3709,13 +3715,23 @@ UMaterialInterface* FglTFRuntimeParser::TriangulateLines(FglTFRuntimePrimitive& 
 		TArray<uint32> LinesIndices;
 		TArray<FVector> LinesPositions;
 		TArray<FVector4> LinesColors;
+		TArray<FVector2D> LinesUV;
 		TArray<FVector2D> PointsUVXY;
 		TArray<FVector2D> PointsUVZW;
 
 		bool bHasColors = Primitive.Colors.Num() > 0;
 		bool bHasNormals = Primitive.Normals.Num() > 0;
+		const bool bHasUVs = Primitive.UVs.Num() > 0;
 
-		for (int64 Index = 0; Index < Primitive.Indices.Num(); Index += 2)
+		bool bUVXY = false;
+		bool bUVZW = false;
+		bool bOpened = false;
+
+		const int64 NumIndices = (Primitive.Indices.Num() / 2) * 2;
+
+		const float Scale = MaterialsConfig.LinesScaleFactor;
+
+		for (int64 Index = 0; Index < NumIndices; Index += 2)
 		{
 			const uint32 Point0Index = Primitive.Indices[Index];
 			const uint32 Point1Index = Primitive.Indices[Index + 1];
@@ -3725,7 +3741,7 @@ UMaterialInterface* FglTFRuntimeParser::TriangulateLines(FglTFRuntimePrimitive& 
 
 			const FVector LineForward = (Point1 - Point0).GetSafeNormal();
 			FVector LineRight = LineForward.Cross(FVector(0, 0, 1));
-			if (FMath::Abs(Point1.Z - Point0.Z) > FMath::Abs(Point1.X - Point0.X))
+			if (FMath::Abs(FVector::DotProduct(LineForward, FVector(0, 0, 1))) > FMath::Abs(FVector::DotProduct(LineForward, FVector(-1, 0, 0))))
 			{
 				LineRight = LineForward.Cross(FVector(-1, 0, 0));
 			}
@@ -3756,47 +3772,110 @@ UMaterialInterface* FglTFRuntimeParser::TriangulateLines(FglTFRuntimePrimitive& 
 			PointsUVXY.Add(FVector2D(Point1.X, Point1.Y));
 			PointsUVZW.Add(FVector2D(Point1.Z, 0));
 #endif
+			FVector2D Point0UV = FVector2D(0, 0);
+			FVector2D Point1UV = FVector2D(0, 0);
+
+			if (bHasUVs)
+			{
+				if (Primitive.UVs[0].IsValidIndex(Point0Index))
+				{
+					Point0UV = Primitive.UVs[0][Point0Index];
+				}
+				if (Primitive.UVs[0].IsValidIndex(Point1Index))
+				{
+					Point1UV = Primitive.UVs[0][Point1Index];
+				}
+			}
+
 			// right bottom
-			LinesIndices.Add(LinesPositions.Add(Point1 - LineUp * 0.5 + LineRight * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point1 - (LineUp * 0.5 + LineRight * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point1UV);
+			}
 			PointsUVXY.Add(FVector2D(Point1.X, Point1.Y));
 			PointsUVZW.Add(FVector2D(Point1.Z, 0));
-			LinesIndices.Add(LinesPositions.Add(Point0 + LineUp * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point0 + (LineUp * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point0UV);
+			}
 			PointsUVXY.Add(FVector2D(Point0.X, Point0.Y));
 			PointsUVZW.Add(FVector2D(Point0.Z, 0));
-			LinesIndices.Add(LinesPositions.Add(Point0 - LineUp * 0.5 + LineRight * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point0 - (LineUp * 0.5 + LineRight * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point0UV);
+			}
 			PointsUVXY.Add(FVector2D(Point0.X, Point0.Y));
 			PointsUVZW.Add(FVector2D(Point0.Z, 0));
 
 			// right top
-			LinesIndices.Add(LinesPositions.Add(Point1 + LineUp * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point1 + (LineUp * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point1UV);
+			}
 			PointsUVXY.Add(FVector2D(Point1.X, Point1.Y));
 			PointsUVZW.Add(FVector2D(Point1.Z, 0));
-			LinesIndices.Add(LinesPositions.Add(Point0 + LineUp * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point0 + (LineUp * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point0UV);
+			}
 			PointsUVXY.Add(FVector2D(Point0.X, Point0.Y));
 			PointsUVZW.Add(FVector2D(Point0.Z, 0));
-			LinesIndices.Add(LinesPositions.Add(Point1 - LineUp * 0.5 + LineRight * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point1 - (LineUp * 0.5 + LineRight * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point1UV);
+			}
 			PointsUVXY.Add(FVector2D(Point1.X, Point1.Y));
 			PointsUVZW.Add(FVector2D(Point1.Z, 0));
 
 			// left bottom
-			LinesIndices.Add(LinesPositions.Add(Point1 - LineUp * 0.5 - LineRight * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point1 - (LineUp * 0.5 - LineRight * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point1UV);
+			}
 			PointsUVXY.Add(FVector2D(Point1.X, Point1.Y));
 			PointsUVZW.Add(FVector2D(Point1.Z, 0));
-			LinesIndices.Add(LinesPositions.Add(Point0 + LineUp * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point0 + (LineUp * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point0UV);
+			}
 			PointsUVXY.Add(FVector2D(Point0.X, Point0.Y));
 			PointsUVZW.Add(FVector2D(Point0.Z, 0));
-			LinesIndices.Add(LinesPositions.Add(Point0 - LineUp * 0.5 - LineRight * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point0 - (LineUp * 0.5 - LineRight * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point0UV);
+			}
 			PointsUVXY.Add(FVector2D(Point0.X, Point0.Y));
 			PointsUVZW.Add(FVector2D(Point0.Z, 0));
 
 			// left top
-			LinesIndices.Add(LinesPositions.Add(Point1 + LineUp * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point1 + (LineUp * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point1UV);
+			}
 			PointsUVXY.Add(FVector2D(Point1.X, Point1.Y));
 			PointsUVZW.Add(FVector2D(Point1.Z, 0));
-			LinesIndices.Add(LinesPositions.Add(Point0 + LineUp * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point0 + (LineUp * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point0UV);
+			}
 			PointsUVXY.Add(FVector2D(Point0.X, Point0.Y));
 			PointsUVZW.Add(FVector2D(Point0.Z, 0));
-			LinesIndices.Add(LinesPositions.Add(Point1 - LineUp * 0.5 - LineRight * 0.5));
+			LinesIndices.Add(LinesPositions.Add(Point1 - (LineUp * 0.5 - LineRight * 0.5) * Scale));
+			if (bHasUVs)
+			{
+				LinesUV.Add(Point1UV);
+			}
 			PointsUVXY.Add(FVector2D(Point1.X, Point1.Y));
 			PointsUVZW.Add(FVector2D(Point1.Z, 0));
 
@@ -3813,6 +3892,7 @@ UMaterialInterface* FglTFRuntimeParser::TriangulateLines(FglTFRuntimePrimitive& 
 				{
 					Color1 = Primitive.Colors[Point1Index];
 				}
+
 				LinesColors.Add(Color1);
 				LinesColors.Add(Color0);
 				LinesColors.Add(Color0);
@@ -3831,18 +3911,17 @@ UMaterialInterface* FglTFRuntimeParser::TriangulateLines(FglTFRuntimePrimitive& 
 		Primitive.Indices = LinesIndices;
 		Primitive.Positions = LinesPositions;
 		Primitive.Normals.Empty();// = LinesNormals;
-		Primitive.UVs = { PointsUVXY, PointsUVZW };
+		Primitive.UVs = { LinesUV, PointsUVXY, PointsUVZW };
 		Primitive.Tangents.Empty();
 		Primitive.bHighPrecisionUVs = true;
-
-		ForceBaseMaterial = UMaterial::GetDefaultMaterial(MD_Surface);// BuildVertexColorOnlyMaterial(MaterialsConfig, false);
 
 		if (bHasColors)
 		{
 			Primitive.Colors = LinesColors;
 		}
+
+		return MaterialsConfig.LinesBaseMaterial;
 	}
-#endif
 
 	return nullptr;
 }

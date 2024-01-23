@@ -2397,8 +2397,10 @@ public:
 
 	FString ToJsonString() const;
 
-protected:
 	bool FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues, FMatrix& Matrix);
+	FTransform RawMatrixToRebasedTransform(const FMatrix& Matrix) const;
+
+protected:
 
 	float FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex);
 
