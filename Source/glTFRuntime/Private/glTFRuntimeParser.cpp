@@ -3743,13 +3743,13 @@ UMaterialInterface* FglTFRuntimeParser::TriangulateLines(FglTFRuntimePrimitive& 
 			const FVector& Point1 = Primitive.Positions[Point1Index];
 
 			const FVector LineForward = (Point1 - Point0).GetSafeNormal();
-			FVector LineRight = LineForward.Cross(FVector(0, 0, 1));
+			FVector LineRight = FVector::CrossProduct(LineForward, FVector(0, 0, 1));
 			if (FMath::Abs(FVector::DotProduct(LineForward, FVector(0, 0, 1))) > FMath::Abs(FVector::DotProduct(LineForward, FVector(-1, 0, 0))))
 			{
-				LineRight = LineForward.Cross(FVector(-1, 0, 0));
+				LineRight = FVector::CrossProduct(LineForward, FVector(-1, 0, 0));
 			}
-			const FVector LineUp = LineForward.Cross(LineRight);
-			LineRight = LineForward.Cross(LineUp);
+			const FVector LineUp = FVector::CrossProduct(LineForward, LineRight);
+			LineRight = FVector::CrossProduct(LineForward, LineUp);
 
 			FVector2D Point0UV = FVector2D(0, 0);
 			FVector2D Point1UV = FVector2D(0, 0);
