@@ -2641,6 +2641,16 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		Primitive.Mode = 4; // triangles
 	}
 
+	if (Primitive.Mode == 0 && MaterialsConfig.bSkipPoints)
+	{
+		return false;
+	}
+
+	if (Primitive.Mode >= 1 && Primitive.Mode <= 3 && MaterialsConfig.bSkipLines)
+	{
+		return false;
+	}
+
 	const TSharedPtr<FJsonObject>* JsonAttributesObject;
 	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
 	{
