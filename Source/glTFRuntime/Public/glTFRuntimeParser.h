@@ -503,8 +503,11 @@ enum class EglTFRuntimePointsTriangulationMode : uint8
 UENUM()
 enum class EglTFRuntimeLinesTriangulationMode : uint8
 {
+	Rectangle,
 	RectangleWithXYInUV1ZWInUV2,
+	TriangularPrism,
 	TriangularPrismWithXYInUV1ZWInUV2,
+	OpenedTriangularPrism,
 	OpenedTriangularPrismWithXYInUV1ZWInUV2,
 	Custom
 };
@@ -616,11 +619,11 @@ struct FglTFRuntimeMaterialsConfig
 		VertexColorOnlyMaterial = nullptr;
 		bLoadMipMaps = false;
 		ForceMaterial = nullptr;
-		bSkipPoints = false;
+		bSkipPoints = true;
 		PointsTriangulationMode = EglTFRuntimePointsTriangulationMode::OpenedTetrahedronWithXYInUV1ZWInUV2;
 		PointsBaseMaterial = nullptr;
 		PointsScaleFactor = 1;
-		bSkipLines = false;
+		bSkipLines = true;
 		LinesTriangulationMode = EglTFRuntimeLinesTriangulationMode::OpenedTriangularPrismWithXYInUV1ZWInUV2;
 		LinesBaseMaterial = nullptr;
 		LinesScaleFactor = 1;
