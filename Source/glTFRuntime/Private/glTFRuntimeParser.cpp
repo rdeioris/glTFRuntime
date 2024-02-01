@@ -1150,6 +1150,16 @@ void FglTFRuntimeParser::AddError(const FString& ErrorContext, const FString& Er
 	}
 }
 
+bool FglTFRuntimeParser::HasErrors() const
+{
+	return Errors.Num() > 0;
+}
+
+const TArray<FString>& FglTFRuntimeParser::GetErrors() const
+{
+	return Errors;
+}
+
 void FglTFRuntimeParser::ClearErrors()
 {
 	Errors.Empty();

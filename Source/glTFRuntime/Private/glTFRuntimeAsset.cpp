@@ -1460,3 +1460,17 @@ TArray<FString> UglTFRuntimeAsset::GetAnimationsNames() const
 
 	return Parser->GetAnimationsNames();
 }
+
+bool UglTFRuntimeAsset::HasErrors() const
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->HasErrors();
+}
+
+TArray<FString> UglTFRuntimeAsset::GetErrors() const
+{
+	GLTF_CHECK_PARSER(TArray<FString>());
+
+	return Parser->GetErrors();
+}

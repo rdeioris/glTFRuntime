@@ -2158,6 +2158,8 @@ public:
 
 	void AddError(const FString& ErrorContext, const FString& ErrorMessage);
 	void ClearErrors();
+	bool HasErrors() const;
+	const TArray<FString>& GetErrors() const;
 
 	bool NodeIsBone(const int32 NodeIndex);
 
