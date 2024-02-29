@@ -708,39 +708,51 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 					}
 
 					// if we do not have tangents but we have normals and a UV channel, we can compute them
-					if (!LOD->bHasTangents && LOD->bHasUV)
+					if (!LOD->bHasTangents)
 					{
-						FVector DeltaPosition0 = Position1 - Position0;
-						FVector DeltaPosition1 = Position2 - Position0;
+						const FVector DeltaPosition0 = Position1 - Position0;
+						const FVector DeltaPosition1 = Position2 - Position0;
 
+						FVector TangentX0;
+						FVector TangentX1;
+						FVector TangentX2;
 
+						if (LOD->bHasUV)
+						{
 #if ENGINE_MAJOR_VERSION > 4
-						const FVector2f& UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
-						const FVector2f& UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
-						const FVector2f& UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
-						FVector2f DeltaUV0 = UV1 - UV0;
-						FVector2f DeltaUV1 = UV2 - UV0;
+							const FVector2f& UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
+							const FVector2f& UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
+							const FVector2f& UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
+							const FVector2f DeltaUV0 = UV1 - UV0;
+							const FVector2f DeltaUV1 = UV2 - UV0;
 #else
-						const FVector2D& UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
-						const FVector2D& UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
-						const FVector2D& UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
-						FVector2D DeltaUV0 = UV1 - UV0;
-						FVector2D DeltaUV1 = UV2 - UV0;
+							const FVector2D& UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
+							const FVector2D& UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
+							const FVector2D& UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
+							const FVector2D DeltaUV0 = UV1 - UV0;
+							const FVector2D DeltaUV1 = UV2 - UV0;
 #endif
 
-						float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
+							const float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
 
-						FVector TriangleTangentX = ((DeltaPosition0 * DeltaUV1.Y) - (DeltaPosition1 * DeltaUV0.Y)) * Factor;
-						FVector TriangleTangentY = ((DeltaPosition0 * DeltaUV1.X) - (DeltaPosition1 * DeltaUV0.X)) * Factor;
+							const FVector TriangleTangentX = ((DeltaPosition0 * DeltaUV1.Y) - (DeltaPosition1 * DeltaUV0.Y)) * Factor;
+							const FVector TriangleTangentY = ((DeltaPosition0 * DeltaUV1.X) - (DeltaPosition1 * DeltaUV0.X)) * Factor;
 
-						FVector TangentX0 = TriangleTangentX - (TangentZ0 * FVector::DotProduct(TangentZ0, TriangleTangentX));
-						TangentX0.Normalize();
+							TangentX0 = TriangleTangentX - (TangentZ0 * FVector::DotProduct(TangentZ0, TriangleTangentX));
+							TangentX0.Normalize();
 
-						FVector TangentX1 = TriangleTangentX - (TangentZ1 * FVector::DotProduct(TangentZ1, TriangleTangentX));
-						TangentX1.Normalize();
+							TangentX1 = TriangleTangentX - (TangentZ1 * FVector::DotProduct(TangentZ1, TriangleTangentX));
+							TangentX1.Normalize();
 
-						FVector TangentX2 = TriangleTangentX - (TangentZ2 * FVector::DotProduct(TangentZ2, TriangleTangentX));
-						TangentX2.Normalize();
+							TangentX2 = TriangleTangentX - (TangentZ2 * FVector::DotProduct(TangentZ2, TriangleTangentX));
+							TangentX2.Normalize();
+						}
+						else
+						{
+							TangentX0 = FVector::CrossProduct(TangentZ0, FVector::ZAxisVector);
+							TangentX1 = FVector::CrossProduct(TangentZ1, FVector::ZAxisVector);
+							TangentX2 = FVector::CrossProduct(TangentZ2, FVector::ZAxisVector);
+						}
 
 #if PLATFORM_ANDROID
 						FixVectorIfNan(TangentX0, 0);
