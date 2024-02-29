@@ -749,9 +749,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 						}
 						else
 						{
-							TangentX0 = FVector::CrossProduct(TangentZ0, FVector::ZAxisVector);
-							TangentX1 = FVector::CrossProduct(TangentZ1, FVector::ZAxisVector);
-							TangentX2 = FVector::CrossProduct(TangentZ2, FVector::ZAxisVector);
+							TangentX0 = FVector::CrossProduct(TangentZ0, FVector::UpVector);
+							TangentX1 = FVector::CrossProduct(TangentZ1, FVector::UpVector);
+							TangentX2 = FVector::CrossProduct(TangentZ2, FVector::UpVector);
 						}
 
 #if PLATFORM_ANDROID
