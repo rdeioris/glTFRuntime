@@ -13,9 +13,13 @@
 #include "Runtime/Launch/Resources/Version.h"
 #include "StaticMeshResources.h"
 #if ENGINE_MAJOR_VERSION >= 5
+#if ENGINE_MINOR_VERSION < 2
+#include "MeshCardRepresentation.h"
+#else
 #undef UE_ENABLE_INCLUDE_ORDER_DEPRECATED_IN_5_2
 #define UE_ENABLE_INCLUDE_ORDER_DEPRECATED_IN_5_2 0
 #include "MeshCardBuild.h"
+#endif
 #endif
 
 FglTFRuntimeStaticMeshContext::FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig) :
