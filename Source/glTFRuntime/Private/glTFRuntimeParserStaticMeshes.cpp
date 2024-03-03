@@ -12,6 +12,11 @@
 #include "PhysicsEngine/BodySetup.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "StaticMeshResources.h"
+#if ENGINE_MAJOR_VERSION >= 5
+#undef UE_ENABLE_INCLUDE_ORDER_DEPRECATED_IN_5_2
+#define UE_ENABLE_INCLUDE_ORDER_DEPRECATED_IN_5_2 0
+#include "MeshCardBuild.h"
+#endif
 
 FglTFRuntimeStaticMeshContext::FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig) :
 	Parser(InParser),
@@ -589,6 +594,34 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 		}
 #endif
+
+		if (StaticMeshConfig.bBuildLumenCards)
+		{
+#if ENGINE_MAJOR_VERSION >= 5 
+			if (!LODResources.CardRepresentationData)
+			{
+				LODResources.CardRepresentationData = new FCardRepresentationData();
+			}
+
+			LODResources.CardRepresentationData->MeshCardsBuildData.Bounds = StaticMeshContext->BoundingBoxAndSphere.GetBox().ExpandBy(2);
+
+			for (int32 Index = 0; Index < 6; Index++)
+			{
+				FLumenCardBuildData CardBuildData;
+				CardBuildData.AxisAlignedDirectionIndex = Index;
+				CardBuildData.OBB.AxisZ = FVector3f(0, 0, 0);
+				CardBuildData.OBB.AxisZ[Index / 2] = Index & 1 ? 1.0f : -1.0f;
+				CardBuildData.OBB.AxisZ.FindBestAxisVectors(CardBuildData.OBB.AxisX, CardBuildData.OBB.AxisY);
+				CardBuildData.OBB.AxisX = FVector3f::CrossProduct(CardBuildData.OBB.AxisZ, CardBuildData.OBB.AxisY);
+				CardBuildData.OBB.AxisX.Normalize();
+
+				CardBuildData.OBB.Origin = FVector3f(LODResources.CardRepresentationData->MeshCardsBuildData.Bounds.GetCenter());
+				CardBuildData.OBB.Extent = CardBuildData.OBB.RotateLocalToCard(FVector3f(LODResources.CardRepresentationData->MeshCardsBuildData.Bounds.GetExtent())).GetAbs();
+
+				LODResources.CardRepresentationData->MeshCardsBuildData.CardBuildData.Add(CardBuildData);
+			}
+#endif
+		}
 	}
 
 	OnPostCreatedStaticMesh.Broadcast(StaticMeshContext);

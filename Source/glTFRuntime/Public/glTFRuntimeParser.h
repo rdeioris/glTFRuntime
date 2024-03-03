@@ -704,6 +704,9 @@ struct FglTFRuntimeStaticMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	float LODScreenSizeMultiplier;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bBuildLumenCards;
+
 	template<typename T>
 	T* GetCustomConfig() const
 	{
@@ -734,6 +737,7 @@ struct FglTFRuntimeStaticMeshConfig
 		bGenerateStaticMeshDescription = false;
 		bBuildNavCollision = false;
 		LODScreenSizeMultiplier = 2;
+		bBuildLumenCards = false;
 	}
 };
 
