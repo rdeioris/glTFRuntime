@@ -7,6 +7,7 @@
 #include "glTFRuntimeAsset.h"
 #include "glTFRuntimeAssetActorAsync.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeProgressDispatcher, float, progress);
 UCLASS()
 class GLTFRUNTIME_API AglTFRuntimeAssetActorAsync : public AActor
 {
@@ -54,7 +55,28 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	bool bStaticMeshesAsSkeletal;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	bool bSkeletalMeshesAsStatic;
+
 	virtual void PostUnregisterAllComponents() override;
+
+	UPROPERTY(BlueprintAssignable, Category = "glTFRuntime")
+	FglTFRuntimeProgressDispatcher OnProgress;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	bool bIsCastShadowEnabled;
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	int GetTotalMeshNum() const;
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	int GetTotalVerticesNum() const;
+
+	int TotalVerticesNum;
+
+	float TotalMeshNum;
+
+	int LoadedMeshNum;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")
@@ -65,7 +87,7 @@ private:
 	void LoadNextMeshAsync();
 
 	UFUNCTION()
-	void LoadStaticMeshAsync(UStaticMesh* StaticMesh);
+	void LoadStaticMeshAsync(UStaticMesh* StaticMesh, UStaticMeshComponent* StaticMeshComponent);
 
 	UFUNCTION()
 	void LoadSkeletalMeshAsync(USkeletalMesh* SkeletalMesh);
@@ -74,5 +96,7 @@ private:
 	UPrimitiveComponent* CurrentPrimitiveComponent;
 
 	double LoadingStartTime;
+
+	FCriticalSection Mutex;
 
 };

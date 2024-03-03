@@ -17,6 +17,9 @@ AglTFRuntimeAssetActorAsync::AglTFRuntimeAssetActorAsync()
 
 	bShowWhileLoading = true;
 	bStaticMeshesAsSkeletal = false;
+	bSkeletalMeshesAsStatic = false;
+	LoadedMeshNum = 0;
+	TotalVerticesNum = 0;
 }
 
 // Called when the game starts or when spawned
@@ -49,6 +52,7 @@ void AglTFRuntimeAssetActorAsync::BeginPlay()
 		}
 	}
 
+	TotalMeshNum = MeshesToLoad.Num();
 	LoadNextMeshAsync();
 }
 
@@ -80,7 +84,7 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 	}
 	else
 	{
-		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal || bSkeletalMeshesAsStatic)
 		{
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
@@ -135,61 +139,67 @@ void AglTFRuntimeAssetActorAsync::LoadNextMeshAsync()
 		return;
 	}
 
-	auto It = MeshesToLoad.CreateIterator();
-	if (UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(It->Key))
+	auto begin = MeshesToLoad.begin();
+	auto end = MeshesToLoad.end();
+
+	for (auto It = begin; It != end; ++It)
 	{
-		CurrentPrimitiveComponent = StaticMeshComponent;
-		if (StaticMeshConfig.Outer == nullptr)
+		if (UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(It->Key))
 		{
-			StaticMeshConfig.Outer = StaticMeshComponent;
+			CurrentPrimitiveComponent = StaticMeshComponent;
+
+			if (StaticMeshConfig.Outer == nullptr)
+			{
+				StaticMeshConfig.Outer = StaticMeshComponent;
+			}
+			FglTFRuntimeStaticMeshAsyncCustom Delegate;
+			Delegate.BindDynamic(this, &AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync);
+			Asset->LoadStaticMeshAsync(It->Value.MeshIndex, Delegate, StaticMeshConfig, StaticMeshComponent);
 		}
-		FglTFRuntimeStaticMeshAsync Delegate;
-		Delegate.BindDynamic(this, &AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync);
-		Asset->LoadStaticMeshAsync(It->Value.MeshIndex, Delegate, StaticMeshConfig);
-	}
-	else if (USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(It->Key))
-	{
-		CurrentPrimitiveComponent = SkeletalMeshComponent;
-		FglTFRuntimeSkeletalMeshAsync Delegate;
-		Delegate.BindDynamic(this, &AglTFRuntimeAssetActorAsync::LoadSkeletalMeshAsync);
-		Asset->LoadSkeletalMeshAsync(It->Value.MeshIndex, It->Value.SkinIndex, Delegate, SkeletalMeshConfig);
+		else if (USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(It->Key))
+		{
+			CurrentPrimitiveComponent = SkeletalMeshComponent;
+			FglTFRuntimeSkeletalMeshAsync Delegate;
+			Delegate.BindDynamic(this, &AglTFRuntimeAssetActorAsync::LoadSkeletalMeshAsync);
+			Asset->LoadSkeletalMeshAsync(It->Value.MeshIndex, It->Value.SkinIndex, Delegate, SkeletalMeshConfig);
+		}
 	}
 }
 
-void AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync(UStaticMesh* StaticMesh)
+void AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync(UStaticMesh* StaticMesh, UStaticMeshComponent* StaticMeshComponent)
 {
-	if (UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(CurrentPrimitiveComponent))
+	Mutex.Lock();
+	StaticMeshComponent->SetCastShadow(bIsCastShadowEnabled);
+	TotalVerticesNum += StaticMesh->GetNumVertices(0);
+	DiscoveredStaticMeshComponents.Add(StaticMeshComponent, StaticMesh);
+	Mutex.Unlock();
+
+	if (bShowWhileLoading)
 	{
-		DiscoveredStaticMeshComponents.Add(StaticMeshComponent, StaticMesh);
-		if (bShowWhileLoading)
-		{
-			StaticMeshComponent->SetStaticMesh(StaticMesh);
-		}
-
-		if (StaticMesh && !StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
-		{
-			UStaticMeshSocket* DeltaSocket = StaticMesh->FindSocket(FName(StaticMeshConfig.ExportOriginalPivotToSocket));
-			if (DeltaSocket)
-			{
-				FTransform NewTransform = StaticMeshComponent->GetRelativeTransform();
-				FVector DeltaLocation = -DeltaSocket->RelativeLocation * NewTransform.GetScale3D();
-				DeltaLocation = NewTransform.GetRotation().RotateVector(DeltaLocation);
-				NewTransform.AddToTranslation(DeltaLocation);
-				StaticMeshComponent->SetRelativeTransform(NewTransform);
-			}
-		}
-
+		StaticMeshComponent->SetStaticMesh(StaticMesh);
 	}
 
-	MeshesToLoad.Remove(CurrentPrimitiveComponent);
-	if (MeshesToLoad.Num() > 0)
+	if (StaticMesh && !StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
 	{
-		LoadNextMeshAsync();
+		UStaticMeshSocket* DeltaSocket = StaticMesh->FindSocket(FName(StaticMeshConfig.ExportOriginalPivotToSocket));
+		if (DeltaSocket)
+		{
+			FTransform NewTransform = StaticMeshComponent->GetRelativeTransform();
+			FVector DeltaLocation = -DeltaSocket->RelativeLocation * NewTransform.GetScale3D();
+			DeltaLocation = NewTransform.GetRotation().RotateVector(DeltaLocation);
+			NewTransform.AddToTranslation(DeltaLocation);
+			StaticMeshComponent->SetRelativeTransform(NewTransform);
+		}
 	}
-	// trigger event
-	else
+
+	LoadedMeshNum++;
+	OnProgress.Broadcast(LoadedMeshNum / TotalMeshNum);
+
+	if (TotalMeshNum - LoadedMeshNum == 0)
 	{
+		Mutex.Lock();
 		ScenesLoaded();
+		Mutex.Unlock();
 	}
 }
 
@@ -261,4 +271,14 @@ void AglTFRuntimeAssetActorAsync::PostUnregisterAllComponents()
 		Asset = nullptr;
 	}
 	Super::PostUnregisterAllComponents();
+}
+
+int AglTFRuntimeAssetActorAsync::GetTotalMeshNum() const
+{
+    return (int)TotalMeshNum;
+}
+
+int AglTFRuntimeAssetActorAsync::GetTotalVerticesNum() const
+{
+    return TotalVerticesNum;
 }

@@ -835,11 +835,11 @@ bool UglTFRuntimeAsset::LoadEmitterIntoAudioComponent(const FglTFRuntimeAudioEmi
 	return Parser->LoadEmitterIntoAudioComponent(Emitter, AudioComponent);
 }
 
-void UglTFRuntimeAsset::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+void UglTFRuntimeAsset::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFRuntimeStaticMeshAsyncCustom& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, UStaticMeshComponent* StaticMeshComponent)
 {
 	GLTF_CHECK_PARSER_VOID();
 
-	Parser->LoadStaticMeshAsync(MeshIndex, AsyncCallback, StaticMeshConfig);
+	Parser->LoadStaticMeshAsync(MeshIndex, AsyncCallback, StaticMeshConfig, StaticMeshComponent);
 }
 
 void UglTFRuntimeAsset::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
