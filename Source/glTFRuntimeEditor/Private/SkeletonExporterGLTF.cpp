@@ -1,7 +1,10 @@
-// Copyright 2020-2021, Roberto De Ioris.
+// Copyright 2020-2023, Roberto De Ioris.
 
 
 #include "SkeletonExporterGLTF.h"
+#include "Misc/Base64.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 
 USkeletonExporterGLTF::USkeletonExporterGLTF(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)

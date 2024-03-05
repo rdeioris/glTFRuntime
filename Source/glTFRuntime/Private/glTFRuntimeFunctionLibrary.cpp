@@ -1,10 +1,13 @@
-// Copyright 2020, Roberto De Ioris.
+// Copyright 2020-2024, Roberto De Ioris.
 
 
 #include "glTFRuntimeFunctionLibrary.h"
+#include "Async/Async.h"
 #include "HttpModule.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig)
 {
@@ -13,6 +16,9 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const 
 	{
 		return nullptr;
 	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
 
 	// Annoying copy, but we do not want to remove the const
 	FglTFRuntimeConfig OverrideConfig = LoaderConfig;
@@ -30,18 +36,97 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const 
 	return Asset;
 }
 
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr);
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	// Annoying copy, but we do not want to remove the const
+	FglTFRuntimeConfig OverrideConfig = LoaderConfig;
+
+	if (bPathRelativeToContent)
+	{
+		OverrideConfig.bSearchContentDir = true;
+	}
+
+	Async(EAsyncExecution::Thread, [Filename, Asset, Completed, OverrideConfig]()
+		{
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename, OverrideConfig);
+
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset);
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+}
+
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
+	{
 		return nullptr;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
 	if (!Asset->LoadFromString(JsonData, LoaderConfig))
+	{
 		return nullptr;
+	}
 
 	return Asset;
 }
 
-void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromStringAsync(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr);
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	Async(EAsyncExecution::Thread, [JsonData, Asset, LoaderConfig, Completed]()
+		{
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromString(JsonData, LoaderConfig);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset);
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 {
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
@@ -54,15 +139,63 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<
 		HttpRequest->AppendToHeader(Header.Key, Header.Value);
 	}
 
-	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
-	{
-		UglTFRuntimeAsset* Asset = nullptr;
-		if (bSuccess)
+	float StartTime = FPlatformTime::Seconds();
+
+	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 		{
-			Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
-		}
-		Completed.ExecuteIfBound(Asset);
-	}, Completed, LoaderConfig);
+			UglTFRuntimeAsset* Asset = nullptr;
+			if (bSuccess && !IsGarbageCollecting())
+			{
+				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+				if (Asset)
+				{
+					Asset->GetParser()->SetDownloadTime(FPlatformTime::Seconds() - StartTime);
+				}
+			}
+			Completed.ExecuteIfBound(Asset);
+		}, Completed, LoaderConfig);
+
+	HttpRequest->ProcessRequest();
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
+{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+#else
+	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
+#endif
+	HttpRequest->SetURL(Url);
+	for (TPair<FString, FString> Header : Headers)
+	{
+		HttpRequest->AppendToHeader(Header.Key, Header.Value);
+	}
+
+	float StartTime = FPlatformTime::Seconds();
+
+	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+		{
+			UglTFRuntimeAsset* Asset = nullptr;
+			if (bSuccess && !IsGarbageCollecting())
+			{
+				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+				if (Asset)
+				{
+					Asset->GetParser()->SetDownloadTime(FPlatformTime::Seconds() - StartTime);
+				}
+			}
+			Completed.ExecuteIfBound(Asset);
+		}, Completed, LoaderConfig);
+
+	HttpRequest->OnRequestProgress().BindLambda([](FHttpRequestPtr RequestPtr, int32 BytesSent, int32 BytesReceived, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
+		{
+			int32 ContentLength = 0;
+			if (RequestPtr->GetResponse().IsValid())
+			{
+				ContentLength = RequestPtr->GetResponse()->GetContentLength();
+			}
+			Progress.ExecuteIfBound(LoaderConfig, BytesReceived, ContentLength);
+		}, Progress, LoaderConfig);
 
 	HttpRequest->ProcessRequest();
 }
@@ -75,10 +208,135 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 		return nullptr;
 	}
 
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
 	if (!Asset->LoadFromData(Data.GetData(), Data.Num(), LoaderConfig))
 	{
 		return nullptr;
 	}
 
 	return Asset;
+}
+
+bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, FString& ClipboardContent, const FglTFRuntimeConfig& LoaderConfig)
+{
+
+	FString Url;
+	FPlatformApplicationMisc::ClipboardPaste(Url);
+
+	if (Url.IsEmpty())
+	{
+		return false;
+	}
+
+	// escaped?
+	if (Url.StartsWith("\"") && Url.EndsWith("\""))
+	{
+		Url = Url.RightChop(1).LeftChop(1);
+	}
+
+	ClipboardContent = Url;
+
+	if (Url.Contains("://"))
+	{
+		glTFLoadAssetFromUrl(Url, {}, Completed, LoaderConfig);
+		return true;
+	}
+
+	UglTFRuntimeAsset* Asset = glTFLoadAssetFromFilename(Url, false, LoaderConfig);
+	Completed.ExecuteIfBound(Asset);
+
+	return Asset != nullptr;
+}
+
+TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArrayFromJSONPath(const FString& JSONPath)
+{
+	TArray<FglTFRuntimePathItem> Paths;
+	TArray<FString> Keys;
+	JSONPath.ParseIntoArray(Keys, TEXT("."));
+
+	for (const FString& Key : Keys)
+	{
+		FString PathKey = Key;
+		int32 PathIndex = -1;
+
+		int32 SquareBracketStart = 0;
+		int32 SquareBracketEnd = 0;
+		if (Key.FindChar('[', SquareBracketStart))
+		{
+			if (Key.FindChar(']', SquareBracketEnd))
+			{
+				if (SquareBracketEnd > SquareBracketStart)
+				{
+					const FString KeyIndex = Key.Mid(SquareBracketStart + 1, SquareBracketEnd - SquareBracketStart);
+					PathIndex = FCString::Atoi(*KeyIndex);
+					PathKey = Key.Left(SquareBracketStart);
+				}
+			}
+		}
+
+		FglTFRuntimePathItem PathItem;
+		PathItem.Path = PathKey;
+		PathItem.Index = PathIndex;
+		Paths.Add(PathItem);
+	}
+
+	return Paths;
+}
+
+bool UglTFRuntimeFunctionLibrary::GetIndicesAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes)
+{
+	if (!RuntimeLOD.Primitives.IsValidIndex(PrimitiveIndex))
+	{
+		return false;
+	}
+
+	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+
+	Bytes.AddUninitialized(Primitive.Indices.Num() * sizeof(uint32));
+	FMemory::Memcpy(Bytes.GetData(), Primitive.Indices.GetData(), Primitive.Indices.Num() * sizeof(uint32));
+	return true;
+}
+
+bool UglTFRuntimeFunctionLibrary::GetPositionsAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes)
+{
+	if (!RuntimeLOD.Primitives.IsValidIndex(PrimitiveIndex))
+	{
+		return false;
+	}
+
+	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+	Bytes.Reserve(Primitive.Positions.Num() * sizeof(float) * 3);
+	for (const FVector& Position : Primitive.Positions)
+	{
+		float X = static_cast<float>(Position.X);
+		float Y = static_cast<float>(Position.Y);
+		float Z = static_cast<float>(Position.Z);
+		Bytes.Append(reinterpret_cast<const uint8*>(&X), sizeof(float));
+		Bytes.Append(reinterpret_cast<const uint8*>(&Y), sizeof(float));
+		Bytes.Append(reinterpret_cast<const uint8*>(&Z), sizeof(float));
+	}
+	return true;
+}
+
+bool UglTFRuntimeFunctionLibrary::GetNormalsAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes)
+{
+	if (!RuntimeLOD.Primitives.IsValidIndex(PrimitiveIndex))
+	{
+		return false;
+	}
+
+	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+	Bytes.Reserve(Primitive.Positions.Num() * sizeof(float) * 3);
+	for (const FVector& Normal : Primitive.Normals)
+	{
+		float X = static_cast<float>(Normal.X);
+		float Y = static_cast<float>(Normal.Y);
+		float Z = static_cast<float>(Normal.Z);
+		Bytes.Append(reinterpret_cast<const uint8*>(&X), sizeof(float));
+		Bytes.Append(reinterpret_cast<const uint8*>(&Y), sizeof(float));
+		Bytes.Append(reinterpret_cast<const uint8*>(&Z), sizeof(float));
+	}
+	return true;
 }
