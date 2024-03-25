@@ -967,7 +967,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonTextures;
 	// no images ?
-	if (!Root->TryGetArrayField("textures", JsonTextures))
+	if (!Root->TryGetArrayField(TEXT("textures"), JsonTextures))
 	{
 		return nullptr;
 	}
@@ -986,7 +986,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	int64 ImageIndex = INDEX_NONE;
 	OnTextureImageIndex.Broadcast(AsShared(), JsonTextureObject.ToSharedRef(), ImageIndex);
 
-	if (ImageIndex <= INDEX_NONE && !JsonTextureObject->TryGetNumberField("source", ImageIndex))
+	if (ImageIndex <= INDEX_NONE && !JsonTextureObject->TryGetNumberField(TEXT("source"), ImageIndex))
 	{
 		return nullptr;
 	}
