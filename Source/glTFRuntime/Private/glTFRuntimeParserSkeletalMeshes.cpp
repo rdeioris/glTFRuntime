@@ -1755,7 +1755,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
-	if (!Root->TryGetArrayField("animations", JsonAnimations))
+	if (!Root->TryGetArrayField(TEXT("animations"), JsonAnimations))
 	{
 		AddError("LoadSkeletalAnimationByName()", "No animations defined in the asset.");
 		return nullptr;
@@ -1770,7 +1770,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 		}
 
 		FString JsonAnimationName;
-		if (JsonAnimationObject->TryGetStringField("name", JsonAnimationName))
+		if (JsonAnimationObject->TryGetStringField(TEXT("name"), JsonAnimationName))
 		{
 			if (JsonAnimationName == AnimationName)
 			{
@@ -1808,7 +1808,7 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 		}
 
 		const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
-		if (!JsonSkinObject->TryGetArrayField("joints", JsonJoints))
+		if (!JsonSkinObject->TryGetArrayField(TEXT("joints"), JsonJoints))
 		{
 			AddError("LoadNodeSkeletalAnimation()", "No joints defined in the skin");
 			return nullptr;
@@ -1826,7 +1826,7 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
-	if (!Root->TryGetArrayField("animations", JsonAnimations))
+	if (!Root->TryGetArrayField(TEXT("animations"), JsonAnimations))
 	{
 		return nullptr;
 	}
@@ -1892,7 +1892,7 @@ TMap<FString, UAnimSequence*> FglTFRuntimeParser::LoadNodeSkeletalAnimationsMap(
 		}
 
 		const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
-		if (!JsonSkinObject->TryGetArrayField("joints", JsonJoints))
+		if (!JsonSkinObject->TryGetArrayField(TEXT("joints"), JsonJoints))
 		{
 			AddError("LoadNodeSkeletalAnimation()", "No joints defined in the skin");
 			return SkeletalAnimationsMap;
@@ -1910,7 +1910,7 @@ TMap<FString, UAnimSequence*> FglTFRuntimeParser::LoadNodeSkeletalAnimationsMap(
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
-	if (!Root->TryGetArrayField("animations", JsonAnimations))
+	if (!Root->TryGetArrayField(TEXT("animations"), JsonAnimations))
 	{
 		return SkeletalAnimationsMap;
 	}
@@ -1924,7 +1924,7 @@ TMap<FString, UAnimSequence*> FglTFRuntimeParser::LoadNodeSkeletalAnimationsMap(
 		}
 
 		FString AnimationName;
-		if (!JsonAnimationObject->TryGetStringField("name", AnimationName))
+		if (!JsonAnimationObject->TryGetStringField(TEXT("name"), AnimationName))
 		{
 			AnimationName = FString::Printf(TEXT("Animation_%d"), JsonAnimationIndex);
 		}
