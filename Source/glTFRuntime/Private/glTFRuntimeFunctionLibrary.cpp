@@ -187,7 +187,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString
 			Completed.ExecuteIfBound(Asset);
 		}, Completed, LoaderConfig);
 
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 4
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 4
 	HttpRequest->OnRequestProgress64().BindLambda([](FHttpRequestPtr RequestPtr, uint64 BytesSent, uint64 BytesReceived, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
 #else
 	HttpRequest->OnRequestProgress().BindLambda([](FHttpRequestPtr RequestPtr, int32 BytesSent, int32 BytesReceived, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
