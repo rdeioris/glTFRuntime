@@ -529,7 +529,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #endif
 
 #if ENGINE_MAJOR_VERSION > 4
-						constFVector Position1 = FVector(StaticMeshVertex1.Position);
+						const FVector Position1 = FVector(StaticMeshVertex1.Position);
 						const FVector4 TangentZ1 = FVector(StaticMeshVertex1.TangentZ);
 						const FVector2D UV1 = FVector2D(StaticMeshVertex1.UVs[0]);
 #else
