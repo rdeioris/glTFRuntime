@@ -1421,6 +1421,7 @@ struct FglTFRuntimePrimitive
 	bool bHighPrecisionWeights;
 
 	bool bDisableShadows;
+	bool bHasIndices;
 
 	FglTFRuntimePrimitive()
 	{
@@ -1431,6 +1432,7 @@ struct FglTFRuntimePrimitive
 		Material = nullptr;
 		Mode = 4;
 		bDisableShadows = false;
+		bHasIndices = false;
 	}
 };
 

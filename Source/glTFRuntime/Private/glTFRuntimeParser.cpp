@@ -2939,42 +2939,44 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			return false;
 		}
 
-		Primitive.Indices.AddUninitialized(Count);
-		for (int64 i = 0; i < Count; i++)
+		if (ComponentType != 5121 && ComponentType != 5123 && ComponentType != 5125)
 		{
-			int64 IndexIndex = i * Stride;
-
-			uint32 VertexIndex;
-			if (ComponentType == 5121)
-			{
-				VertexIndex = IndicesBytes.Data[IndexIndex];
-			}
-			else if (ComponentType == 5123)
-			{
-				uint16* IndexPtr = (uint16*)&(IndicesBytes.Data[IndexIndex]);
-				VertexIndex = *IndexPtr;
-			}
-			else if (ComponentType == 5125)
-			{
-				uint32* IndexPtr = (uint32*)&(IndicesBytes.Data[IndexIndex]);
-				VertexIndex = *IndexPtr;
-			}
-			else
-			{
-				AddError("LoadPrimitive()", FString::Printf(TEXT("Invalid component type for indices: %lld"), ComponentType));
-				return false;
-			}
-
-			Primitive.Indices[i] = VertexIndex;
+			AddError("LoadPrimitive()", FString::Printf(TEXT("Invalid component type for indices: %lld"), ComponentType));
+			return false;
 		}
+
+		Primitive.Indices.AddUninitialized(Count);
+		ParallelFor(Count, [&](const int32 Index)
+			{
+				int64 IndexIndex = Index * Stride;
+
+				uint32 VertexIndex;
+				if (ComponentType == 5121)
+				{
+					VertexIndex = IndicesBytes.Data[IndexIndex];
+				}
+				else if (ComponentType == 5123)
+				{
+					uint16* IndexPtr = (uint16*)&(IndicesBytes.Data[IndexIndex]);
+					VertexIndex = *IndexPtr;
+				}
+				else if (ComponentType == 5125)
+				{
+					uint32* IndexPtr = (uint32*)&(IndicesBytes.Data[IndexIndex]);
+					VertexIndex = *IndexPtr;
+				}
+
+				Primitive.Indices[Index] = VertexIndex;
+			});
+		Primitive.bHasIndices = true;
 	}
 	else
 	{
 		Primitive.Indices.AddUninitialized(Primitive.Positions.Num());
-		for (int32 VertexIndex = 0; VertexIndex < Primitive.Positions.Num(); VertexIndex++)
-		{
-			Primitive.Indices[VertexIndex] = VertexIndex;
-		}
+		ParallelFor(Primitive.Positions.Num(), [&](const int32 VertexIndex)
+			{
+				Primitive.Indices[VertexIndex] = VertexIndex;
+			});
 	}
 
 	// fixing indices... 5: TRIANGLE_STRIP 6: TRIANGLE_FAN
