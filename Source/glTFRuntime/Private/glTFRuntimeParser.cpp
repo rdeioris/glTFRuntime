@@ -2950,7 +2950,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			{
 				int64 IndexIndex = Index * Stride;
 
-				uint32 VertexIndex;
+				uint32 VertexIndex = 0;
 				if (ComponentType == 5121)
 				{
 					VertexIndex = IndicesBytes.Data[IndexIndex];
