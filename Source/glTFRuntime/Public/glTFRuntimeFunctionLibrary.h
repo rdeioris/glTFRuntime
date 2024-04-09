@@ -54,4 +54,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Get an array of bytes containing the glTF Runtime LOD normals"), Category = "glTFRuntime")
 	static bool GetNormalsAsBytesFromglTFRuntimeLODPrimitive(const FglTFRuntimeMeshLOD& RuntimeLOD, const int32 PrimitiveIndex, TArray<uint8>& Bytes);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Base64 String", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
+	static UglTFRuntimeAsset* glTFLoadAssetFromBase64(const FString& Base64, const FglTFRuntimeConfig& LoaderConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Base64 String Async", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
+	static void glTFLoadAssetFromBase64Async(const FString& Base64, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed);
 };
