@@ -268,7 +268,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString
 		}, Progress, LoaderConfig);
 
 	HttpRequest->ProcessRequest();
-		}
+}
 
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig)
 {
@@ -409,4 +409,37 @@ bool UglTFRuntimeFunctionLibrary::GetNormalsAsBytesFromglTFRuntimeLODPrimitive(c
 		Bytes.Append(reinterpret_cast<const uint8*>(&Z), sizeof(float));
 	}
 	return true;
+}
+
+FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs)
+{
+	FglTFRuntimeMeshLOD NewRuntimeLOD;
+
+	for (const FglTFRuntimeMeshLOD& RuntimeLOD : RuntimeLODs)
+	{
+		NewRuntimeLOD.Primitives.Append(RuntimeLOD.Primitives);
+		NewRuntimeLOD.AdditionalTransforms.Append(RuntimeLOD.AdditionalTransforms);
+		if (NewRuntimeLOD.Skeleton.Num() == 0)
+		{
+			NewRuntimeLOD.Skeleton = RuntimeLOD.Skeleton;
+		}
+		if (!NewRuntimeLOD.bHasNormals)
+		{
+			NewRuntimeLOD.bHasNormals = RuntimeLOD.bHasNormals;
+		}
+		if (NewRuntimeLOD.bHasTangents)
+		{
+			NewRuntimeLOD.bHasTangents = RuntimeLOD.bHasTangents;
+		}
+		if (!NewRuntimeLOD.bHasUV)
+		{
+			NewRuntimeLOD.bHasUV = RuntimeLOD.bHasUV;
+		}
+		if (!NewRuntimeLOD.bHasVertexColors)
+		{
+			NewRuntimeLOD.bHasVertexColors = RuntimeLOD.bHasVertexColors;
+		}
+	}
+
+	return NewRuntimeLOD;
 }

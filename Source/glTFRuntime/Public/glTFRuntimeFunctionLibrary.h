@@ -60,4 +60,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Base64 String Async", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromBase64Async(const FString& Base64, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Merge multiple glTF Runtime LODs"), Category = "glTFRuntime")
+	static FglTFRuntimeMeshLOD glTFMergeRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs);
 };
