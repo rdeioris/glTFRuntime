@@ -666,7 +666,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		// special (slower) logic for huge meshes (data size > 2GB)
 		if (PositionsSize > MAX_int32)
 		{
+#if ENGINE_MAJOR_VERSION >= 5
 			TArray<FVector3f> Positions;
+#else
+			TArray<FVector> Positions;
+#endif
 			Positions.AddUninitialized(StaticMeshBuildVertices.Num());
 			for (int32 BuildVertexIndex = 0; BuildVertexIndex < StaticMeshBuildVertices.Num(); BuildVertexIndex++)
 			{
