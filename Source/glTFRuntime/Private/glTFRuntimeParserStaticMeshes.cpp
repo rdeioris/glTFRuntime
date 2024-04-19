@@ -662,7 +662,23 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			StaticMeshContext->BoundingBoxAndSphere.Origin -= PivotDelta;
 		}
 
-		LODResources.VertexBuffers.PositionVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
+		const int64 PositionsSize = StaticMeshBuildVertices.Num() * sizeof(FStaticMeshBuildVertex);
+		// special (slower) logic for huge meshes (data size > 2GB)
+		if (PositionsSize > MAX_int32)
+		{
+			TArray<FVector3f> Positions;
+			Positions.AddUninitialized(StaticMeshBuildVertices.Num());
+			for (int32 BuildVertexIndex = 0; BuildVertexIndex < StaticMeshBuildVertices.Num(); BuildVertexIndex++)
+			{
+				Positions[BuildVertexIndex] = StaticMeshBuildVertices[BuildVertexIndex].Position;
+			}
+			LODResources.VertexBuffers.PositionVertexBuffer.Init(Positions, StaticMesh->bAllowCPUAccess);
+		}
+		else
+		{
+			LODResources.VertexBuffers.PositionVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
+		}
+		
 		LODResources.VertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bHighPrecisionUVs || StaticMeshConfig.bUseHighPrecisionUVs);
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 3
 		LODResources.VertexBuffers.StaticMeshVertexBuffer.Init(0, NumUVs, StaticMesh->bAllowCPUAccess);
