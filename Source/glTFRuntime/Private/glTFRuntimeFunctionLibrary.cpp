@@ -8,6 +8,7 @@
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/Base64.h"
+#include "GenericPlatform/GenericPlatformProcess.h"
 #include "Runtime/Launch/Resources/Version.h"
 
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig)
@@ -442,4 +443,99 @@ FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODs(const TArr
 	}
 
 	return NewRuntimeLOD;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Command, const FString& Arguments, const FString& WorkingDirectory, const FglTFRuntimeCommandResponse& Completed, const FglTFRuntimeConfig& LoaderConfig, const int32 ExpectedExitCode)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr, -1, "");
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	Async(EAsyncExecution::Thread, [Command, Arguments, WorkingDirectory, Asset, LoaderConfig, Completed, ExpectedExitCode]()
+		{
+			TArray<uint8> Bytes;
+
+			void* ReadPipe = nullptr;
+			void* WritePipe = nullptr;
+
+			if (!FPlatformProcess::CreatePipe(ReadPipe, WritePipe))
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+					{
+						Completed.ExecuteIfBound(nullptr, -1, "Unable to create process pipe");
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+			FProcHandle ProcHandle = FPlatformProcess::CreateProc(
+				*Command,
+				*Arguments,
+				true,
+				true,
+				true,
+				nullptr,
+				0,
+				WorkingDirectory.IsEmpty() ? nullptr : *WorkingDirectory,
+				WritePipe,
+				ReadPipe);
+
+			if (!ProcHandle.IsValid())
+			{
+				FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+					{
+						Completed.ExecuteIfBound(nullptr, -1, "Unable to launch process");
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+			while (FPlatformProcess::IsProcRunning(ProcHandle))
+			{
+				TArray<uint8> PipeChunk;
+				if (FPlatformProcess::ReadPipeToArray(ReadPipe, PipeChunk))
+				{
+					Bytes.Append(PipeChunk);
+				}
+			}
+
+			int32 ReturnCode = 0;
+			FPlatformProcess::GetProcReturnCode(ProcHandle, &ReturnCode);
+
+			FPlatformProcess::CloseProc(ProcHandle);
+			FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
+
+			if (ReturnCode != ExpectedExitCode)
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed, ReturnCode, &Bytes]()
+					{
+						Completed.ExecuteIfBound(nullptr, ReturnCode, FString::FromBlob(Bytes.GetData(), Bytes.Num()));
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(Bytes, LoaderConfig);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed, ReturnCode]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset, ReturnCode, "");
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr, ReturnCode, "Unable to parse command output");
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+
 }

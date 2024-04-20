@@ -9,6 +9,8 @@
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeHttpResponse, UglTFRuntimeAsset*, Asset);
 DECLARE_DYNAMIC_DELEGATE_ThreeParams(FglTFRuntimeHttpProgress, const FglTFRuntimeConfig&, LoaderConfig, int32, BytesProcessed, int32, TotalBytes);
+DECLARE_DYNAMIC_DELEGATE_ThreeParams(FglTFRuntimeCommandResponse, UglTFRuntimeAsset*, Asset, const int32, ExitCode, const FString&, StdErr);
+
 
 /**
  * 
@@ -63,4 +65,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Merge multiple glTF Runtime LODs"), Category = "glTFRuntime")
 	static FglTFRuntimeMeshLOD glTFMergeRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Command", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
+	static void glTFLoadAssetFromCommand(const FString& Command, const FString& Arguments, const FString& WorkingDirectory, const FglTFRuntimeCommandResponse& Completed, const FglTFRuntimeConfig& LoaderConfig, const int32 ExpectedExitCode = 0);
 };
