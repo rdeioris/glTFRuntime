@@ -7,6 +7,8 @@
 #include "HAL/PlatformApplicationMisc.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
+#include "Misc/Base64.h"
+#include "GenericPlatform/GenericPlatformProcess.h"
 #include "Runtime/Launch/Resources/Version.h"
 
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig)
@@ -93,6 +95,71 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FS
 	}
 
 	return Asset;
+}
+
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64(const FString& Base64, const FglTFRuntimeConfig& LoaderConfig)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		return nullptr;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	TArray<uint8> BytesBase64;
+
+	if (!FBase64::Decode(Base64, BytesBase64))
+	{
+		return nullptr;
+	}
+
+	if (!Asset->LoadFromData(BytesBase64.GetData(), BytesBase64.Num(), LoaderConfig))
+	{
+		return nullptr;
+	}
+
+	return Asset;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64Async(const FString& Base64, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr);
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	Async(EAsyncExecution::Thread, [Base64, Asset, LoaderConfig, Completed]()
+		{
+			TArray<uint8> BytesBase64;
+
+			if (!FBase64::Decode(Base64, BytesBase64))
+			{
+				Completed.ExecuteIfBound(nullptr);
+				return;
+			}
+
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(BytesBase64, LoaderConfig);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset);
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
 }
 
 void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromStringAsync(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
@@ -187,7 +254,11 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString
 			Completed.ExecuteIfBound(Asset);
 		}, Completed, LoaderConfig);
 
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 4
+	HttpRequest->OnRequestProgress64().BindLambda([](FHttpRequestPtr RequestPtr, uint64 BytesSent, uint64 BytesReceived, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
+#else
 	HttpRequest->OnRequestProgress().BindLambda([](FHttpRequestPtr RequestPtr, int32 BytesSent, int32 BytesReceived, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
+#endif
 		{
 			int32 ContentLength = 0;
 			if (RequestPtr->GetResponse().IsValid())
@@ -339,4 +410,132 @@ bool UglTFRuntimeFunctionLibrary::GetNormalsAsBytesFromglTFRuntimeLODPrimitive(c
 		Bytes.Append(reinterpret_cast<const uint8*>(&Z), sizeof(float));
 	}
 	return true;
+}
+
+FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs)
+{
+	FglTFRuntimeMeshLOD NewRuntimeLOD;
+
+	for (const FglTFRuntimeMeshLOD& RuntimeLOD : RuntimeLODs)
+	{
+		NewRuntimeLOD.Primitives.Append(RuntimeLOD.Primitives);
+		NewRuntimeLOD.AdditionalTransforms.Append(RuntimeLOD.AdditionalTransforms);
+		if (NewRuntimeLOD.Skeleton.Num() == 0)
+		{
+			NewRuntimeLOD.Skeleton = RuntimeLOD.Skeleton;
+		}
+		if (!NewRuntimeLOD.bHasNormals)
+		{
+			NewRuntimeLOD.bHasNormals = RuntimeLOD.bHasNormals;
+		}
+		if (NewRuntimeLOD.bHasTangents)
+		{
+			NewRuntimeLOD.bHasTangents = RuntimeLOD.bHasTangents;
+		}
+		if (!NewRuntimeLOD.bHasUV)
+		{
+			NewRuntimeLOD.bHasUV = RuntimeLOD.bHasUV;
+		}
+		if (!NewRuntimeLOD.bHasVertexColors)
+		{
+			NewRuntimeLOD.bHasVertexColors = RuntimeLOD.bHasVertexColors;
+		}
+	}
+
+	return NewRuntimeLOD;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Command, const FString& Arguments, const FString& WorkingDirectory, const FglTFRuntimeCommandResponse& Completed, const FglTFRuntimeConfig& LoaderConfig, const int32 ExpectedExitCode)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr, -1, "");
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	Async(EAsyncExecution::Thread, [Command, Arguments, WorkingDirectory, Asset, LoaderConfig, Completed, ExpectedExitCode]()
+		{
+			TArray<uint8> Bytes;
+
+			void* ReadPipe = nullptr;
+			void* WritePipe = nullptr;
+
+			if (!FPlatformProcess::CreatePipe(ReadPipe, WritePipe))
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+					{
+						Completed.ExecuteIfBound(nullptr, -1, "Unable to create process pipe");
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+			FProcHandle ProcHandle = FPlatformProcess::CreateProc(
+				*Command,
+				*Arguments,
+				true,
+				true,
+				true,
+				nullptr,
+				0,
+				WorkingDirectory.IsEmpty() ? nullptr : *WorkingDirectory,
+				WritePipe,
+				ReadPipe);
+
+			if (!ProcHandle.IsValid())
+			{
+				FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+					{
+						Completed.ExecuteIfBound(nullptr, -1, "Unable to launch process");
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+			while (FPlatformProcess::IsProcRunning(ProcHandle))
+			{
+				TArray<uint8> PipeChunk;
+				if (FPlatformProcess::ReadPipeToArray(ReadPipe, PipeChunk))
+				{
+					Bytes.Append(PipeChunk);
+				}
+			}
+
+			int32 ReturnCode = 0;
+			FPlatformProcess::GetProcReturnCode(ProcHandle, &ReturnCode);
+
+			FPlatformProcess::CloseProc(ProcHandle);
+			FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
+
+			if (ReturnCode != ExpectedExitCode)
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed, ReturnCode, &Bytes]()
+					{
+						Completed.ExecuteIfBound(nullptr, ReturnCode, FString::FromBlob(Bytes.GetData(), Bytes.Num()));
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(Bytes, LoaderConfig);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed, ReturnCode]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset, ReturnCode, "");
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr, ReturnCode, "Unable to parse command output");
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+
 }
