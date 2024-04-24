@@ -3722,6 +3722,72 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<
 	return FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
 }
 
+void FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
+	SkeletalMeshContext->SkinIndex = SkinIndex;
+
+	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, RuntimeLODs, AsyncCallback]()
+		{
+			FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
+
+			if (RuntimeLODs.Num() < 1)
+			{
+				AddError("LoadSkeletalMeshFromRuntimeLODsAsync()", "No RuntimeLOD specified");
+				return;
+			}
+
+			if (RuntimeLODs[0].Primitives.Num() < 1)
+			{
+				AddError("LoadSkeletalMeshFromRuntimeLODsAsync()", "No Primitives for RuntimeLOD 0");
+				return;
+			}
+
+			const TMap<int32, FName>& BaseBoneMap = RuntimeLODs[0].Primitives[0].OverrideBoneMap;
+
+			SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLODs[0]));
+
+			auto ContainsBone = [BaseBoneMap](FName BoneName) -> bool
+				{
+					for (const TPair<int32, FName>& Pair : BaseBoneMap)
+					{
+						if (Pair.Value == BoneName)
+						{
+							return true;
+						}
+					}
+					return false;
+				};
+
+			for (int32 LODIndex = 1; LODIndex < RuntimeLODs.Num(); LODIndex++)
+			{
+				if (RuntimeLODs[LODIndex].Primitives.Num() < 1)
+				{
+					AddError("LoadSkeletalMeshFromRuntimeLODsAsync()", "Invalid RuntimeLOD, no Primitives defined");
+					return;
+				}
+
+				for (const FglTFRuntimePrimitive& Primitive : RuntimeLODs[LODIndex].Primitives)
+				{
+					FglTFRuntimePrimitive& NonConstPrimitive = const_cast<FglTFRuntimePrimitive&>(Primitive);
+
+					for (TPair<int32, FName>& Pair : NonConstPrimitive.OverrideBoneMap)
+					{
+						if (!ContainsBone(Pair.Value))
+						{
+							AddError("LoadSkeletalMeshFromRuntimeLODsAsync()", FString::Printf(TEXT("Unknown bone %s"), *Pair.Value.ToString()));
+							return;
+						}
+					}
+				}
+
+				SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLODs[LODIndex]));
+			}
+
+			SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
+		});
+}
+
 const FBox& FglTFRuntimeSkeletalMeshContext::GetBoneBox(const int32 BoneIndex)
 {
 	// unfortunately we need access to SkinWeightVertexBuffer.GetBoneIndex (and it is not available in 4.25)
