@@ -142,7 +142,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		int32 NumUVs = 1;
 		FVector PivotDelta = FVector::ZeroVector;
 
-		int32 NumVertexInstancesPerLOD = 0;
+		int32 NumVerticesToBuildPerLOD = 0;
 
 		for (const FglTFRuntimePrimitive& Primitive : LOD->Primitives)
 		{
@@ -156,11 +156,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				bHasVertexColors = true;
 			}
 
-			NumVertexInstancesPerLOD += Primitive.Indices.Num();
+			NumVerticesToBuildPerLOD += Primitive.Positions.Num();
 		}
 
 		TArray<FStaticMeshBuildVertex> StaticMeshBuildVertices;
-		StaticMeshBuildVertices.AddUninitialized(NumVertexInstancesPerLOD);
+		StaticMeshBuildVertices.AddUninitialized(NumVerticesToBuildPerLOD);
 
 		FBox BoundingBox;
 		BoundingBox.Init();
