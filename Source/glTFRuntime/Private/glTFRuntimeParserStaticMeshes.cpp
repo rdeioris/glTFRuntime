@@ -156,7 +156,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				bHasVertexColors = true;
 			}
 
-			NumVerticesToBuildPerLOD += Primitive.Positions.Num();
+			NumVerticesToBuildPerLOD += Primitive.bHasIndices ? Primitive.Positions.Num() : Primitive.Indices.Num();
 		}
 
 		TArray<FStaticMeshBuildVertex> StaticMeshBuildVertices;
@@ -679,7 +679,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		{
 			LODResources.VertexBuffers.PositionVertexBuffer.Init(StaticMeshBuildVertices, StaticMesh->bAllowCPUAccess);
 		}
-		
+
 		LODResources.VertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bHighPrecisionUVs || StaticMeshConfig.bUseHighPrecisionUVs);
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 3
 		LODResources.VertexBuffers.StaticMeshVertexBuffer.Init(0, NumUVs, StaticMesh->bAllowCPUAccess);

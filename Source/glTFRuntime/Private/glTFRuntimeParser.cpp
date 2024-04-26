@@ -2968,7 +2968,12 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 
 				Primitive.Indices[Index] = VertexIndex;
 			});
-		Primitive.bHasIndices = true;
+
+		// use indices only if their number is higher than positions (this reduces gpu usage on assets reusing the same POSITION buffer)
+		if (Primitive.Positions.Num() < Primitive.Indices.Num())
+		{
+			Primitive.bHasIndices = true;
+		}
 	}
 	else
 	{
@@ -5302,7 +5307,6 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		for (int64 ElementIndex = 0; ElementIndex < Elements; ElementIndex += MaxBlockElements)
 		{
 			int64 BlockElements = FMath::Min<int64>(Elements - ElementIndex, MaxBlockElements);
-
 #if ENGINE_MAJOR_VERSION > 4
 			int64 GroupCount = FMath::CeilToInt64(BlockElements / 16.0);
 #else
@@ -5454,7 +5458,6 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 				}
 			}
 		}
-
 	}
 	else if (Mode == "TRIANGLES" && Blob.Num >= 17 && Blob.Data[0] == 0xe1 && (Stride == 2 || Stride == 4) && ((Elements % 3) == 0))
 	{
