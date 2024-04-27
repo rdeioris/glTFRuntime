@@ -159,6 +159,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				}
 
 				ParamTextureCache = LoadTexture(TextureIndex, ParamMips, sRGB, MaterialsConfig, Sampler);
+
 				return *JsonTextureObject;
 			}
 			return nullptr;
@@ -257,6 +258,17 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			}
 			GetMaterialTexture(JsonMaterialSpecular->ToSharedRef(), "specularTexture", false, RuntimeMaterial.SpecularTextureCache, RuntimeMaterial.SpecularTextureMips, RuntimeMaterial.SpecularTransform, RuntimeMaterial.SpecularSampler, false);
 			RuntimeMaterial.bKHR_materials_specular = true;
+		}
+
+		// KHR_materials_emissive_strength
+		const TSharedPtr<FJsonObject>* JsonMaterialEmissiveStrength;
+		if ((*JsonExtensions)->TryGetObjectField(TEXT("KHR_materials_emissive_strength"), JsonMaterialEmissiveStrength))
+		{
+			if (!(*JsonMaterialEmissiveStrength)->TryGetNumberField(TEXT("emissiveStrength"), RuntimeMaterial.EmissiveStrength))
+			{
+				RuntimeMaterial.EmissiveStrength = 1;
+			}
+			RuntimeMaterial.bKHR_materials_emissive_strength = true;
 		}
 
 		// KHR_materials_clearcoat
@@ -770,6 +782,8 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			TextureCompressionSettings::TC_Default, false);
 	}
 
+
+
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
 	Material->SetScalarParameterValue("AlphaMask", RuntimeMaterial.bMasked ? 1.0f : 0.0f);
 
@@ -777,6 +791,8 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatFactor", RuntimeMaterial.ClearCoatFactor);
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatRoughnessFactor", RuntimeMaterial.ClearCoatRoughnessFactor);
+
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_emissive_strength, "emissiveStrength", RuntimeMaterial.EmissiveStrength);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ScalarParamsOverrides)
 	{

@@ -335,6 +335,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FString> GetErrors() const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool MeshHasMorphTargets(const int32 MeshIndex) const;
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

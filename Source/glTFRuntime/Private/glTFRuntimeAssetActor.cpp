@@ -27,6 +27,7 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 	RootNodeIndex = INDEX_NONE;
 	bLoadAllSkeletalAnimations = false;
 	bAutoPlayAnimations = true;
+	bStaticMeshesAsSkeletalOnMorphTargets = true;
 }
 
 // Called when the game starts or when spawned
@@ -142,7 +143,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 	else
 	{
-		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal && !(bStaticMeshesAsSkeletalOnMorphTargets && Asset->MeshHasMorphTargets(Node.MeshIndex)))
 		{
 			UStaticMeshComponent* StaticMeshComponent = nullptr;
 			TArray<FTransform> GPUInstancingTransforms;

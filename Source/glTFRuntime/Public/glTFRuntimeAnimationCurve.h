@@ -18,10 +18,16 @@ class GLTFRUNTIME_API UglTFRuntimeAnimationCurve : public UCurveBase
     FRichCurve LocationCurves[3];
 
     UPROPERTY()
-    FRichCurve RotationCurves[3];
+    FRichCurve QuatCurves[4];
+
+    UPROPERTY()
+    FRichCurve RotatorCurves[3];
 
     UPROPERTY()
     FRichCurve ScaleCurves[3];
+
+    TArray<TPair<float, FQuat>> ConvertedQuaternions;
+    bool bIsStepped;
 
     // Begin FCurveOwnerInterface
     virtual TArray<FRichCurveEditInfoConst> GetCurves() const override;
@@ -51,7 +57,9 @@ public:
     FTransform GetTransformValue(float InTime) const;
 
     void AddLocationValue(const float InTime, const FVector InLocation, const ERichCurveInterpMode InterpolationMode);
-    void AddRotationValue(const float InTime, const FVector InEulerRotation, const ERichCurveInterpMode InterpolationMode);
+    void AddQuatValue(const float InTime, const FQuat InQuat, const ERichCurveInterpMode InterpolationMode);
+    void AddRotatorValue(const float InTime, const FRotator InRotator, const ERichCurveInterpMode InterpolationMode);
     void AddScaleValue(const float InTime, const FVector InScale, const ERichCurveInterpMode InterpolationMode);
-    void SetDefaultValues(const FVector Location, const FVector EulerRotation, const FVector Scale);
+    void SetDefaultValues(const FVector Location, const FQuat Quat, const FRotator Rotator, const FVector Scale);
+    void AddConvertedQuaternion(const float InTime, const FQuat InQuat, const bool bStep);
 };

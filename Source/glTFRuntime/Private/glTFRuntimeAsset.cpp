@@ -1481,3 +1481,10 @@ TArray<FString> UglTFRuntimeAsset::GetErrors() const
 
 	return Parser->GetErrors();
 }
+
+bool UglTFRuntimeAsset::MeshHasMorphTargets(const int32 MeshIndex) const
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->MeshHasMorphTargets(MeshIndex);
+}
