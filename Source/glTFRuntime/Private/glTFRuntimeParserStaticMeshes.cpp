@@ -28,7 +28,11 @@ FglTFRuntimeStaticMeshContext::FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRun
 {
 	StaticMesh = NewObject<UStaticMesh>(StaticMeshConfig.Outer ? StaticMeshConfig.Outer : GetTransientPackage(), NAME_None, RF_Public);
 #if PLATFORM_ANDROID || PLATFORM_IOS
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 4
+	StaticMesh->bAllowCPUAccess = StaticMeshConfig.bAllowCPUAccess;
+#else
 	StaticMesh->bAllowCPUAccess = false;
+#endif
 #else
 	StaticMesh->bAllowCPUAccess = StaticMeshConfig.bAllowCPUAccess;
 #endif
