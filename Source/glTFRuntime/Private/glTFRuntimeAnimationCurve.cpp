@@ -248,7 +248,7 @@ void UglTFRuntimeAnimationCurve::AddConvertedQuaternion(const float InTime, cons
 		for (; Index < ConvertedQuaternions.Num() && ConvertedQuaternions[Index].Key < InTime; ++Index);
 	}
 
-	ConvertedQuaternions.Insert({ InTime, InQuat }, Index);
+	ConvertedQuaternions.Insert(TPair<float, FQuat>{ InTime, InQuat }, Index);
 
 	bIsStepped = bStep;
 }

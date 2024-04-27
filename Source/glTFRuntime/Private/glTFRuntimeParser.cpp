@@ -5818,7 +5818,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 					X /= One;
 					Y /= One;
 					const float Z = 1.0 - FMath::Abs(X) - FMath::Abs(Y);
-					const float T = FMath::Max(-Z, 0.0);
+					const float T = FMath::Max(-Z, 0.0f);
 					X -= (X >= 0) ? T : -T;
 					Y -= (Y >= 0) ? T : -T;
 					const float H = MaxInt / FMath::Sqrt(X * X + Y * Y + Z * Z);
@@ -5839,7 +5839,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 					X /= One;
 					Y /= One;
 					const float Z = 1.0 - FMath::Abs(X) - FMath::Abs(Y);
-					const float T = FMath::Max(-Z, 0.0);
+					const float T = FMath::Max(-Z, 0.0f);
 					X -= (X >= 0) ? T : -T;
 					Y -= (Y >= 0) ? T : -T;
 					const float H = MaxInt / FMath::Sqrt(X * X + Y * Y + Z * Z);
