@@ -17,6 +17,7 @@
 #endif
 #include "Misc/Base64.h"
 #include "Misc/Compression.h"
+#include "Misc/Crc.h"
 #include "Misc/Paths.h"
 #include "Interfaces/IPluginManager.h"
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
@@ -4856,8 +4857,12 @@ bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName
 
 void FglTFRuntimeZipFile::SetPassword(const FString& EncryptionKey)
 {
-	auto UTF8Conversion = StringCast<UTF8CHAR>(*EncryptionKey);
 	Password.Empty();
+#if ENGINE_MAJOR_VERSION >= 5
+	auto UTF8Conversion = StringCast<UTF8CHAR>(*EncryptionKey);
+#else
+	auto UTF8Conversion = StringCast<char>(*EncryptionKey);
+#endif
 	Password.Append(reinterpret_cast<const uint8*>(UTF8Conversion.Get()), UTF8Conversion.Length());
 }
 
