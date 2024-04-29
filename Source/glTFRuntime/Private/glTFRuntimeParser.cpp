@@ -85,13 +85,15 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 
 	TSharedPtr<FglTFRuntimeParser> Parser = FromData(Content.GetData(), Content.Num(), LoaderConfig);
 
-	if (Parser && LoaderConfig.bAllowExternalFiles)
+	if (Parser)
 	{
-		// allows to load external files
-		Parser->BaseDirectory = FPaths::GetPath(TruePath);
+		if (LoaderConfig.bAllowExternalFiles)
+		{
+			// allows to load external files
+			Parser->BaseDirectory = FPaths::GetPath(TruePath);
+		}
+		Parser->BaseFilename = FPaths::GetBaseFilename(TruePath);
 	}
-
-	Parser->BaseFilename = FPaths::GetBaseFilename(TruePath);
 
 	return Parser;
 }
@@ -197,6 +199,11 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 	if (DataNum > 4 && DataPtr[0] == 0x50 && DataPtr[1] == 0x4b && DataPtr[2] == 0x03 && DataPtr[3] == 0x04)
 	{
 		ZipFile = MakeShared<FglTFRuntimeZipFile>();
+		if (!LoaderConfig.EncryptionKey.IsEmpty())
+		{
+			ZipFile->SetPassword(LoaderConfig.EncryptionKey);
+		}
+
 		if (!ZipFile->FromData(DataPtr, DataNum))
 		{
 			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to parse Zip archive."));
@@ -4847,6 +4854,13 @@ bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName
 	return true;
 }
 
+void FglTFRuntimeZipFile::SetPassword(const FString& EncryptionKey)
+{
+	auto UTF8Conversion = StringCast<UTF8CHAR>(*EncryptionKey);
+	Password.Empty();
+	Password.Append(reinterpret_cast<const uint8*>(UTF8Conversion.Get()), UTF8Conversion.Length());
+}
+
 bool FglTFRuntimeZipFile::FromData(const uint8* DataPtr, const int64 DataNum)
 {
 	Data.Append(DataPtr, DataNum);
@@ -4953,6 +4967,7 @@ bool FglTFRuntimeZipFile::GetFileContent(const FString& Filename, TArray64<uint8
 		return false;
 	}
 
+	uint16 Flags = 0;
 	uint16 Compression = 0;
 	uint32 CompressedSize;
 	uint32 UncompressedSize = 0;
@@ -4960,7 +4975,8 @@ bool FglTFRuntimeZipFile::GetFileContent(const FString& Filename, TArray64<uint8
 	uint16 ExtraFieldLen = 0;
 
 	// seek to Compression
-	Data.Seek(*Offset + 8);
+	Data.Seek(*Offset + 6);
+	Data << Flags;
 	Data << Compression;
 	// seek to CompressedSize
 	Data.Seek(*Offset + 18);
@@ -4974,17 +4990,61 @@ bool FglTFRuntimeZipFile::GetFileContent(const FString& Filename, TArray64<uint8
 		return false;
 	}
 
+	const uint8* CompressedData = Data.GetData() + *Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen;
+
+	// encrypted ?
+	TArray64<uint8> DecryptedData;
+	if (Flags & 1 && Password.Num() > 0)
+	{
+		if (*Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen + CompressedSize + 12 > Data.Num())
+		{
+			return false;
+		}
+		DecryptedData.AddUninitialized(CompressedSize + 12);
+
+		uint32 Key0 = 305419896;
+		uint32 Key1 = 591751049;
+		uint32 Key2 = 878082192;
+
+		auto Crc32 = [](const uint8 Byte, const uint32 Crc) -> uint32
+			{
+				return (Crc >> 8) ^ FCrc::CRCTablesSB8[0][(Crc ^ Byte) & 0xFF];
+			};
+
+		auto UpdateKeys = [&Key0, &Key1, &Key2, &Crc32](const uint8 Byte)
+			{
+				Key0 = Crc32(Byte, Key0);
+				Key1 = Key1 + (Key0 & 0xFF);
+				Key1 = Key1 * 134775813 + 1;
+				Key2 = Crc32(Key1 >> 24, Key2);
+			};
+
+		for (const uint8& Byte : Password)
+		{
+			UpdateKeys(Byte);
+		}
+
+		for (int64 EncryptedIndex = 0; EncryptedIndex < CompressedSize + 12; EncryptedIndex++)
+		{
+			const uint16 Temp = Key2 | 2;
+			DecryptedData[EncryptedIndex] = CompressedData[EncryptedIndex] ^ ((Temp * (Temp ^ 1)) >> 8);
+			UpdateKeys(DecryptedData[EncryptedIndex]);
+		}
+
+		CompressedData = DecryptedData.GetData() + 12;
+	}
+
 	if (Compression == 8)
 	{
 		OutData.AddUninitialized(UncompressedSize);
-		if (!FCompression::UncompressMemory(NAME_Zlib, OutData.GetData(), UncompressedSize, Data.GetData() + *Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen, CompressedSize, COMPRESS_NoFlags, -15))
+		if (!FCompression::UncompressMemory(NAME_Zlib, OutData.GetData(), UncompressedSize, CompressedData, CompressedSize, COMPRESS_NoFlags, -15))
 		{
 			return false;
 		}
 	}
 	else if (Compression == 0 && CompressedSize == UncompressedSize)
 	{
-		OutData.Append(Data.GetData() + *Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen, UncompressedSize);
+		OutData.Append(CompressedData, UncompressedSize);
 	}
 	else
 	{

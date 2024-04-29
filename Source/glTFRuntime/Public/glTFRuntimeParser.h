@@ -197,6 +197,9 @@ struct FglTFRuntimeConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FString PrefixForUnnamedNodes;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FString EncryptionKey;
+
 	FglTFRuntimeConfig()
 	{
 		TransformBaseType = EglTFRuntimeTransformBaseType::Default;
@@ -1975,9 +1978,12 @@ public:
 		OffsetsMap.GetKeys(Items);
 	}
 
+	void SetPassword(const FString& EncryptionKey);
+
 protected:
 	TMap<FString, uint32> OffsetsMap;
 	FArrayReader Data;
+	TArray<uint8> Password;
 };
 
 USTRUCT(BlueprintType)
