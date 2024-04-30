@@ -103,8 +103,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromData, FColor::Magenta);
 
-	// required for Gzip;
-	TArray<uint8> UncompressedData;
+	// required for Gzip and LZ4;
+	TArray64<uint8> UncompressedData;
 
 	// Gzip Compressed ? 10 bytes header and 8 bytes footer
 	if (DataNum > 18 && DataPtr[0] == 0x1F && DataPtr[1] == 0x8B && DataPtr[2] == 0x08)
@@ -187,11 +187,213 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		DataPtr = UncompressedData.GetData();
 		DataNum = *GzipOriginalSize;
 	}
-	// LZ4 ? magic number(4) + 3 + 8 bytes size (expects uncompressed size)
-	else if (DataNum > 15 && DataPtr[0] == 0x04 && DataPtr[1] == 0x22 && DataPtr[2] == 0x4D && DataPtr[3] == 0x18)
+	// LZ4 ? magic number(4) + 3 (Note: Unreal includes the classic LZ4 c library, unfortunately it is exposed in a pretty annoying way, so I have reimplemented the decoding process as it is way more fun than messing around with the build system)
+	else if (DataNum > 7 && DataPtr[0] == 0x04 && DataPtr[1] == 0x22 && DataPtr[2] == 0x4D && DataPtr[3] == 0x18)
 	{
-		UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to uncompress LZ4 data."));
-		return nullptr;
+		const uint8* LZ4FLG = DataPtr + 4;
+		const uint8* LZ4BD = DataPtr + 5;
+
+		const bool bLZ4ThreadSafe = ((*LZ4FLG >> 5) & 0x01) == 1;
+		const bool bLZ4BlockHasChecksum = ((*LZ4FLG >> 4) & 0x01) == 1;
+		const bool bLZ4BlockHasContentSize = ((*LZ4FLG >> 3) & 0x01) == 1;
+		const bool bLZ4BlockHasDictID = (*LZ4FLG & 0x01) == 1;
+
+		int64 ReserveBlockSize = 0;
+		if (((*LZ4BD >> 7) & 0x01) == 1)
+		{
+			ReserveBlockSize = 4 * 1024 * 1024;
+		}
+		else if (((*LZ4BD >> 6) & 0x01) == 1)
+		{
+			ReserveBlockSize = 1024 * 1024;
+		}
+		else if (((*LZ4BD >> 5) & 0x01) == 1)
+		{
+			ReserveBlockSize = 256 * 1024;
+		}
+		else if (((*LZ4BD >> 4) & 0x01) == 1)
+		{
+			ReserveBlockSize = 64 * 1024;
+		}
+
+		int64 LZ4Offset = 7 + (bLZ4BlockHasContentSize ? 8 : 0) + (bLZ4BlockHasDictID ? 4 : 0);
+
+		TArray<TPair<const uint8*, int64>> LZ4Blocks;
+
+		while (LZ4Offset < DataNum)
+		{
+			if (LZ4Offset + 4 >= DataNum)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid LZ4 Block at index %d."), LZ4Blocks.Num());
+				return nullptr;
+			}
+
+			const uint32* BlockSize = reinterpret_cast<const uint32*>(DataPtr + LZ4Offset);
+
+			const uint32 TrueBlockSize = *BlockSize & 0x7FFFFFFF;
+
+			if (TrueBlockSize == 0)
+			{
+				break;
+			}
+
+			if (LZ4Offset + 4 + TrueBlockSize >= DataNum)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Invalid LZ4 Block at index %d."), LZ4Blocks.Num());
+				return nullptr;
+			}
+
+			LZ4Blocks.Add(TPair<const uint8*, int64>(DataPtr + LZ4Offset + 4, *BlockSize));
+
+			LZ4Offset += 4 + TrueBlockSize + (bLZ4BlockHasChecksum ? 4 : 0);
+
+		}
+
+		if (bLZ4BlockHasContentSize)
+		{
+			const uint64* LZ4ContentSize = reinterpret_cast<const uint64*>(DataPtr + 4 + 2);
+			// 64GB seems a pretty reasonable limit...
+			UncompressedData.Reserve(FMath::Min<int64>(*LZ4ContentSize, 64 * 1024 * 1024 * 1024));
+		}
+		else
+		{
+			// let's reserve double of the "theoretical" compressed size
+			UncompressedData.Reserve(ReserveBlockSize * LZ4Blocks.Num() * 2);
+		}
+
+		auto LZ4Decompress = [](const uint8* BlockData, const int64 BlockSize, TArray64<uint8>& Output) -> bool
+			{
+				const uint32 TrueBlockSize = BlockSize & 0x7FFFFFFF;
+				// uncompressed block?
+				if (((BlockSize >> 31) & 0x01) == 1)
+				{
+					Output.Append(BlockData, TrueBlockSize);
+					return true;
+				}
+
+				int64 Offset = 0;
+				while (Offset < TrueBlockSize)
+				{
+					const uint8 Token = BlockData[Offset++];
+					int64 Length = Token >> 4;
+
+					if (Length > 0)
+					{
+						int64 TempLength = Length + 240;
+						while (TempLength == 255)
+						{
+							if (Offset + 1 >= TrueBlockSize)
+							{
+								return false;
+							}
+							TempLength = BlockData[Offset++];
+							Length += TempLength;
+						}
+
+						if (Offset + Length > TrueBlockSize)
+						{
+							return false;
+						}
+
+						while (Length > 0)
+						{
+							Output.Add(BlockData[Offset++]);
+							Length--;
+						}
+
+						if (Offset == TrueBlockSize)
+						{
+							return true;
+						}
+					}
+
+					if (Offset + 2 >= TrueBlockSize)
+					{
+						return false;
+					}
+
+					uint16 CopyOffset = static_cast<uint16>(BlockData[Offset++]);
+					CopyOffset |= (static_cast<uint16>(BlockData[Offset++]) << 8);
+
+					if (CopyOffset == 0)
+					{
+						return false;
+					}
+
+					int64 MatchOffset = Output.Num() - CopyOffset;
+					if (MatchOffset < 0)
+					{
+						return false;
+					}
+
+					int64 MatchLength = Token & 0x0F;
+					int64 TempMatchLength = MatchLength + 240;
+					while (TempMatchLength == 255)
+					{
+						if (Offset + 1 > TrueBlockSize)
+						{
+							return false;
+						}
+						TempMatchLength = BlockData[Offset++];
+						MatchLength += TempMatchLength;
+					}
+
+					MatchLength += 4;
+
+					while (MatchLength > 0)
+					{
+						if (!Output.IsValidIndex(MatchOffset))
+						{
+							return false;
+						}
+						const uint8 Byte = Output[MatchOffset++];
+						Output.Add(Byte);
+						MatchLength--;
+					}
+				}
+
+				return true;
+			};
+
+		// can we decompress the blocks in parallel?
+		if (bLZ4ThreadSafe)
+		{
+			TArray<TPair<TArray64<uint8>, bool>> BlocksStates;
+			BlocksStates.AddDefaulted(LZ4Blocks.Num());
+
+			ParallelFor(LZ4Blocks.Num(), [&](const int32 BlockIndex)
+				{
+					TPair<TArray64<uint8>, bool>& BlockState = BlocksStates[BlockIndex];
+					BlockState.Key.Reserve(ReserveBlockSize);
+					BlockState.Value = LZ4Decompress(LZ4Blocks[BlockIndex].Key, LZ4Blocks[BlockIndex].Value, BlockState.Key);
+				});
+
+			for (int32 BlockIndex = 0; BlockIndex < LZ4Blocks.Num(); BlockIndex++)
+			{
+				const TPair<TArray64<uint8>, bool>& BlockState = BlocksStates[BlockIndex];
+				if (!BlockState.Value)
+				{
+					UE_LOG(LogGLTFRuntime, Error, TEXT("LZ4 parallel decompression error @Block %d"), BlockIndex);
+					return nullptr;
+				}
+
+				UncompressedData.Append(BlockState.Key);
+			}
+		}
+		else
+		{
+			for (int32 BlockIndex = 0; BlockIndex < LZ4Blocks.Num(); BlockIndex++)
+			{
+				if (!LZ4Decompress(LZ4Blocks[BlockIndex].Key, LZ4Blocks[BlockIndex].Value, UncompressedData))
+				{
+					UE_LOG(LogGLTFRuntime, Error, TEXT("LZ4 decompression error @Block %d"), BlockIndex);
+					return nullptr;
+				}
+			}
+		}
+
+		DataPtr = UncompressedData.GetData();
+		DataNum = UncompressedData.Num();
 	}
 
 	// Zip archive ?
