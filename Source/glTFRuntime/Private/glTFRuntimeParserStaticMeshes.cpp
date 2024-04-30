@@ -302,9 +302,9 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				ParallelFor(NumVertexInstancesPerSection, [&](const int32 VertexInstanceSectionIndex)
 					{
 						uint32 VertexIndex = Primitive.Indices[VertexInstanceSectionIndex];
-						LODIndices[VertexInstanceBaseIndex + VertexInstanceSectionIndex] = VertexInstanceBaseIndex + VertexInstanceSectionIndex;
+						LODIndices[VertexInstanceBaseIndex + VertexInstanceSectionIndex] = VertexBaseIndex + VertexInstanceSectionIndex;
 
-						FStaticMeshBuildVertex& StaticMeshVertex = StaticMeshBuildVertices[VertexInstanceBaseIndex + VertexInstanceSectionIndex];
+						FStaticMeshBuildVertex& StaticMeshVertex = StaticMeshBuildVertices[VertexBaseIndex + VertexInstanceSectionIndex];
 
 #if ENGINE_MAJOR_VERSION > 4
 						StaticMeshVertex.Position = FVector3f(GetSafeValue(Primitive.Positions, VertexIndex, FVector::ZeroVector, bMissingIgnore));
