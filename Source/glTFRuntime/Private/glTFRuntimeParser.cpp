@@ -253,7 +253,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		{
 			const uint64* LZ4ContentSize = reinterpret_cast<const uint64*>(DataPtr + 4 + 2);
 			// 64GB seems a pretty reasonable limit...
-			UncompressedData.Reserve(FMath::Min<int64>(*LZ4ContentSize, 64 * 1024 * 1024 * 1024));
+			UncompressedData.Reserve(FMath::Min<int64>(*LZ4ContentSize, 64LLU * 1024 * 1024 * 1024));
 		}
 		else
 		{
