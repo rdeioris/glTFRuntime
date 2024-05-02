@@ -495,6 +495,103 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 
 		Archive = ZipFile;
 	}
+	// tar ?
+	else if (DataNum % 512 == 0 && DataNum >= 10240 && DataPtr[257] == 'u' && DataPtr[258] == 's' && DataPtr[259] == 't' && DataPtr[260] == 'a' && DataPtr[261] == 'r')
+	{
+		TMap<FString, TArray64<uint8>> TarMap;
+
+		auto GetTarString = [](const uint8* StringDataPtr, const int32 StringLen) -> FString
+			{
+				TArray<uint8> StringData;
+				StringData.Reserve(StringLen + 1);
+				for (int32 StringByteIndex = 0; StringByteIndex < StringLen; StringByteIndex++)
+				{
+					if (StringDataPtr[StringByteIndex] == 0)
+					{
+						break;
+					}
+
+					StringData.Add(StringDataPtr[StringByteIndex]);
+				}
+
+				StringData.Add(0);
+
+				return FString(UTF8_TO_TCHAR(StringData.GetData()));
+			};
+
+		TSharedPtr<FglTFRuntimeArchiveMap> TarArchive = MakeShared<FglTFRuntimeArchiveMap>();
+
+		// given the block nature of tar files, it is more memory efficient to extract the files directly
+		int64 ByteIndex = 0;
+		bool bTarParsingFailed = false;
+		int64 TarPrefixLen = 0;
+		while (ByteIndex < DataNum)
+		{
+			const uint8* Block = DataPtr + ByteIndex;
+			ByteIndex += 512;
+
+			// end of archive ?
+			if (Block[0] == 0)
+			{
+				// no entry ? assume error
+				if (TarMap.Num() < 1)
+				{
+					bTarParsingFailed = true;
+				}
+				break;
+			}
+
+			if (Block[257] != 'u' || Block[258] != 's' || Block[259] != 't' || Block[260] != 'a' || Block[261] != 'r')
+			{
+				bTarParsingFailed = true;
+				break;
+			}
+
+			const FString BlockSizeString = GetTarString(Block + 124, 12);
+			int64 FileSize = 0;
+			for (const TCHAR& BlockSizeChar : BlockSizeString)
+			{
+				FileSize *= 8;
+				FileSize += static_cast<char>(BlockSizeChar) - '0';
+			}
+
+			const int64 BlockSize = Align(FileSize, 512);
+
+			if (ByteIndex + BlockSize > DataNum)
+			{
+				bTarParsingFailed = true;
+				break;
+			}
+
+			// first entry ?
+			if (ByteIndex == 512)
+			{
+				const FString TarPrefix = GetTarString(Block, 100);
+				TarPrefixLen = TarPrefix.Len();
+			}
+
+			if (Block[156] == 0 || Block[156] == '0' || Block[156] == '7')
+			{
+				const FString TarFilename = GetTarString(Block, 100);
+				if (TarFilename.Len() <= TarPrefixLen)
+				{
+					bTarParsingFailed = true;
+					break;
+				}
+				TArray64<uint8>& TarFileContent = TarMap.Add(TarFilename.RightChop(TarPrefixLen));
+				TarFileContent.AddUninitialized(FileSize);
+				FMemory::Memcpy(TarFileContent.GetData(), DataPtr + ByteIndex, FileSize);
+			}
+
+			ByteIndex += BlockSize;
+		}
+
+		if (!bTarParsingFailed)
+		{
+			TarArchive->FromMap(TarMap);
+			Archive = TarArchive;
+		}
+	}
 
 	return FromRawDataAndArchive(DataPtr, DataNum, Archive, LoaderConfig);
 }
@@ -4323,10 +4420,10 @@ bool FglTFRuntimeParser::GetBuffer(const int32 Index, FglTFRuntimeBlob& Blob)
 
 	if (Archive)
 	{
-		TArray64<uint8> ZipData;
-		if (Archive->GetFileContent(Uri, ZipData))
+		TArray64<uint8> ArchiveItemData;
+		if (Archive->GetFileContent(Uri, ArchiveItemData))
 		{
-			BuffersCache.Add(Index, ZipData);
+			BuffersCache.Add(Index, ArchiveItemData);
 			Blob.Data = BuffersCache[Index].GetData();
 			Blob.Num = BuffersCache[Index].Num();
 			return true;
