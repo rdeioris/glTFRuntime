@@ -1962,12 +1962,12 @@ struct FglTFRuntimeMaterial
 	}
 };
 
-class FglTFRuntimeZipFile
+class FglTFRuntimeArchive
 {
 public:
-	bool FromData(const uint8* DataPtr, const int64 DataNum);
+	virtual ~FglTFRuntimeArchive() {}
 
-	bool GetFileContent(const FString& Filename, TArray64<uint8>& OutData);
+	virtual bool GetFileContent(const FString& Filename, TArray64<uint8>& OutData) = 0;
 
 	bool FileExists(const FString& Filename) const;
 
@@ -1978,12 +1978,33 @@ public:
 		OffsetsMap.GetKeys(Items);
 	}
 
+protected:
+	TMap<FString, uint32> OffsetsMap;
+};
+
+class FglTFRuntimeArchiveZip : public FglTFRuntimeArchive
+{
+public:
+	bool FromData(const uint8* DataPtr, const int64 DataNum);
+
+	bool GetFileContent(const FString& Filename, TArray64<uint8>& OutData) override;
+
 	void SetPassword(const FString& EncryptionKey);
 
 protected:
-	TMap<FString, uint32> OffsetsMap;
 	FArrayReader Data;
 	TArray<uint8> Password;
+};
+
+class FglTFRuntimeArchiveMap : public FglTFRuntimeArchive
+{
+public:
+	void FromMap(const TMap<FString, TArray64<uint8>> InMap);
+
+	bool GetFileContent(const FString& Filename, TArray64<uint8>& OutData) override;
+
+protected:
+	TArray<TArray64<uint8>> MapItems;
 };
 
 USTRUCT(BlueprintType)
@@ -2103,12 +2124,15 @@ public:
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale);
 
 	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig);
-	static TSharedPtr<FglTFRuntimeParser> FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile = nullptr);
-	static TSharedPtr<FglTFRuntimeParser> FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile = nullptr);
+	static TSharedPtr<FglTFRuntimeParser> FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeArchive> InArchive = nullptr);
+	static TSharedPtr<FglTFRuntimeParser> FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeArchive> InArchive = nullptr);
 	static TSharedPtr<FglTFRuntimeParser> FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig);
+	static TSharedPtr<FglTFRuntimeParser> FromMap(const TMap<FString, TArray64<uint8>> Map, const FglTFRuntimeConfig& LoaderConfig);
 
-	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile = nullptr) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig, InZipFile); }
-	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile = nullptr) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig, InZipFile); }
+	static TSharedPtr<FglTFRuntimeParser> FromRawDataAndArchive(const uint8* DataPtr, int64 DataNum, TSharedPtr<FglTFRuntimeArchive> InArchive, const FglTFRuntimeConfig& LoaderConfig);
+
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeArchive> InArchive = nullptr) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig, InArchive); }
+	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromBinary(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeArchive> InArchive = nullptr) { return FromBinary(Data.GetData(), Data.Num(), LoaderConfig, InArchive); }
 	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromData(Data.GetData(), Data.Num(), LoaderConfig); }
 	static FORCEINLINE TSharedPtr<FglTFRuntimeParser> FromData(const TArray64<uint8> Data, const FglTFRuntimeConfig& LoaderConfig) { return FromData(Data.GetData(), Data.Num(), LoaderConfig); }
 
@@ -2777,7 +2801,7 @@ protected:
 
 	bool MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive);
 
-	TSharedPtr<FglTFRuntimeZipFile> ZipFile;
+	TSharedPtr<FglTFRuntimeArchive> Archive;
 
 	template<typename T>
 	T GetSafeValue(const TArray<T>& Values, const int32 Index, const T DefaultValue, bool& bMissing)

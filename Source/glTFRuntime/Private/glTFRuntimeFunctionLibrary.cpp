@@ -8,6 +8,7 @@
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/Base64.h"
+#include "Misc/FileHelper.h"
 #include "GenericPlatform/GenericPlatformProcess.h"
 #include "Runtime/Launch/Resources/Version.h"
 
@@ -141,7 +142,11 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64Async(const FString& Ba
 
 			if (!FBase64::Decode(Base64, BytesBase64))
 			{
-				Completed.ExecuteIfBound(nullptr);
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 				return;
 			}
 
@@ -177,6 +182,80 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromStringAsync(const FString& Js
 	Async(EAsyncExecution::Thread, [JsonData, Asset, LoaderConfig, Completed]()
 		{
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromString(JsonData, LoaderConfig);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset);
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+}
+
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFileMap(const TMap<FString, FString>& FileMap, const FglTFRuntimeConfig& LoaderConfig)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		return nullptr;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	TMap<FString, TArray64<uint8>> Map;
+
+	for (const TPair<FString, FString>& Pair : FileMap)
+	{
+		TArray64<uint8> Data;
+		if (FFileHelper::LoadFileToArray(Data, *Pair.Value))
+		{
+			Map.Add(Pair.Key, MoveTemp(Data));
+		}
+	}
+
+	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromMap(Map, LoaderConfig);
+
+	if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+	{
+		return Asset;
+	}
+
+	return nullptr;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFileMapAsync(const TMap<FString, FString>& FileMap, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr);
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	Async(EAsyncExecution::Thread, [FileMap, Asset, LoaderConfig, Completed]()
+		{
+			TMap<FString, TArray64<uint8>> Map;
+
+			for (const TPair<FString, FString>& Pair : FileMap)
+			{
+				TArray64<uint8> Data;
+				if (FFileHelper::LoadFileToArray(Data, *Pair.Value))
+				{
+					Map.Add(Pair.Key, MoveTemp(Data));
+				}
+			}
+
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromMap(Map, LoaderConfig);
 
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
 				{

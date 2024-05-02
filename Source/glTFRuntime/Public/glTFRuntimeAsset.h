@@ -169,6 +169,7 @@ public:
 	bool LoadFromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig);
 	bool LoadFromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig);
 	bool LoadFromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig);
+	
 	FORCEINLINE bool LoadFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig) { return LoadFromData(Data.GetData(), Data.Num(), LoaderConfig); }
 	FORCEINLINE bool LoadFromData(const TArray64<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig) { return LoadFromData(Data.GetData(), Data.Num(), LoaderConfig); }
 

@@ -99,6 +99,86 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 	return Parser;
 }
 
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromRawDataAndArchive(const uint8* DataPtr, int64 DataNum, TSharedPtr<FglTFRuntimeArchive> InArchive, const FglTFRuntimeConfig& LoaderConfig)
+{
+	// this must be defined here as we are dealing with raw C pointers
+	TArray64<uint8> ArchiveEntryPointData;
+
+	if (InArchive)
+	{
+		FString Filename = LoaderConfig.ArchiveEntryPoint;
+
+		if (Filename.IsEmpty())
+		{
+			TArray<FString> Extensions;
+			LoaderConfig.ArchiveAutoEntryPointExtensions.ParseIntoArray(Extensions, TEXT(" "), true);
+			for (const FString& Extension : Extensions)
+			{
+				Filename = InArchive->GetFirstFilenameByExtension(Extension);
+				if (!Filename.IsEmpty())
+				{
+					break;
+				}
+			}
+		}
+
+		if (!LoaderConfig.bAsBlob && Filename.IsEmpty())
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to find entry point from Archive."), *Filename);
+			return nullptr;
+		}
+
+		if (!LoaderConfig.bAsBlob && !InArchive->GetFileContent(Filename, ArchiveEntryPointData))
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to get %s from Archive."), *Filename);
+			return nullptr;
+		}
+
+		if (ArchiveEntryPointData.Num() > 0)
+		{
+			DataPtr = ArchiveEntryPointData.GetData();
+			DataNum = ArchiveEntryPointData.Num();
+		}
+		else
+		{
+			DataPtr = nullptr;
+			DataNum = 0;
+		}
+	}
+
+	if (LoaderConfig.bAsBlob)
+	{
+		TSharedPtr<FglTFRuntimeParser> NewParser = MakeShared<FglTFRuntimeParser>(MakeShared<FJsonObject>(), LoaderConfig.GetMatrix(), LoaderConfig.SceneScale);
+		if (NewParser)
+		{
+			NewParser->AsBlob.Append(DataPtr, DataNum);
+			NewParser->Archive = InArchive;
+		}
+		return NewParser;
+	}
+
+	// detect binary format
+	if (DataNum > 20)
+	{
+		if (DataPtr[0] == 0x67 &&
+			DataPtr[1] == 0x6C &&
+			DataPtr[2] == 0x54 &&
+			DataPtr[3] == 0x46)
+		{
+			return FromBinary(DataPtr, DataNum, LoaderConfig, InArchive);
+		}
+	}
+
+	if (DataNum > 0 && DataNum <= INT32_MAX)
+	{
+		FString JsonData;
+		FFileHelper::BufferToString(JsonData, DataPtr, (int32)DataNum);
+		return FromString(JsonData, LoaderConfig, InArchive);
+	}
+
+	return nullptr;
+}
+
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromData, FColor::Magenta);
@@ -396,12 +476,12 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		DataNum = UncompressedData.Num();
 	}
 
+	TSharedPtr<FglTFRuntimeArchive> Archive = nullptr;
+
 	// Zip archive ?
-	TSharedPtr<FglTFRuntimeZipFile> ZipFile = nullptr;
-	TArray64<uint8> UnzippedData;
 	if (DataNum > 4 && DataPtr[0] == 0x50 && DataPtr[1] == 0x4b && DataPtr[2] == 0x03 && DataPtr[3] == 0x04)
 	{
-		ZipFile = MakeShared<FglTFRuntimeZipFile>();
+		TSharedPtr<FglTFRuntimeArchiveZip> ZipFile = MakeShared<FglTFRuntimeArchiveZip>();
 		if (!LoaderConfig.EncryptionKey.IsEmpty())
 		{
 			ZipFile->SetPassword(LoaderConfig.EncryptionKey);
@@ -413,80 +493,24 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 			return nullptr;
 		}
 
-		FString Filename = LoaderConfig.ArchiveEntryPoint;
-
-		if (Filename.IsEmpty())
-		{
-			TArray<FString> Extensions;
-			LoaderConfig.ArchiveAutoEntryPointExtensions.ParseIntoArray(Extensions, TEXT(" "), true);
-			for (const FString& Extension : Extensions)
-			{
-				Filename = ZipFile->GetFirstFilenameByExtension(Extension);
-				if (!Filename.IsEmpty())
-				{
-					break;
-				}
-			}
-		}
-
-		if (!LoaderConfig.bAsBlob && Filename.IsEmpty())
-		{
-			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to find entry point from Zip archive."), *Filename);
-			return nullptr;
-		}
-
-		if (!LoaderConfig.bAsBlob && !ZipFile->GetFileContent(Filename, UnzippedData))
-		{
-			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to get %s from Zip archive."), *Filename);
-			return nullptr;
-		}
-
-		if (UnzippedData.Num() > 0)
-		{
-			DataPtr = UnzippedData.GetData();
-			DataNum = UnzippedData.Num();
-		}
-		else
-		{
-			DataPtr = nullptr;
-			DataNum = 0;
-		}
+		Archive = ZipFile;
 	}
 
-	if (LoaderConfig.bAsBlob)
-	{
-		TSharedPtr<FglTFRuntimeParser> NewParser = MakeShared<FglTFRuntimeParser>(MakeShared<FJsonObject>(), LoaderConfig.GetMatrix(), LoaderConfig.SceneScale);
-		if (NewParser)
-		{
-			NewParser->AsBlob.Append(DataPtr, DataNum);
-			NewParser->ZipFile = ZipFile;
-		}
-		return NewParser;
-	}
-
-	// detect binary format
-	if (DataNum > 20)
-	{
-		if (DataPtr[0] == 0x67 &&
-			DataPtr[1] == 0x6C &&
-			DataPtr[2] == 0x54 &&
-			DataPtr[3] == 0x46)
-		{
-			return FromBinary(DataPtr, DataNum, LoaderConfig, ZipFile);
-		}
-	}
-
-	if (DataNum > 0 && DataNum <= INT32_MAX)
-	{
-		FString JsonData;
-		FFileHelper::BufferToString(JsonData, DataPtr, (int32)DataNum);
-		return FromString(JsonData, LoaderConfig, ZipFile);
-	}
-
-	return nullptr;
+	return FromRawDataAndArchive(DataPtr, DataNum, Archive, LoaderConfig);
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromMap(const TMap<FString, TArray64<uint8>> Map, const FglTFRuntimeConfig& LoaderConfig)
+{
+	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromMap, FColor::Magenta);
+
+	TSharedPtr<FglTFRuntimeArchiveMap> ArchiveMap = MakeShared<FglTFRuntimeArchiveMap>();
+
+	ArchiveMap->FromMap(Map);
+
+	return FromRawDataAndArchive(nullptr, 0, ArchiveMap, LoaderConfig);
+}
+
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeArchive> InArchive)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromString, FColor::Magenta);
 
@@ -518,13 +542,13 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 			}
 		}
 		Parser->DefaultPrefixForUnnamedNodes = LoaderConfig.PrefixForUnnamedNodes;
-		Parser->ZipFile = InZipFile;
+		Parser->Archive = InArchive;
 	}
 
 	return Parser;
 }
 
-TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
+TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeArchive> InArchive)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromBinary, FColor::Magenta);
 
@@ -572,7 +596,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 		return nullptr;
 	}
 
-	TSharedPtr<FglTFRuntimeParser> Parser = FromString(JsonData, LoaderConfig, InZipFile);
+	TSharedPtr<FglTFRuntimeParser> Parser = FromString(JsonData, LoaderConfig, InArchive);
 
 	if (Parser)
 	{
@@ -4297,10 +4321,10 @@ bool FglTFRuntimeParser::GetBuffer(const int32 Index, FglTFRuntimeBlob& Blob)
 		return false;
 	}
 
-	if (ZipFile)
+	if (Archive)
 	{
 		TArray64<uint8> ZipData;
-		if (ZipFile->GetFileContent(Uri, ZipData))
+		if (Archive->GetFileContent(Uri, ZipData))
 		{
 			BuffersCache.Add(Index, ZipData);
 			Blob.Data = BuffersCache[Index].GetData();
@@ -5057,7 +5081,7 @@ bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName
 	return true;
 }
 
-void FglTFRuntimeZipFile::SetPassword(const FString& EncryptionKey)
+void FglTFRuntimeArchiveZip::SetPassword(const FString& EncryptionKey)
 {
 	Password.Empty();
 #if ENGINE_MAJOR_VERSION >= 5
@@ -5068,7 +5092,7 @@ void FglTFRuntimeZipFile::SetPassword(const FString& EncryptionKey)
 	Password.Append(reinterpret_cast<const uint8*>(UTF8Conversion.Get()), UTF8Conversion.Length());
 }
 
-bool FglTFRuntimeZipFile::FromData(const uint8* DataPtr, const int64 DataNum)
+bool FglTFRuntimeArchiveZip::FromData(const uint8* DataPtr, const int64 DataNum)
 {
 	Data.Append(DataPtr, DataNum);
 
@@ -5159,7 +5183,7 @@ bool FglTFRuntimeZipFile::FromData(const uint8* DataPtr, const int64 DataNum)
 	return true;
 }
 
-bool FglTFRuntimeZipFile::GetFileContent(const FString& Filename, TArray64<uint8>& OutData)
+bool FglTFRuntimeArchiveZip::GetFileContent(const FString& Filename, TArray64<uint8>& OutData)
 {
 	uint32* Offset = OffsetsMap.Find(Filename);
 	if (!Offset)
@@ -5261,12 +5285,12 @@ bool FglTFRuntimeZipFile::GetFileContent(const FString& Filename, TArray64<uint8
 	return true;
 }
 
-bool FglTFRuntimeZipFile::FileExists(const FString& Filename) const
+bool FglTFRuntimeArchive::FileExists(const FString& Filename) const
 {
 	return OffsetsMap.Contains(Filename);
 }
 
-FString FglTFRuntimeZipFile::GetFirstFilenameByExtension(const FString& Extension) const
+FString FglTFRuntimeArchive::GetFirstFilenameByExtension(const FString& Extension) const
 {
 	for (const TPair<FString, uint32>& Pair : OffsetsMap)
 	{
@@ -5300,9 +5324,9 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 		else
 		{
 			bool bFound = false;
-			if (ZipFile)
+			if (Archive)
 			{
-				if (ZipFile->GetFileContent(Uri, Bytes))
+				if (Archive->GetFileContent(Uri, Bytes))
 				{
 					bFound = true;
 				}
@@ -6245,16 +6269,15 @@ FString FglTFRuntimeParser::GetGenerator() const
 
 bool FglTFRuntimeParser::IsArchive() const
 {
-	return ZipFile.IsValid();
+	return Archive.IsValid();
 }
-
 
 TArray<FString> FglTFRuntimeParser::GetArchiveItems() const
 {
 	TArray<FString> Items;
-	if (ZipFile.IsValid())
+	if (Archive.IsValid())
 	{
-		ZipFile->GetItems(Items);
+		Archive->GetItems(Items);
 	}
 	return Items;
 }
@@ -6266,7 +6289,7 @@ bool FglTFRuntimeParser::GetBlobByName(const FString& Name, TArray64<uint8>& Blo
 		return false;
 	}
 
-	return ZipFile->GetFileContent(Name, Blob);
+	return Archive->GetFileContent(Name, Blob);
 }
 
 void FglTFRuntimeParser::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
@@ -6355,4 +6378,30 @@ TArray<FString> FglTFRuntimeParser::GetAnimationsNames(const bool bIncludeUnname
 		}
 	}
 	return Names;
+}
+
+void FglTFRuntimeArchiveMap::FromMap(const TMap<FString, TArray64<uint8>> InMap)
+{
+	for (const TPair<FString, TArray64<uint8>>& Pair : InMap)
+	{
+		const int32 NewOffset = MapItems.Add(Pair.Value);
+		OffsetsMap.Add(Pair.Key, NewOffset);
+	}
+}
+
+bool FglTFRuntimeArchiveMap::GetFileContent(const FString& Filename, TArray64<uint8>& OutData)
+{
+	if (!OffsetsMap.Contains(Filename))
+	{
+		return false;
+	}
+
+	if (!MapItems.IsValidIndex(OffsetsMap[Filename]))
+	{
+		return false;
+	}
+
+	OutData = MapItems[OffsetsMap[Filename]];
+
+	return true;
 }
