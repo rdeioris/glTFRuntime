@@ -28,6 +28,7 @@ This is an incomplete list of available plugins:
 
 * https://github.com/rdeioris/glTFRuntimeSTL (STL files support)
 * https://github.com/rdeioris/glTFRuntimeOBJ (OBJ files support)
+* https://github.com/rdeioris/glTFRuntimeFBX (FBX files support)
 * https://github.com/rdeioris/glTFRuntimeVox (MagicaVoxel/Vox files support)
 * https://github.com/rdeioris/glTFRuntimeWebP (WebP textures support)
 * https://github.com/rdeioris/glTFRuntimePointCloud (PointCloud support for glTF, XYZ, PCD)
