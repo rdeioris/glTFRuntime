@@ -6336,19 +6336,22 @@ TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetAnimations() const
 	return Animations;
 }
 
-TArray<FString> FglTFRuntimeParser::GetAnimationsNames() const
+TArray<FString> FglTFRuntimeParser::GetAnimationsNames(const bool bIncludeUnnameds) const
 {
 	TArray<FString> Names;
 	const TArray<TSharedRef<FJsonObject>> Animations = GetAnimations();
-	for (const TSharedRef<FJsonObject>& Animation : Animations)
+	for (int32 AnimationIndex = 0; AnimationIndex < Animations.Num(); AnimationIndex++)
 	{
+		const TSharedRef<FJsonObject>& Animation = Animations[AnimationIndex];
 		FString Name;
-		if (Animation->TryGetStringField(TEXT("name"), Name))
+		if (bIncludeUnnameds && (!Animation->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty()))
 		{
-			if (!Name.IsEmpty())
-			{
-				Names.Add(Name);
-			}
+			Name = FString::Printf(TEXT("Animation_%d"), AnimationIndex);
+		}
+
+		if (!Name.IsEmpty())
+		{
+			Names.Add(Name);
 		}
 	}
 	return Names;

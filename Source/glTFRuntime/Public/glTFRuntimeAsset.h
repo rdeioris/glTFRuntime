@@ -137,7 +137,7 @@ public:
 	int32 GetNumAnimations() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
-	TArray<FString> GetAnimationsNames() const;
+	TArray<FString> GetAnimationsNames(const bool bIncludeUnnameds = true) const;
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	bool LoadCamera(const int32 CameraIndex, UCameraComponent* CameraComponent);

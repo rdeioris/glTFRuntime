@@ -1461,11 +1461,11 @@ float UglTFRuntimeAsset::GetDownloadTime() const
 	return Parser->GetDownloadTime();
 }
 
-TArray<FString> UglTFRuntimeAsset::GetAnimationsNames() const
+TArray<FString> UglTFRuntimeAsset::GetAnimationsNames(const bool bIncludeUnnameds) const
 {
 	GLTF_CHECK_PARSER(TArray<FString>());
 
-	return Parser->GetAnimationsNames();
+	return Parser->GetAnimationsNames(bIncludeUnnameds);
 }
 
 bool UglTFRuntimeAsset::HasErrors() const
