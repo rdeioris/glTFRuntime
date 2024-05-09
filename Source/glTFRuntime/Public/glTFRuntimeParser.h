@@ -2080,6 +2080,8 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeStaticMeshAsync, UStaticMesh*, Sta
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*, SkeletalMesh);
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FglTFRuntimeMeshLODAsync, const bool, bValid, const FglTFRuntimeMeshLOD&, MeshLOD);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeTextureCubeAsync, UTextureCube*, TextureCube);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeTexture2DAsync, UTexture2D*, Texture);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeTexture2DArrayAsync, UTexture2DArray*, TextureArray);
 
 using FglTFRuntimeStaticMeshContextRef = TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>;
 using FglTFRuntimeSkeletalMeshContextRef = TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>;

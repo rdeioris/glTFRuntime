@@ -245,6 +245,9 @@ public:
 	UTexture2D* LoadImageFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ImagesConfig", AutoCreateRefTerm = "ImagesConfig"), Category = "glTFRuntime")
+	void LoadImageFromBlobAsync(const FglTFRuntimeTexture2DAsync& AsyncCallback, const FglTFRuntimeImagesConfig& ImagesConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ImagesConfig", AutoCreateRefTerm = "ImagesConfig"), Category = "glTFRuntime")
 	UTexture2D* LoadMipsFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ImagesConfig", AutoCreateRefTerm = "ImagesConfig"), Category = "glTFRuntime")
@@ -255,6 +258,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ImagesConfig", AutoCreateRefTerm = "ImagesConfig"), Category = "glTFRuntime")
 	UTexture2DArray* LoadImageArrayFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ImagesConfig", AutoCreateRefTerm = "ImagesConfig"), Category = "glTFRuntime")
+	void LoadImageArrayFromBlobAsync(const FglTFRuntimeTexture2DArrayAsync& AsyncCallback, const FglTFRuntimeImagesConfig& ImagesConfig);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FString> GetExtensionsUsed() const;
