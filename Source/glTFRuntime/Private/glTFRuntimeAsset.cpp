@@ -1050,7 +1050,7 @@ void UglTFRuntimeAsset::LoadImageFromBlobAsync(const FglTFRuntimeTexture2DAsync&
 			EPixelFormat PixelFormat;
 
 			if (!Parser ||
-				Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, PixelFormat, ImagesConfig) ||
+				!Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, PixelFormat, ImagesConfig) ||
 				Width <= 0 ||
 				Height <= 0)
 			{
