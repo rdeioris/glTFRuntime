@@ -1604,7 +1604,7 @@ void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipM
 	}
 	else
 	{
-		if (!(Ptr32[18] % DDPF_ALPHAPIXELS))
+		if (!(Ptr32[20] & DDPF_ALPHAPIXELS))
 		{
 			UE_LOG(LogGLTFRuntime, Warning, TEXT("DDS Uncompressed PixelFormat without Alpha is not supported"));
 			return;
