@@ -619,31 +619,51 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		// check for pivot repositioning
 		if (StaticMeshConfig.PivotPosition != EglTFRuntimePivotPosition::Asset)
 		{
-			if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Center)
+			if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::CustomTransform)
 			{
-				PivotDelta = BoundingBox.GetCenter();
-			}
-			else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Top)
-			{
-				PivotDelta = BoundingBox.GetCenter() + FVector(0, 0, BoundingBox.GetExtent().Z);
-			}
-			else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Bottom)
-			{
-				PivotDelta = BoundingBox.GetCenter() - FVector(0, 0, BoundingBox.GetExtent().Z);
-			}
-
-			for (FStaticMeshBuildVertex& StaticMeshVertex : StaticMeshBuildVertices)
-			{
+				for (FStaticMeshBuildVertex& StaticMeshVertex : StaticMeshBuildVertices)
+				{
 #if ENGINE_MAJOR_VERSION > 4
-				StaticMeshVertex.Position -= FVector3f(PivotDelta);
+					StaticMeshVertex.Position = FVector3f(StaticMeshConfig.CustomPivotTransform.InverseTransformPosition(FVector(StaticMeshVertex.Position)));
+					StaticMeshVertex.TangentX = FVector3f(StaticMeshConfig.CustomPivotTransform.InverseTransformVector(FVector(StaticMeshVertex.TangentX)));
+					StaticMeshVertex.TangentY = FVector3f(StaticMeshConfig.CustomPivotTransform.InverseTransformVector(FVector(StaticMeshVertex.TangentY)));
+					StaticMeshVertex.TangentZ = FVector3f(StaticMeshConfig.CustomPivotTransform.InverseTransformVector(FVector(StaticMeshVertex.TangentZ)));
 #else
-				StaticMeshVertex.Position -= PivotDelta;
+					StaticMeshVertex.Position = StaticMeshConfig.CustomPivotTransform.InverseTransformPosition(StaticMeshVertex.Position);
+					StaticMeshVertex.TangentX = StaticMeshConfig.CustomPivotTransform.InverseTransformVector(StaticMeshVertex.TangentX);
+					StaticMeshVertex.TangentY = StaticMeshConfig.CustomPivotTransform.InverseTransformVector(StaticMeshVertex.TangentY);
+					StaticMeshVertex.TangentZ = StaticMeshConfig.CustomPivotTransform.InverseTransformVector(StaticMeshVertex.TangentZ);
 #endif
+				}
 			}
-
-			if (CurrentLODIndex == 0)
+			else
 			{
-				StaticMeshContext->LOD0PivotDelta = PivotDelta;
+				if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Center)
+				{
+					PivotDelta = BoundingBox.GetCenter();
+				}
+				else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Top)
+				{
+					PivotDelta = BoundingBox.GetCenter() + FVector(0, 0, BoundingBox.GetExtent().Z);
+				}
+				else if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::Bottom)
+				{
+					PivotDelta = BoundingBox.GetCenter() - FVector(0, 0, BoundingBox.GetExtent().Z);
+				}
+
+				for (FStaticMeshBuildVertex& StaticMeshVertex : StaticMeshBuildVertices)
+				{
+#if ENGINE_MAJOR_VERSION > 4
+					StaticMeshVertex.Position -= FVector3f(PivotDelta);
+#else
+					StaticMeshVertex.Position -= PivotDelta;
+#endif
+				}
+
+				if (CurrentLODIndex == 0)
+				{
+					StaticMeshContext->LOD0PivotDelta = PivotDelta;
+				}
 			}
 		}
 
@@ -661,6 +681,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			}
 
 			StaticMeshContext->BoundingBoxAndSphere.Origin -= PivotDelta;
+
+			if (StaticMeshConfig.PivotPosition == EglTFRuntimePivotPosition::CustomTransform)
+			{
+				StaticMeshContext->BoundingBoxAndSphere = StaticMeshContext->BoundingBoxAndSphere.TransformBy(StaticMeshConfig.CustomPivotTransform.Inverse());
+			}
 		}
 
 		const int64 PositionsSize = StaticMeshBuildVertices.Num() * sizeof(FStaticMeshBuildVertex);

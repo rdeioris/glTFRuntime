@@ -355,7 +355,8 @@ enum class EglTFRuntimePivotPosition : uint8
 	Asset,
 	Center,
 	Top,
-	Bottom
+	Bottom,
+	CustomTransform
 };
 
 USTRUCT(BlueprintType)
@@ -709,6 +710,9 @@ struct FglTFRuntimeStaticMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bBuildLumenCards;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FTransform CustomPivotTransform;
 
 	template<typename T>
 	T* GetCustomConfig() const
