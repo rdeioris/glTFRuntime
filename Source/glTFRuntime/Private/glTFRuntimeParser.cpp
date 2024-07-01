@@ -6511,9 +6511,12 @@ void FglTFRuntimeParser::FillAssetUserData(const int32 Index, IInterface_AssetUs
 {
 	for (TSubclassOf<UglTFRuntimeAssetUserData> AssetUserDataClass : AssetUserDataClasses)
 	{
-		UglTFRuntimeAssetUserData* AssetUserData = NewObject<UglTFRuntimeAssetUserData>(InObject->_getUObject(), AssetUserDataClass, NAME_None, RF_Public);
-		AssetUserData->SetParser(AsShared());
-		AssetUserData->ReceiveFillAssetUserData(Index);
-		InObject->AddAssetUserData(AssetUserData);
+		if (AssetUserDataClass)
+		{
+			UglTFRuntimeAssetUserData* AssetUserData = NewObject<UglTFRuntimeAssetUserData>(InObject->_getUObject(), AssetUserDataClass, NAME_None, RF_Public);
+			AssetUserData->SetParser(AsShared());
+			AssetUserData->ReceiveFillAssetUserData(Index);
+			InObject->AddAssetUserData(AssetUserData);
+		}
 	}
 }
