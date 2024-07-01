@@ -200,6 +200,9 @@ struct FglTFRuntimeConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FString EncryptionKey;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<TSubclassOf<class UglTFRuntimeAssetUserData>> AssetUserDataClasses;
+
 	FglTFRuntimeConfig()
 	{
 		TransformBaseType = EglTFRuntimeTransformBaseType::Default;
@@ -1470,7 +1473,9 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 	TArray<FglTFRuntimeMeshLOD> ContextLODs;
 	TMap<int32, int32> ContextLODsMap;
 
-	FglTFRuntimeSkeletalMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : Parser(InParser), SkeletalMeshConfig(InSkeletalMeshConfig)
+	const int32 MeshIndex;
+
+	FglTFRuntimeSkeletalMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const int32 InMeshIndex, const FglTFRuntimeSkeletalMeshConfig& InSkeletalMeshConfig) : Parser(InParser), SkeletalMeshConfig(InSkeletalMeshConfig), MeshIndex(InMeshIndex)
 	{
 		EObjectFlags Flags = RF_Public;
 		UObject* Outer = InSkeletalMeshConfig.Outer ? InSkeletalMeshConfig.Outer : GetTransientPackage();
@@ -1686,7 +1691,9 @@ struct FglTFRuntimeStaticMeshContext : public FGCObject
 	TArray<FglTFRuntimeMeshLOD> ContextLODs;
 	TMap<int32, int32> ContextLODsMap;
 
-	FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig);
+	const int32 MeshIndex;
+
+	FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const int32 InMeshIndex, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig);
 
 	FString GetReferencerName() const override
 	{
@@ -2259,7 +2266,7 @@ public:
 
 	UStaticMesh* FinalizeStaticMesh(TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext);
 
-	TSharedPtr<FJsonValue> GetJSONObjectFromRelativePath(TSharedRef<FJsonObject> JsonObject, const TArray<FglTFRuntimePathItem>& Path) const;
+	static TSharedPtr<FJsonValue> GetJSONObjectFromRelativePath(TSharedRef<FJsonObject> JsonObject, const TArray<FglTFRuntimePathItem>& Path);
 	TSharedPtr<FJsonValue> GetJSONObjectFromPath(const TArray<FglTFRuntimePathItem>& Path) const;
 
 	FString GetJSONStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
@@ -2401,6 +2408,8 @@ public:
 	void MergePrimitivesByMaterial(TArray<FglTFRuntimePrimitive>& Primitives);
 
 	bool MeshHasMorphTargets(const int32 MeshIndex) const;
+
+	void FillAssetUserData(const int32 Index, IInterface_AssetUserData* InObject);
 protected:
 	void LoadAndFillBaseMaterials();
 	TSharedRef<FJsonObject> Root;
@@ -2463,6 +2472,8 @@ protected:
 	bool HasRoot(int32 NodeIndex, int32 RootIndex);
 
 	void GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshContextRef SkeletalMeshContext);
+
+	TArray<TSubclassOf<class UglTFRuntimeAssetUserData>> AssetUserDataClasses;
 
 public:
 	UMaterialInterface* BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, UMaterialInterface* ForceBaseMaterial = nullptr);

@@ -26,6 +26,8 @@
 #include "RenderUtils.h"
 #endif
 
+#include "glTFRuntimeAssetUserData.h"
+
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
 FglTFRuntimeOnPreLoadedPrimitive FglTFRuntimeParser::OnPreLoadedPrimitive;
@@ -153,6 +155,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromRawDataAndArchive(const u
 		{
 			NewParser->AsBlob.Append(DataPtr, DataNum);
 			NewParser->Archive = InArchive;
+			NewParser->AssetUserDataClasses = LoaderConfig.AssetUserDataClasses;
 		}
 		return NewParser;
 	}
@@ -640,6 +643,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 		}
 		Parser->DefaultPrefixForUnnamedNodes = LoaderConfig.PrefixForUnnamedNodes;
 		Parser->Archive = InArchive;
+		Parser->AssetUserDataClasses = LoaderConfig.AssetUserDataClasses;
 	}
 
 	return Parser;
@@ -6501,4 +6505,15 @@ bool FglTFRuntimeArchiveMap::GetFileContent(const FString& Filename, TArray64<ui
 	OutData = MapItems[OffsetsMap[Filename]];
 
 	return true;
+}
+
+void FglTFRuntimeParser::FillAssetUserData(const int32 Index, IInterface_AssetUserData* InObject)
+{
+	for (TSubclassOf<UglTFRuntimeAssetUserData> AssetUserDataClass : AssetUserDataClasses)
+	{
+		UglTFRuntimeAssetUserData* AssetUserData = NewObject<UglTFRuntimeAssetUserData>(InObject->_getUObject(), AssetUserDataClass, NAME_None, RF_Public);
+		AssetUserData->SetParser(AsShared());
+		AssetUserData->ReceiveFillAssetUserData(Index);
+		InObject->AddAssetUserData(AssetUserData);
+	}
 }

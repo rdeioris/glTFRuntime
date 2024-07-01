@@ -415,6 +415,8 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
 
+	FillAssetUserData(Mips[0].TextureIndex, Texture);
+
 	return Texture;
 }
 
@@ -1273,6 +1275,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		MaterialsNameCache.Add(Material, MaterialName);
 		MaterialsCache.Add(Index, Material);
 	}
+
+	FillAssetUserData(Index,  Material);
 
 	return Material;
 }
