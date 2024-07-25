@@ -4647,6 +4647,13 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 		}
 		Blob.Data = AdditionalBufferView->Data;
 		Blob.Num = FinalSize;
+
+		// special case for bigger buffers
+		if (FinalSize < AdditionalBufferView->Num && (AdditionalBufferView->Num % (ElementSize * Elements)) == 0)
+		{
+			Count = AdditionalBufferView->Num / (ElementSize * Elements);
+		}
+
 		if (!bHasSparse)
 		{
 			Stride = ElementSize * Elements;
