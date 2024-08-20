@@ -48,6 +48,12 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On Scenes Loaded"))
 	void ReceiveOnScenesLoaded();
 
+	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On Node Processed"))
+	void ReceiveOnNodeProcessed(const int32 NodeIndex, USceneComponent* NodeSceneComponent);
+
+	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "Override StaticMeshConfig"))
+	FglTFRuntimeStaticMeshConfig OverrideStaticMeshConfig(const int32 NodeIndex, UStaticMeshComponent* NodeStaticMeshComponent);
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	bool bShowWhileLoading;
 
@@ -55,6 +61,12 @@ public:
 	bool bStaticMeshesAsSkeletal;
 
 	virtual void PostUnregisterAllComponents() override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	bool bAllowLights;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	FglTFRuntimeLightConfig LightConfig;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")

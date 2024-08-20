@@ -214,6 +214,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
 	int32 GetArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
+	FVector4 GetVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
 

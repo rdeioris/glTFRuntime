@@ -444,6 +444,9 @@ struct FglTFRuntimeImagesConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	int32 LODBias;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bForceAutoDetect;
+
 	FglTFRuntimeImagesConfig()
 	{
 		Compression = TextureCompressionSettings::TC_Default;
@@ -456,6 +459,7 @@ struct FglTFRuntimeImagesConfig
 		bCompressMips = false;
 		bStreaming = false;
 		LODBias = 0;
+		bForceAutoDetect = false;
 	}
 };
 
@@ -614,6 +618,27 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<FString, UTexture*> CustomTextureParams;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAddEpicInterchangeParams;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MetallicRoughnessOverrideMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SpecularGlossinessOverrideMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> ClearCoatOverrideMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> TransmissionOverrideMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UnlitOverrideMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SheenOverrideMap;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -634,6 +659,7 @@ struct FglTFRuntimeMaterialsConfig
 		LinesTriangulationMode = EglTFRuntimeLinesTriangulationMode::OpenedTriangularPrismWithXYInUV1ZWInUV2;
 		LinesBaseMaterial = nullptr;
 		LinesScaleFactor = 1;
+		bAddEpicInterchangeParams = false;
 	}
 };
 
@@ -1934,6 +1960,16 @@ struct FglTFRuntimeMaterial
 	bool bKHR_materials_emissive_strength;
 	double EmissiveStrength;
 
+	bool bKHR_materials_volume;
+	bool bHasThicknessFactor;
+	double ThicknessFactor;
+	TArray<FglTFRuntimeMipMap> ThicknessTextureMips;
+	UTexture2D* ThicknessTextureCache;
+	FglTFRuntimeTextureTransform ThicknessTransform;
+	FglTFRuntimeTextureSampler ThicknessSampler;
+	double AttenuationDistance;
+	FLinearColor AttenuationColor;
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -1970,6 +2006,12 @@ struct FglTFRuntimeMaterial
 		SpecularTextureCache = nullptr;
 		bKHR_materials_emissive_strength = false;
 		EmissiveStrength = 1;
+		bKHR_materials_volume = false;
+		bHasThicknessFactor = true;
+		ThicknessFactor = 0;
+		ThicknessTextureCache = nullptr;
+		AttenuationDistance = 0;
+		AttenuationColor = FLinearColor::White;
 	}
 };
 
@@ -2274,6 +2316,7 @@ public:
 	bool GetJSONBooleanFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
 	int32 GetJSONArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+	FVector4 GetJSONVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
 	bool GetStringMapFromExtras(const FString& Key, TMap<FString, FString>& StringMap) const;
 	bool GetStringArrayFromExtras(const FString& Key, TArray<FString>& StringArray) const;
@@ -2314,6 +2357,7 @@ public:
 
 	TArray<TSharedRef<FJsonObject>> GetMeshes() const;
 	TArray<TSharedRef<FJsonObject>> GetMeshPrimitives(TSharedRef<FJsonObject> Mesh) const;
+	TArray<TSharedRef<FJsonObject>> GetMaterials() const;
 	TSharedPtr<FJsonObject> GetJsonObjectExtras(TSharedRef<FJsonObject> JsonObject) const;
 	TSharedPtr<FJsonObject> GetJsonObjectFromObject(TSharedRef<FJsonObject> JsonObject, const FString& Name) const;
 	TSharedPtr<FJsonObject> GetJsonObjectExtension(TSharedRef<FJsonObject> JsonObject, const FString& Name) const;

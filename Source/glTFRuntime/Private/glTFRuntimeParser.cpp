@@ -5536,6 +5536,26 @@ TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetMeshPrimitives(TSharedRef
 	return Primitives;
 }
 
+TArray<TSharedRef<FJsonObject>> FglTFRuntimeParser::GetMaterials() const
+{
+	TArray<TSharedRef<FJsonObject>> Materials;
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+	if (Root->TryGetArrayField(TEXT("materials"), JsonArray))
+	{
+		for (TSharedPtr<FJsonValue> JsonValue : *JsonArray)
+		{
+			const TSharedPtr<FJsonObject>* JsonObject;
+			if (JsonValue->TryGetObject(JsonObject))
+			{
+				Materials.Add(JsonObject->ToSharedRef());
+			}
+		}
+	}
+
+	return Materials;
+}
+
 TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectExtras(TSharedRef<FJsonObject> JsonObject) const
 {
 	return GetJsonObjectFromObject(JsonObject, TEXT("extras"));

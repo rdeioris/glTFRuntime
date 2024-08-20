@@ -817,6 +817,13 @@ int32 UglTFRuntimeAsset::GetArraySizeFromPath(const TArray<FglTFRuntimePathItem>
 	return Parser->GetJSONArraySizeFromPath(Path, bFound);
 }
 
+FVector4 UglTFRuntimeAsset::GetVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	GLTF_CHECK_PARSER(FVector4(0, 0, 0, 0));
+	return Parser->GetJSONVectorFromPath(Path, bFound);
+}
+
+
 bool UglTFRuntimeAsset::LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter)
 {
 	GLTF_CHECK_PARSER(false);

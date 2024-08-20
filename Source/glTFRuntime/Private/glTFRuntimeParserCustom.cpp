@@ -134,3 +134,35 @@ int32 FglTFRuntimeParser::GetJSONArraySizeFromPath(const TArray<FglTFRuntimePath
 	}
 	return ReturnValue;
 }
+
+FVector4 FglTFRuntimeParser::GetJSONVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	FVector4 Vector = FVector4(0, 0, 0, 1);
+
+	int32 ReturnValue = -1;
+	bFound = false;
+
+	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
+	if (!CurrentObject)
+	{
+		return Vector;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* IsArray = nullptr;
+	bFound = CurrentObject->TryGetArray(IsArray);
+	if (!bFound)
+	{
+		return Vector;
+	}
+
+	for (int32 Index = 0; Index < FMath::Min<int32>(IsArray->Num(), 4); Index++)
+	{
+		double Value = 0;
+		if ((*IsArray)[Index]->TryGetNumber(Value))
+		{
+			Vector[Index] = Value;
+		}
+	}
+
+	return Vector;
+}
