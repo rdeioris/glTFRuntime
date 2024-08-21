@@ -1299,6 +1299,12 @@ bool UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Node
 	return Parser->LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, SkinIndex, ExcludeNodes, RuntimeLOD, MaterialsConfig, SkeletonConfig, TransformApplyRecursiveMode);
 }
 
+void UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLODAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, int32& SkinIndex, const int32 OverrideSkinIndex, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
+{
+	GLTF_CHECK_PARSER_VOID();
+	Parser->LoadSkinnedMeshRecursiveAsRuntimeLODAsync(NodeName, SkinIndex, ExcludeNodes, AsyncCallback, MaterialsConfig, SkeletonConfig, TransformApplyRecursiveMode);
+}
+
 USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);

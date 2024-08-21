@@ -3342,6 +3342,21 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
 }
 
+void FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLODAsync(const FString& NodeName, int32& SkinIndex, const TArray<FString>& ExcludeNodes, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
+{
+	Async(EAsyncExecution::Thread, [this, ExcludeNodes, NodeName, SkinIndex, AsyncCallback, MaterialsConfig, SkeletonConfig, TransformApplyRecursiveMode]()
+		{
+			FglTFRuntimeMeshLOD LOD;
+			int32 NewSkinIndex = SkinIndex;
+			const bool bSuccess = LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, NewSkinIndex, ExcludeNodes, LOD, MaterialsConfig, SkeletonConfig, TransformApplyRecursiveMode);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
+				{
+					AsyncCallback.ExecuteIfBound(bSuccess, MoveTemp(LOD));
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+}
 
 bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& NodeName, int32& SkinIndex, const TArray<FString>& ExcludeNodes, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
 {
