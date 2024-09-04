@@ -430,6 +430,14 @@ void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimati
 
 }
 
+void AglTFRuntimeAssetActor::SetAllLoopTimes(float LoopTime)
+{
+	for(TPair<USceneComponent*, UglTFRuntimeAnimationCurve*>& Pair : CurveBasedAnimations)
+	{
+		Pair.Value->SetglTFLoopStartTime(LoopTime);
+	}
+}
+
 // Called every frame
 void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 {
@@ -449,8 +457,8 @@ void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 		float CurrentTime = CurveBasedAnimationsTimeTracker[Pair.Key];
 		if (CurrentTime > Pair.Value->glTFCurveAnimationDuration)
 		{
-			CurveBasedAnimationsTimeTracker[Pair.Key] = 0;
-			CurrentTime = 0;
+			CurveBasedAnimationsTimeTracker[Pair.Key] = Pair.Value->glTFLoopStartTime;
+			CurrentTime = Pair.Value->glTFLoopStartTime;
 		}
 
 		if (CurrentTime >= MinTime)

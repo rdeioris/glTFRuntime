@@ -9,6 +9,11 @@ UglTFRuntimeAnimationCurve::UglTFRuntimeAnimationCurve()
 	glTFCurveAnimationDuration = 0;
 }
 
+void UglTFRuntimeAnimationCurve::SetglTFLoopStartTime(float StartTimeInput)
+{
+	glTFLoopStartTime = StartTimeInput < 0 ? glTFCurveAnimationDuration : StartTimeInput;
+}
+
 FTransform UglTFRuntimeAnimationCurve::GetTransformValue(float InTime) const
 {
 	FVector Location;

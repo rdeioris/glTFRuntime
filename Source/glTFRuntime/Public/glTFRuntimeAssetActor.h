@@ -75,6 +75,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	void SetCurveAnimationByName(const FString& CurveAnimationName);
 
+	/**
+	 *Sets the time in all animations curves which animations that reach their end will start from.
+	 *LoopTime is the Timestamp at which the loops should occur
+	 *These properties can be set individually through the CurveBasedAnimations values
+	 */
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime",meta=(DisplayName="Set Loop Start Time"))
+	void SetAllLoopTimes(float LoopTime);
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	bool bAllowNodeAnimations;
 

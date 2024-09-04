@@ -50,6 +50,13 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "glTFRuntime|Curves")
     float glTFCurveAnimationDuration;
 
+	//Sets which time looping will start from. setting to 0 will cause it to do a full loop. setting to -1 will cause it to stick on the last frame. defaults to 0
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, BlueprintSetter=SetglTFLoopStartTime, Category = "glTFRuntime|Curves")
+	float glTFLoopStartTime = 0;
+
+	UFUNCTION(BlueprintCallable)
+	void SetglTFLoopStartTime(float StartTimeInput);
+	
     FMatrix BasisMatrix;
 
     /** Evaluate this float curve at the specified time */
