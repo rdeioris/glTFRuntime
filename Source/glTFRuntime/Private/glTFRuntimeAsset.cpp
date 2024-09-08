@@ -1412,6 +1412,7 @@ bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TA
 
 	for (int32 Index = 0; Index < Scales.Num(); Index++)
 	{
+		Transforms[Index].NormalizeRotation();
 		Transforms[Index] = Parser->RebaseTransform(Transforms[Index]);
 	}
 
