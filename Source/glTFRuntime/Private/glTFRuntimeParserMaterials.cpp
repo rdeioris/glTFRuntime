@@ -763,9 +763,9 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 				if (MaterialsConfig.bAddEpicInterchangeParams)
 				{
-					Material->SetVectorParameterValue(FName(TransformPrefix + "_TexCoord"), FLinearColor(UVSet));
-					Material->SetVectorParameterValue(FName(TransformPrefix + "_OffsetScale"), FLinearColor(Transform.Offset.R, Transform.Offset.G, Transform.Scale.R, Transform.Scale.G));
-					Material->SetScalarParameterValue(FName(TransformPrefix + "_Rotation"), Transform.Rotation);
+					Material->SetVectorParameterValue(FName(TransformPrefix + "Texture_TexCoord"), FLinearColor(UVSet));
+					Material->SetVectorParameterValue(FName(TransformPrefix + "Texture_OffsetScale"), FLinearColor(Transform.Offset.R, Transform.Offset.G, Transform.Scale.R, Transform.Scale.G));
+					Material->SetScalarParameterValue(FName(TransformPrefix + "Texture_Rotation"), Transform.Rotation);
 				}
 			}
 		};
