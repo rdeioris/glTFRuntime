@@ -569,7 +569,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildVertexColorOnlyMaterial(const FglTF
 
 	if (IsInGameThread())
 	{
-		UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+		UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, GetTransientPackage());
 		if (!Material)
 		{
 			AddError("BuildVertexColorOnlyMaterial()", "Unable to create material instance, falling back to default material");
@@ -590,7 +590,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildVertexColorOnlyMaterial(const FglTF
 			{
 				return;
 			}
-			Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+			Material = UMaterialInstanceDynamic::Create(BaseMaterial, GetTransientPackage());
 			if (!Material)
 			{
 				AddError("BuildVertexColorOnlyMaterial()", "Unable to create material instance, falling back to default material");
@@ -708,7 +708,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		return UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
 	}
 
-	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, GetTransientPackage());
 	if (!Material)
 	{
 		AddError("BuildMaterial()", "Unable to create material instance, falling back to default material");
