@@ -763,9 +763,9 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 				if (MaterialsConfig.bAddEpicInterchangeParams)
 				{
-					Material->SetVectorParameterValue(FName(TransformPrefix + "_TexCoord"), FLinearColor(UVSet));
-					Material->SetVectorParameterValue(FName(TransformPrefix + "_OffsetScale"), FLinearColor(Transform.Offset.R, Transform.Offset.G, Transform.Scale.R, Transform.Scale.G));
-					Material->SetScalarParameterValue(FName(TransformPrefix + "_Rotation"), Transform.Rotation);
+					Material->SetVectorParameterValue(FName(TransformPrefix + "Texture_TexCoord"), FLinearColor(UVSet));
+					Material->SetVectorParameterValue(FName(TransformPrefix + "Texture_OffsetScale"), FLinearColor(Transform.Offset.R, Transform.Offset.G, Transform.Scale.R, Transform.Scale.G));
+					Material->SetScalarParameterValue(FName(TransformPrefix + "Texture_Rotation"), Transform.Rotation);
 				}
 			}
 		};
@@ -789,6 +789,11 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		"normal", RuntimeMaterial.NormalTransform,
 		TextureCompressionSettings::TC_Normalmap, false);
 	ApplyMaterialFactor(true, "normalTexScale", FLinearColor(RuntimeMaterial.NormalTextureScale, RuntimeMaterial.NormalTextureScale, 1, 1));
+
+	if (MaterialsConfig.bAddEpicInterchangeParams)
+	{
+		ApplyMaterialFloatFactor(true, "normalScale", RuntimeMaterial.NormalTextureScale);
+	}
 
 	ApplyMaterialTexture("occlusionTexture", RuntimeMaterial.OcclusionTextureCache, RuntimeMaterial.OcclusionTextureMips,
 		RuntimeMaterial.OcclusionSampler,
@@ -955,7 +960,7 @@ bool FglTFRuntimeParser::LoadImageFromBlob(const TArray64<uint8>& Blob, TSharedR
 			{
 				AddError("LoadImageFromBlob()", "Unable to parse image data");
 				return false;
-		}
+			}
 
 #if ENGINE_MAJOR_VERSION >= 5
 			if (!ImageWrapper->GetRaw(ImagesConfig.bForceHDR ? ERGBFormat::RGBAF : RGBFormat, ImagesConfig.bForceHDR ? 16 : BitDepth, UncompressedBytes))
@@ -974,8 +979,8 @@ bool FglTFRuntimeParser::LoadImageFromBlob(const TArray64<uint8>& Blob, TSharedR
 
 			Width = ImageWrapper->GetWidth();
 			Height = ImageWrapper->GetHeight();
-	}
-}
+			}
+		}
 
 	if (ImagesConfig.bVerticalFlip && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
 	{
@@ -990,7 +995,7 @@ bool FglTFRuntimeParser::LoadImageFromBlob(const TArray64<uint8>& Blob, TSharedR
 	}
 
 	return true;
-}
+	}
 
 bool FglTFRuntimeParser::LoadImageBytes(const int32 ImageIndex, TSharedPtr<FJsonObject>& JsonImageObject, TArray64<uint8>& Bytes)
 {
@@ -1206,7 +1211,7 @@ bool FglTFRuntimeParser::LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJs
 				Height = NewHeight;
 				UncompressedBytes.Empty(ResizedPixels.Num() * 4);
 				UncompressedBytes.Append(reinterpret_cast<uint8*>(ResizedPixels.GetData()), ResizedPixels.Num() * 4);
-		}
+			}
 
 			int32 NumOfMips = 1;
 
@@ -1264,8 +1269,8 @@ bool FglTFRuntimeParser::LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJs
 				MipWidth = FMath::Max(MipWidth / 2, 1);
 				MipHeight = FMath::Max(MipHeight / 2, 1);
 			}
+		}
 	}
-}
 
 	OnTextureFilterMips.Broadcast(AsShared(), Mips, MaterialsConfig.ImagesConfig);
 
@@ -1441,7 +1446,7 @@ UTextureCube* FglTFRuntimeParser::BuildTextureCube(UObject* Outer, const TArray<
 
 
 		Mip->BulkData.Unlock();
-		}
+	}
 
 
 	Texture->CompressionSettings = ImagesConfig.Compression;
@@ -1544,7 +1549,7 @@ UTexture2DArray* FglTFRuntimeParser::BuildTextureArray(UObject* Outer, const TAr
 	Texture->UpdateResource();
 
 	return Texture;
-	}
+}
 
 FglTFRuntimeDDS::FglTFRuntimeDDS(const TArray64<uint8>& InData) : Data(InData)
 {
@@ -1723,11 +1728,11 @@ int32 FglTFRuntimeTextureMipDataProvider::GetMips(const FTextureUpdateContext& C
 		{
 			ByteBulkData->GetCopy(&Dest, false);
 		}
-	}
+}
 
 	AdvanceTo(ETickState::CleanUp, ETickThread::Async);
 	return CurrentFirstLODIdx;
-}
+	}
 
 bool FglTFRuntimeParser::LoadBlobToMips(const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
