@@ -317,6 +317,18 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			GetMaterialVector(JsonMaterialVolume->ToSharedRef(), "attenuationColor", 3, bDummyValue, RuntimeMaterial.AttenuationColor);
 			RuntimeMaterial.bKHR_materials_volume = true;
 		}
+
+		// KHR_materials_sheen
+		const TSharedPtr<FJsonObject>* JsonMaterialSheen;
+		if ((*JsonExtensions)->TryGetObjectField(TEXT("KHR_materials_sheen"), JsonMaterialSheen))
+		{
+			bool bDymmySheenValue = false;
+			GetMaterialVector(JsonMaterialSheen->ToSharedRef(), "sheenColorFactor", 3, bDymmySheenValue, RuntimeMaterial.SheenColorFactor);
+			GetMaterialFactor(JsonMaterialSheen->ToSharedRef(), "sheenRoughnessFactor", bDymmySheenValue, RuntimeMaterial.SheenRoughnessFactor);
+			GetMaterialTexture(JsonMaterialSheen->ToSharedRef(), "sheenColorTexture", true, RuntimeMaterial.SheenColorTextureCache, RuntimeMaterial.SheenColorTextureMips, RuntimeMaterial.SheenColorTextureTransform, RuntimeMaterial.SheenColorTextureSampler, false);
+			GetMaterialTexture(JsonMaterialSheen->ToSharedRef(), "sheenRoughnessTexture", false, RuntimeMaterial.SheenRoughnessTextureCache, RuntimeMaterial.SheenRoughnessTextureMips, RuntimeMaterial.SheenRoughnessTextureTransform, RuntimeMaterial.SheenRoughnessTextureSampler, false);
+			RuntimeMaterial.bKHR_materials_sheen = true;
+		}
 	}
 
 	if (IsInGameThread())
@@ -669,6 +681,18 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			}
 		}
 
+		if (RuntimeMaterial.bKHR_materials_sheen)
+		{
+			if (MaterialsConfig.SheenOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			{
+				BaseMaterial = MaterialsConfig.SheenOverrideMap[RuntimeMaterial.MaterialType];
+			}
+			else if (SheenMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+			{
+				BaseMaterial = SheenMaterialsMap[RuntimeMaterial.MaterialType];
+			}
+		}
+
 		// NOTE: ensure to have transmission as the last check given its incompatibility with other materials like clearcoat
 		if (RuntimeMaterial.bKHR_materials_transmission)
 		{
@@ -882,6 +906,21 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			TextureCompressionSettings::TC_Normalmap, false);
 	}
 
+	ApplyMaterialFactor(RuntimeMaterial.bKHR_materials_sheen, "sheenColorFactor", RuntimeMaterial.SheenColorFactor);
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_sheen, "sheenRoughnessFactor", RuntimeMaterial.SheenRoughnessFactor);
+	if (RuntimeMaterial.bKHR_materials_sheen)
+	{
+		ApplyMaterialTexture("sheenColorTexture", RuntimeMaterial.SheenColorTextureCache, RuntimeMaterial.SheenColorTextureMips,
+			RuntimeMaterial.SheenColorTextureSampler,
+			"sheenColor", RuntimeMaterial.SheenColorTextureTransform,
+			TextureCompressionSettings::TC_Default, true);
+
+		ApplyMaterialTexture("sheenRoughnessTexture", RuntimeMaterial.SheenRoughnessTextureCache, RuntimeMaterial.SheenRoughnessTextureMips,
+			RuntimeMaterial.SheenRoughnessTextureSampler,
+			"sheenRoughness", RuntimeMaterial.SheenRoughnessTextureTransform,
+			TextureCompressionSettings::TC_Default, false);
+	}
+
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_emissive_strength, "emissiveStrength", RuntimeMaterial.EmissiveStrength);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ScalarParamsOverrides)
@@ -1001,8 +1040,8 @@ bool FglTFRuntimeParser::LoadImageFromBlob(const TArray64<uint8>& Blob, TSharedR
 
 			Width = ImageWrapper->GetWidth();
 			Height = ImageWrapper->GetHeight();
-			}
 		}
+	}
 
 	if (ImagesConfig.bVerticalFlip && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
 	{
@@ -1017,7 +1056,7 @@ bool FglTFRuntimeParser::LoadImageFromBlob(const TArray64<uint8>& Blob, TSharedR
 	}
 
 	return true;
-	}
+}
 
 bool FglTFRuntimeParser::LoadImageBytes(const int32 ImageIndex, TSharedPtr<FJsonObject>& JsonImageObject, TArray64<uint8>& Bytes)
 {
@@ -1750,11 +1789,11 @@ int32 FglTFRuntimeTextureMipDataProvider::GetMips(const FTextureUpdateContext& C
 		{
 			ByteBulkData->GetCopy(&Dest, false);
 		}
-}
+	}
 
 	AdvanceTo(ETickState::CleanUp, ETickThread::Async);
 	return CurrentFirstLODIdx;
-	}
+}
 
 bool FglTFRuntimeParser::LoadBlobToMips(const TArray64<uint8>& Blob, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
