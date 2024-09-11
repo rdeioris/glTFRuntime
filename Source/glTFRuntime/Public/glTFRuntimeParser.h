@@ -1985,6 +1985,19 @@ struct FglTFRuntimeMaterial
 	FglTFRuntimeTextureTransform ClearCoatNormalTextureTransform;
 	FglTFRuntimeTextureSampler ClearCoatNormalTextureSampler;
 
+	bool bKHR_materials_sheen;
+	FLinearColor SheenColorFactor;
+	double SheenRoughnessFactor;
+	TArray<FglTFRuntimeMipMap> SheenColorTextureMips;
+	UTexture2D* SheenColorTextureCache;
+	FglTFRuntimeTextureTransform SheenColorTextureTransform;
+	FglTFRuntimeTextureSampler SheenColorTextureSampler;
+	TArray<FglTFRuntimeMipMap> SheenRoughnessTextureMips;
+	UTexture2D* SheenRoughnessTextureCache;
+	FglTFRuntimeTextureTransform SheenRoughnessTextureTransform;
+	FglTFRuntimeTextureSampler SheenRoughnessTextureSampler;
+
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -2030,6 +2043,11 @@ struct FglTFRuntimeMaterial
 		ClearCoatTextureCache = nullptr;
 		ClearCoatRoughnessTextureCache = nullptr;
 		ClearCoatNormalTextureCache = nullptr;
+		bKHR_materials_sheen = false;
+		SheenColorFactor = FLinearColor::Black;
+		SheenRoughnessFactor = 0;
+		SheenColorTextureCache = nullptr;
+		SheenRoughnessTextureCache = nullptr;
 	}
 };
 
@@ -2561,12 +2579,14 @@ public:
 	TMap<EglTFRuntimeMaterialType, TObjectPtr<UMaterialInterface>>& GetUnlitMaterialsMap() { return UnlitMaterialsMap; };
 	TMap<EglTFRuntimeMaterialType, TObjectPtr<UMaterialInterface>>& GetTransmissionMaterialsMap() { return TransmissionMaterialsMap; };
 	TMap<EglTFRuntimeMaterialType, TObjectPtr<UMaterialInterface>>& GetClearCoatMaterialsMap() { return ClearCoatMaterialsMap; };
+	TMap<EglTFRuntimeMaterialType, TObjectPtr<UMaterialInterface>>& GetSheenMaterialsMap() { return SheenMaterialsMap; };
 #else
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetMetallicRoughnessMaterialsMap() { return MetallicRoughnessMaterialsMap; };
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetSpecularGlossinessMaterialsMap() { return SpecularGlossinessMaterialsMap; };
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetUnlitMaterialsMap() { return UnlitMaterialsMap; };
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetTransmissionMaterialsMap() { return TransmissionMaterialsMap; };
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetClearCoatMaterialsMap() { return ClearCoatMaterialsMap; };
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& GetSheenMaterialsMap() { return SheenMaterialsMap; };
 #endif
 
 	FString ToJsonString() const;
@@ -2601,12 +2621,14 @@ protected:
 	TMap<EglTFRuntimeMaterialType, TObjectPtr<UMaterialInterface>> UnlitMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, TObjectPtr<UMaterialInterface>> TransmissionMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, TObjectPtr<UMaterialInterface>> ClearCoatMaterialsMap;
+	TMap<EglTFRuntimeMaterialType, TObjectPtr<UMaterialInterface>> SheenMaterialsMap;
 #else
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MetallicRoughnessMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SpecularGlossinessMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UnlitMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> TransmissionMaterialsMap;
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> ClearCoatMaterialsMap;
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SheenMaterialsMap;
 #endif
 
 	TArray<FString> Errors;
