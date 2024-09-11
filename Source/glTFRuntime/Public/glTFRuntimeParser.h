@@ -1970,6 +1970,21 @@ struct FglTFRuntimeMaterial
 	double AttenuationDistance;
 	FLinearColor AttenuationColor;
 
+	TArray<FglTFRuntimeMipMap> ClearCoatTextureMips;
+	UTexture2D* ClearCoatTextureCache;
+	FglTFRuntimeTextureTransform ClearCoatTextureTransform;
+	FglTFRuntimeTextureSampler ClearCoatTextureSampler;
+
+	TArray<FglTFRuntimeMipMap> ClearCoatRoughnessTextureMips;
+	UTexture2D* ClearCoatRoughnessTextureCache;
+	FglTFRuntimeTextureTransform ClearCoatRoughnessTextureTransform;
+	FglTFRuntimeTextureSampler ClearCoatRoughnessTextureSampler;
+
+	TArray<FglTFRuntimeMipMap> ClearCoatNormalTextureMips;
+	UTexture2D* ClearCoatNormalTextureCache;
+	FglTFRuntimeTextureTransform ClearCoatNormalTextureTransform;
+	FglTFRuntimeTextureSampler ClearCoatNormalTextureSampler;
+
 	FglTFRuntimeMaterial()
 	{
 		bTwoSided = false;
@@ -2012,6 +2027,9 @@ struct FglTFRuntimeMaterial
 		ThicknessTextureCache = nullptr;
 		AttenuationDistance = 0;
 		AttenuationColor = FLinearColor::White;
+		ClearCoatTextureCache = nullptr;
+		ClearCoatRoughnessTextureCache = nullptr;
+		ClearCoatNormalTextureCache = nullptr;
 	}
 };
 

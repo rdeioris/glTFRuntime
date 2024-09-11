@@ -299,6 +299,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				RuntimeMaterial.ClearCoatRoughnessFactor = 0;
 			}
 
+			GetMaterialTexture(JsonMaterialClearCoat->ToSharedRef(), "clearcoatTexture", false, RuntimeMaterial.ClearCoatTextureCache, RuntimeMaterial.ClearCoatTextureMips, RuntimeMaterial.ClearCoatTextureTransform, RuntimeMaterial.ClearCoatTextureSampler, false);
+			GetMaterialTexture(JsonMaterialClearCoat->ToSharedRef(), "clearcoatRoughnessTexture", false, RuntimeMaterial.ClearCoatRoughnessTextureCache, RuntimeMaterial.ClearCoatRoughnessTextureMips, RuntimeMaterial.ClearCoatRoughnessTextureTransform, RuntimeMaterial.ClearCoatRoughnessTextureSampler, false);
+			GetMaterialTexture(JsonMaterialClearCoat->ToSharedRef(), "clearcoatNormalTexture", false, RuntimeMaterial.ClearCoatNormalTextureCache, RuntimeMaterial.ClearCoatNormalTextureMips, RuntimeMaterial.ClearCoatNormalTextureTransform, RuntimeMaterial.ClearCoatNormalTextureSampler, true);
+
+
 			RuntimeMaterial.bKHR_materials_clearcoat = true;
 		}
 
@@ -859,6 +864,23 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatFactor", RuntimeMaterial.ClearCoatFactor);
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatRoughnessFactor", RuntimeMaterial.ClearCoatRoughnessFactor);
+	if (RuntimeMaterial.bKHR_materials_clearcoat)
+	{
+		ApplyMaterialTexture("clearcoatTexture", RuntimeMaterial.ClearCoatTextureCache, RuntimeMaterial.ClearCoatTextureMips,
+			RuntimeMaterial.ClearCoatTextureSampler,
+			"clearcoat", RuntimeMaterial.ClearCoatTextureTransform,
+			TextureCompressionSettings::TC_Default, false);
+
+		ApplyMaterialTexture("clearcoatRoughnessTexture", RuntimeMaterial.ClearCoatRoughnessTextureCache, RuntimeMaterial.ClearCoatRoughnessTextureMips,
+			RuntimeMaterial.ClearCoatRoughnessTextureSampler,
+			"clearcoatRoughness", RuntimeMaterial.ClearCoatRoughnessTextureTransform,
+			TextureCompressionSettings::TC_Default, false);
+
+		ApplyMaterialTexture("clearcoatNormalTexture", RuntimeMaterial.ClearCoatNormalTextureCache, RuntimeMaterial.ClearCoatNormalTextureMips,
+			RuntimeMaterial.ClearCoatNormalTextureSampler,
+			"clearcoatNormal", RuntimeMaterial.ClearCoatNormalTextureTransform,
+			TextureCompressionSettings::TC_Normalmap, false);
+	}
 
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_emissive_strength, "emissiveStrength", RuntimeMaterial.EmissiveStrength);
 
