@@ -166,3 +166,22 @@ FVector4 FglTFRuntimeParser::GetJSONVectorFromPath(const TArray<FglTFRuntimePath
 
 	return Vector;
 }
+
+TArray<FString> FglTFRuntimeParser::GetJSONObjectKeysFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	bFound = false;
+	TArray<FString> Keys;
+
+	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
+	if (CurrentObject)
+	{
+		TSharedPtr<FJsonObject>* JsonObject = nullptr;
+		if (CurrentObject->TryGetObject(JsonObject))
+		{
+			bFound = true;
+			(*JsonObject)->Values.GetKeys(Keys);
+		}
+	}
+
+	return Keys;
+}
