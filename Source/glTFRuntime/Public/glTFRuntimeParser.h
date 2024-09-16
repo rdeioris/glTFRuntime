@@ -447,6 +447,9 @@ struct FglTFRuntimeImagesConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bForceAutoDetect;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TEnumAsByte<EPixelFormat> ForcePixelFormat;
+
 	FglTFRuntimeImagesConfig()
 	{
 		Compression = TextureCompressionSettings::TC_Default;
@@ -460,6 +463,7 @@ struct FglTFRuntimeImagesConfig
 		bStreaming = false;
 		LODBias = 0;
 		bForceAutoDetect = false;
+		ForcePixelFormat = EPixelFormat::PF_Unknown;
 	}
 };
 
