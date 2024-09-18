@@ -175,7 +175,7 @@ TArray<FString> FglTFRuntimeParser::GetJSONObjectKeysFromPath(const TArray<FglTF
 	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
 	if (CurrentObject)
 	{
-		TSharedPtr<FJsonObject>* JsonObject = nullptr;
+		const TSharedPtr<FJsonObject>* JsonObject = nullptr;
 		if (CurrentObject->TryGetObject(JsonObject))
 		{
 			bFound = true;
