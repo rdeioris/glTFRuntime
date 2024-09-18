@@ -807,7 +807,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				});
 		}
 
-		LodRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision);
+		LodRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision || SkeletalMeshContext->SkeletalMeshConfig.bAllowCPUAccess);
 #if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION <= 25 && WITH_EDITOR
 		// very annoying hack for support UE4.25 (unfortunately we cannot set bone influences)
 		TArray<FSoftSkinVertex> SoftSkinVertices;
@@ -834,7 +834,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		{
 			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
 		}
-
 	}
 
 	FillAssetUserData(SkeletalMeshContext->MeshIndex, SkeletalMeshContext->SkeletalMesh);

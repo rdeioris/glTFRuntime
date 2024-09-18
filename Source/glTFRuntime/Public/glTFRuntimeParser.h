@@ -1214,6 +1214,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FglTFRuntimeBoneBoundsFilterHook BoneBoundsFilter;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bAllowCPUAccess;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -1239,6 +1242,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		bReverseTangents = false;
 		bAutoGeneratePhysicsAssetBodies = false;
 		bAutoGeneratePhysicsAssetConstraints = false;
+		bAllowCPUAccess = false;
 	}
 };
 
