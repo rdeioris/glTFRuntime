@@ -524,6 +524,98 @@ FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODs(const TArr
 	return NewRuntimeLOD;
 }
 
+FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODsWithSkeleton(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FString& RootBoneName)
+{
+	FglTFRuntimeMeshLOD NewRuntimeLOD;
+
+	FglTFRuntimeBone RootBone;
+	RootBone.BoneName = RootBoneName;
+	RootBone.ParentIndex = INDEX_NONE;
+	RootBone.Transform = FTransform::Identity;
+
+	NewRuntimeLOD.Skeleton.Add(RootBone);
+
+	TSet<FString> BoneNames;
+	BoneNames.Add(RootBoneName);
+
+	// build the skeleton
+	for (const FglTFRuntimeMeshLOD& RuntimeLOD : RuntimeLODs)
+	{
+		NewRuntimeLOD.AdditionalTransforms.Append(RuntimeLOD.AdditionalTransforms);
+
+		if (!NewRuntimeLOD.bHasNormals)
+		{
+			NewRuntimeLOD.bHasNormals = RuntimeLOD.bHasNormals;
+		}
+		if (NewRuntimeLOD.bHasTangents)
+		{
+			NewRuntimeLOD.bHasTangents = RuntimeLOD.bHasTangents;
+		}
+		if (!NewRuntimeLOD.bHasUV)
+		{
+			NewRuntimeLOD.bHasUV = RuntimeLOD.bHasUV;
+		}
+		if (!NewRuntimeLOD.bHasVertexColors)
+		{
+			NewRuntimeLOD.bHasVertexColors = RuntimeLOD.bHasVertexColors;
+		}
+
+		// we have a skeleton to merge
+		if (RuntimeLOD.Skeleton.Num() > 0)
+		{
+
+		}
+		// check for overrides
+		else
+		{
+			for (const FglTFRuntimePrimitive& Primitive : RuntimeLOD.Primitives)
+			{
+				// case for static meshes recursively merged as skinned
+				if (Primitive.OverrideBoneMap.Num() == 1 && Primitive.OverrideBoneMap.Contains(0) && Primitive.Joints.Num() == 0 && Primitive.Weights.Num() == 0)
+				{
+					FglTFRuntimePrimitive NewPrimitive = Primitive;
+					NewPrimitive.OverrideBoneMap.Empty();
+
+					// let's add the bone to the skeleton
+					FglTFRuntimeBone NewBone;
+					NewBone.BoneName = Primitive.OverrideBoneMap[0].ToString();
+					// name collision ?
+					if (BoneNames.Contains(NewBone.BoneName))
+					{
+						NewBone.BoneName += FString("_") + FGuid::NewGuid().ToString();
+					}
+					NewBone.ParentIndex = 0;
+					NewBone.Transform = FTransform::Identity;
+
+					BoneNames.Add(NewBone.BoneName);
+
+					const int32 NewBoneIndex = NewRuntimeLOD.Skeleton.Add(NewBone);
+					// fix joints and weights
+					NewPrimitive.Joints.AddDefaulted();
+					NewPrimitive.Weights.AddDefaulted();
+					NewPrimitive.Joints[0].AddUninitialized(NewPrimitive.Positions.Num());
+					NewPrimitive.Weights[0].AddUninitialized(NewPrimitive.Positions.Num());
+					for (int32 VertexIndex = 0; VertexIndex < NewPrimitive.Joints[0].Num(); VertexIndex++)
+					{
+						NewPrimitive.Joints[0][VertexIndex].X = NewBoneIndex;
+						NewPrimitive.Joints[0][VertexIndex].Y = 0;
+						NewPrimitive.Joints[0][VertexIndex].Z = 0;
+						NewPrimitive.Joints[0][VertexIndex].W = 0;
+						NewPrimitive.Weights[0][VertexIndex].X = 1;
+						NewPrimitive.Weights[0][VertexIndex].Y = 0;
+						NewPrimitive.Weights[0][VertexIndex].Z = 0;
+						NewPrimitive.Weights[0][VertexIndex].W = 0;
+					}
+
+					NewRuntimeLOD.Primitives.Add(MoveTemp(NewPrimitive));
+				}
+			}
+		}
+	}
+
+	return NewRuntimeLOD;
+}
+
 void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Command, const FString& Arguments, const FString& WorkingDirectory, const FglTFRuntimeCommandResponse& Completed, const FglTFRuntimeConfig& LoaderConfig, const int32 ExpectedExitCode)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();

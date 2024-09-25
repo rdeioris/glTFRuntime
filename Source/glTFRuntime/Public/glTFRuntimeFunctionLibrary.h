@@ -66,6 +66,9 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Merge multiple glTF Runtime LODs"), Category = "glTFRuntime")
 	static FglTFRuntimeMeshLOD glTFMergeRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs);
 
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Merge multiple glTF Runtime LODs with Skeleton"), Category = "glTFRuntime")
+	static FglTFRuntimeMeshLOD glTFMergeRuntimeLODsWithSkeleton(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FString& RootBoneName = "root");
+
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Command", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromCommand(const FString& Command, const FString& Arguments, const FString& WorkingDirectory, const FglTFRuntimeCommandResponse& Completed, const FglTFRuntimeConfig& LoaderConfig, const int32 ExpectedExitCode = 0);
 
