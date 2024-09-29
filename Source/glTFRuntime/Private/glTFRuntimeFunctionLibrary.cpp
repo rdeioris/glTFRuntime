@@ -568,8 +568,9 @@ FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODsWithSkeleto
 		// check for overrides
 		else
 		{
-			for (const FglTFRuntimePrimitive& Primitive : RuntimeLOD.Primitives)
+			for (int32 PrimitiveIndex = 0; PrimitiveIndex < RuntimeLOD.Primitives.Num(); PrimitiveIndex++)
 			{
+				const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
 				// case for static meshes recursively merged as skinned
 				if (Primitive.OverrideBoneMap.Num() == 1 && Primitive.OverrideBoneMap.Contains(0) && Primitive.Joints.Num() == 0 && Primitive.Weights.Num() == 0)
 				{
@@ -586,6 +587,10 @@ FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODsWithSkeleto
 					}
 					NewBone.ParentIndex = 0;
 					NewBone.Transform = FTransform::Identity;
+					if (RuntimeLOD.AdditionalTransforms.IsValidIndex(PrimitiveIndex))
+					{
+						NewBone.Transform = RuntimeLOD.AdditionalTransforms[PrimitiveIndex];
+					}
 
 					BoneNames.Add(NewBone.BoneName);
 
