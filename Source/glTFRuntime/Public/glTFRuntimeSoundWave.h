@@ -27,6 +27,12 @@ public:
 		RuntimeAudioOffset = 0;
 	}
 
+	UFUNCTION(BlueprintCallable, Category="glTFRuntime")
+	void ResetAudioOffset();
+
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	UglTFRuntimeSoundWave* DuplicateRuntimeSoundWave();
+
 protected:
 	TArray64<uint8> RuntimeAudioData;
 	int64 RuntimeAudioOffset;

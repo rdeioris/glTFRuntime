@@ -35,3 +35,28 @@ int32 UglTFRuntimeSoundWave::GeneratePCMData(uint8* PCMData, const int32 Samples
 	RuntimeAudioOffset += BytesToCopy;
 	return BytesToCopy;
 }
+
+void UglTFRuntimeSoundWave::ResetAudioOffset()
+{
+	RuntimeAudioOffset = 0;
+}
+
+UglTFRuntimeSoundWave* UglTFRuntimeSoundWave::DuplicateRuntimeSoundWave()
+{
+	UglTFRuntimeSoundWave* RuntimeSound = NewObject<UglTFRuntimeSoundWave>(GetTransientPackage(), NAME_None, RF_Public);
+
+	RuntimeSound->NumChannels = NumChannels;
+
+	RuntimeSound->Duration = Duration;
+
+	RuntimeSound->SetSampleRate(SampleRate);
+	RuntimeSound->TotalSamples = TotalSamples;
+
+	RuntimeSound->bLooping = bLooping;
+
+	RuntimeSound->Volume = Volume;
+
+	RuntimeSound->SetRuntimeAudioData(RuntimeAudioData.GetData(), RuntimeAudioData.Num());
+
+	return RuntimeSound;
+}
