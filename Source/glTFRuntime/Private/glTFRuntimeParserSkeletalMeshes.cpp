@@ -1966,14 +1966,26 @@ TMap<FString, UAnimSequence*> FglTFRuntimeParser::LoadNodeSkeletalAnimationsMap(
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTargets(USkeletalMesh* SkeletalMesh, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+	USkeleton* Skeleton = SkeletalMesh->GetSkeleton();
+#else
+	USkeleton* Skeleton = SkeletalMesh->Skeleton;
+#endif
+	UAnimSequence* AnimSequence = LoadSkeletalAnimationFromTracksAndMorphTargets(Skeleton, Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig);
+	if (AnimSequence)
+	{
+		AnimSequence->SetPreviewMesh(SkeletalMesh);
+	}
+	return AnimSequence;
+}
+
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTargets(USkeleton* Skeleton, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
 	int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
-#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
-#else
-	AnimSequence->SetSkeleton(SkeletalMesh->Skeleton);
-#endif
-	AnimSequence->SetPreviewMesh(SkeletalMesh);
+
+	AnimSequence->SetSkeleton(Skeleton);
+
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
 	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
