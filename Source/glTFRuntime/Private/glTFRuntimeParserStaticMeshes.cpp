@@ -891,6 +891,13 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	UBodySetup* BodySetup = StaticMesh->BodySetup;
 #endif
 
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+	if (StaticMesh->bSupportRayTracing)
+	{
+		RenderData->InitializeRayTracingRepresentationFromRenderingLODs();
+	}
+#endif
+
 	StaticMesh->InitResources();
 
 	// set default LODs screen sizes
