@@ -203,6 +203,9 @@ struct FglTFRuntimeConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<TSubclassOf<class UglTFRuntimeAssetUserData>> AssetUserDataClasses;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bNoArchive;
+
 	FglTFRuntimeConfig()
 	{
 		TransformBaseType = EglTFRuntimeTransformBaseType::Default;
@@ -216,6 +219,7 @@ struct FglTFRuntimeConfig
 		RuntimeContextObject = nullptr;
 		bAsBlob = false;
 		PrefixForUnnamedNodes = "node";
+		bNoArchive = false;
 	}
 
 	FMatrix GetMatrix() const

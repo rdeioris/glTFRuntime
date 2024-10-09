@@ -482,7 +482,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 	TSharedPtr<FglTFRuntimeArchive> Archive = nullptr;
 
 	// Zip archive ?
-	if (DataNum > 4 && DataPtr[0] == 0x50 && DataPtr[1] == 0x4b && DataPtr[2] == 0x03 && DataPtr[3] == 0x04)
+	if (!LoaderConfig.bNoArchive && DataNum > 4 && DataPtr[0] == 0x50 && DataPtr[1] == 0x4b && DataPtr[2] == 0x03 && DataPtr[3] == 0x04)
 	{
 		TSharedPtr<FglTFRuntimeArchiveZip> ZipFile = MakeShared<FglTFRuntimeArchiveZip>();
 		if (!LoaderConfig.EncryptionKey.IsEmpty())
@@ -499,7 +499,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 		Archive = ZipFile;
 	}
 	// tar ?
-	else if (DataNum % 512 == 0 && DataNum >= 10240 && DataPtr[257] == 'u' && DataPtr[258] == 's' && DataPtr[259] == 't' && DataPtr[260] == 'a' && DataPtr[261] == 'r')
+	else if (!LoaderConfig.bNoArchive && DataNum % 512 == 0 && DataNum >= 10240 && DataPtr[257] == 'u' && DataPtr[258] == 's' && DataPtr[259] == 't' && DataPtr[260] == 'a' && DataPtr[261] == 'r')
 	{
 		TMap<FString, TArray64<uint8>> TarMap;
 
