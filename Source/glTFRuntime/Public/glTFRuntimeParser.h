@@ -2505,6 +2505,8 @@ public:
 	bool MeshHasMorphTargets(const int32 MeshIndex) const;
 
 	void FillAssetUserData(const int32 Index, IInterface_AssetUserData* InObject);
+
+	void UpdateSceneBasis(const FMatrix& InSceneBasis);
 protected:
 	void LoadAndFillBaseMaterials();
 	TSharedRef<FJsonObject> Root;

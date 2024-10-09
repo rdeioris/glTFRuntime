@@ -6547,3 +6547,8 @@ void FglTFRuntimeParser::FillAssetUserData(const int32 Index, IInterface_AssetUs
 		}
 	}
 }
+
+void FglTFRuntimeParser::UpdateSceneBasis(const FMatrix& InSceneBasis)
+{
+	SceneBasis = InSceneBasis;
+}
