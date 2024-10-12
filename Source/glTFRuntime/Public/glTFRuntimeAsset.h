@@ -354,6 +354,12 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	bool MeshHasMorphTargets(const int32 MeshIndex) const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	FString GetBaseDirectory() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	FString GetBaseFilename() const;
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 	

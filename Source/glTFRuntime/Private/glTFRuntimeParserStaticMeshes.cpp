@@ -269,6 +269,15 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 								StaticMeshVertex.UVs[UVIndex] = GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore);
 #endif
 							}
+							// no UVs specified, let's set them to 0
+							else
+							{
+#if ENGINE_MAJOR_VERSION > 4
+								StaticMeshVertex.UVs[UVIndex] = FVector2f::ZeroVector;
+#else
+								StaticMeshVertex.UVs[UVIndex] = FVector2D::ZeroVector;
+#endif
+							}
 						}
 
 						if (bHasVertexColors)
@@ -332,6 +341,15 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 								StaticMeshVertex.UVs[UVIndex] = FVector2f(GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore));
 #else
 								StaticMeshVertex.UVs[UVIndex] = GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore);
+#endif
+							}
+							// no UVs specified, let's set them to 0
+							else
+							{
+#if ENGINE_MAJOR_VERSION > 4
+								StaticMeshVertex.UVs[UVIndex] = FVector2f::ZeroVector;
+#else
+								StaticMeshVertex.UVs[UVIndex] = FVector2D::ZeroVector;
 #endif
 							}
 						}

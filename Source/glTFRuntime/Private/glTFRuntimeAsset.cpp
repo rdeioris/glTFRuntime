@@ -1607,3 +1607,17 @@ bool UglTFRuntimeAsset::MeshHasMorphTargets(const int32 MeshIndex) const
 
 	return Parser->MeshHasMorphTargets(MeshIndex);
 }
+
+FString UglTFRuntimeAsset::GetBaseDirectory() const
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->GetBaseDirectory();
+}
+
+FString UglTFRuntimeAsset::GetBaseFilename() const
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->GetBaseFilename();
+}
