@@ -51,6 +51,12 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On Node Processed"))
 	void ReceiveOnNodeProcessed(const int32 NodeIndex, USceneComponent* NodeSceneComponent);
 
+	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On StaticMeshComponent Created"))
+	void ReceiveOnStaticMeshComponentCreated(UStaticMeshComponent* StaticMeshComponent, const FglTFRuntimeNode& Node);
+
+	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On SkeletalMeshComponent Created"))
+	void ReceiveOnSkeletalMeshComponentCreated(USkeletalMeshComponent* SkeletalMeshComponent, const FglTFRuntimeNode& Node);
+
 	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "Override StaticMeshConfig"))
 	FglTFRuntimeStaticMeshConfig OverrideStaticMeshConfig(const int32 NodeIndex, UStaticMeshComponent* NodeStaticMeshComponent);
 

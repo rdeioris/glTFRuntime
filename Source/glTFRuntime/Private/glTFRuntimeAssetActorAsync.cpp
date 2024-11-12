@@ -92,6 +92,7 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 			AddInstanceComponent(StaticMeshComponent);
 			MeshesToLoad.Add(StaticMeshComponent, Node);
 			NewComponent = StaticMeshComponent;
+			ReceiveOnStaticMeshComponentCreated(StaticMeshComponent, Node);
 		}
 		else
 		{
@@ -102,6 +103,7 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 			AddInstanceComponent(SkeletalMeshComponent);
 			MeshesToLoad.Add(SkeletalMeshComponent, Node);
 			NewComponent = SkeletalMeshComponent;
+			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
 		}
 	}
 
@@ -292,4 +294,14 @@ void AglTFRuntimeAssetActorAsync::ReceiveOnNodeProcessed_Implementation(const in
 FglTFRuntimeStaticMeshConfig AglTFRuntimeAssetActorAsync::OverrideStaticMeshConfig_Implementation(const int32 NodeIndex, UStaticMeshComponent* NodeStaticMeshComponent)
 {
 	return StaticMeshConfig;
+}
+
+void AglTFRuntimeAssetActorAsync::ReceiveOnStaticMeshComponentCreated_Implementation(UStaticMeshComponent* StaticMeshComponent, const FglTFRuntimeNode& Node)
+{
+
+}
+
+void AglTFRuntimeAssetActorAsync::ReceiveOnSkeletalMeshComponentCreated_Implementation(USkeletalMeshComponent* SkeletalMeshComponent, const FglTFRuntimeNode& Node)
+{
+
 }
