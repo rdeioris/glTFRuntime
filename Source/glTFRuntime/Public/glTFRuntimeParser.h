@@ -1394,6 +1394,7 @@ struct FglTFRuntimeSkeletalAnimationConfig
 		bFillAllCurves = false;
 		RetargetToSkeletalMesh = nullptr;
 		RetargetSkinIndex = INDEX_NONE;
+		PoseForRetargeting = nullptr;
 	}
 };
 
