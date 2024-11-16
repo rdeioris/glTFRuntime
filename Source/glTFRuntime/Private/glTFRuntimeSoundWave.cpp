@@ -1,7 +1,8 @@
-// Copyright 2020-2022, Roberto De Ioris.
+// Copyright 2020-2024, Roberto De Ioris.
 
 
 #include "glTFRuntimeSoundWave.h"
+#include "UObject/Package.h"
 
 UglTFRuntimeSoundWave::UglTFRuntimeSoundWave()
 {

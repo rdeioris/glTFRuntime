@@ -39,6 +39,9 @@
 #include "Animation/AnimCurveTypes.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "PhysicsEngine/PhysicsConstraintTemplate.h"
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#include "PhysicsEngine/SkeletalBodySetup.h"
+#endif
 #include "Engine/SkeletalMeshLODSettings.h"
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
 #include "UObject/SavePackage.h"
