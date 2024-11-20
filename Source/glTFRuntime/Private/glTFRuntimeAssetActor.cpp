@@ -27,6 +27,7 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 	RootNodeIndex = INDEX_NONE;
 	bLoadAllSkeletalAnimations = false;
 	bAutoPlayAnimations = true;
+	bStaticMeshesAsSkeletalOnMorphTargets = true;
 }
 
 // Called when the game starts or when spawned
@@ -142,7 +143,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 	else
 	{
-		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal && !(bStaticMeshesAsSkeletalOnMorphTargets && Asset->MeshHasMorphTargets(Node.MeshIndex)))
 		{
 			UStaticMeshComponent* StaticMeshComponent = nullptr;
 			TArray<FTransform> GPUInstancingTransforms;
@@ -269,8 +270,8 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 	else
 	{
-		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("GLTFRuntime:NodeName:%s"), *Node.Name));
-		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("GLTFRuntime:NodeIndex:%d"), Node.Index));
+		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("glTFRuntime:NodeName:%s"), *Node.Name));
+		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("glTFRuntime:NodeIndex:%d"), Node.Index));
 
 		if (SocketName != NAME_None)
 		{

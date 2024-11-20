@@ -8,6 +8,7 @@
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/Base64.h"
+#include "Misc/FileHelper.h"
 #include "GenericPlatform/GenericPlatformProcess.h"
 #include "Runtime/Launch/Resources/Version.h"
 
@@ -141,7 +142,11 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64Async(const FString& Ba
 
 			if (!FBase64::Decode(Base64, BytesBase64))
 			{
-				Completed.ExecuteIfBound(nullptr);
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 				return;
 			}
 
@@ -177,6 +182,80 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromStringAsync(const FString& Js
 	Async(EAsyncExecution::Thread, [JsonData, Asset, LoaderConfig, Completed]()
 		{
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromString(JsonData, LoaderConfig);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset);
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+}
+
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFileMap(const TMap<FString, FString>& FileMap, const FglTFRuntimeConfig& LoaderConfig)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		return nullptr;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	TMap<FString, TArray64<uint8>> Map;
+
+	for (const TPair<FString, FString>& Pair : FileMap)
+	{
+		TArray64<uint8> Data;
+		if (FFileHelper::LoadFileToArray(Data, *Pair.Value))
+		{
+			Map.Add(Pair.Key, MoveTemp(Data));
+		}
+	}
+
+	TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromMap(Map, LoaderConfig);
+
+	if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+	{
+		return Asset;
+	}
+
+	return nullptr;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFileMapAsync(const TMap<FString, FString>& FileMap, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr);
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	Async(EAsyncExecution::Thread, [FileMap, Asset, LoaderConfig, Completed]()
+		{
+			TMap<FString, TArray64<uint8>> Map;
+
+			for (const TPair<FString, FString>& Pair : FileMap)
+			{
+				TArray64<uint8> Data;
+				if (FFileHelper::LoadFileToArray(Data, *Pair.Value))
+				{
+					Map.Add(Pair.Key, MoveTemp(Data));
+				}
+			}
+
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromMap(Map, LoaderConfig);
 
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
 				{
@@ -439,6 +518,103 @@ FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODs(const TArr
 		if (!NewRuntimeLOD.bHasVertexColors)
 		{
 			NewRuntimeLOD.bHasVertexColors = RuntimeLOD.bHasVertexColors;
+		}
+	}
+
+	return NewRuntimeLOD;
+}
+
+FglTFRuntimeMeshLOD UglTFRuntimeFunctionLibrary::glTFMergeRuntimeLODsWithSkeleton(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FString& RootBoneName)
+{
+	FglTFRuntimeMeshLOD NewRuntimeLOD;
+
+	FglTFRuntimeBone RootBone;
+	RootBone.BoneName = RootBoneName;
+	RootBone.ParentIndex = INDEX_NONE;
+	RootBone.Transform = FTransform::Identity;
+
+	NewRuntimeLOD.Skeleton.Add(RootBone);
+
+	TSet<FString> BoneNames;
+	BoneNames.Add(RootBoneName);
+
+	// build the skeleton
+	for (const FglTFRuntimeMeshLOD& RuntimeLOD : RuntimeLODs)
+	{
+		NewRuntimeLOD.AdditionalTransforms.Append(RuntimeLOD.AdditionalTransforms);
+
+		if (!NewRuntimeLOD.bHasNormals)
+		{
+			NewRuntimeLOD.bHasNormals = RuntimeLOD.bHasNormals;
+		}
+		if (NewRuntimeLOD.bHasTangents)
+		{
+			NewRuntimeLOD.bHasTangents = RuntimeLOD.bHasTangents;
+		}
+		if (!NewRuntimeLOD.bHasUV)
+		{
+			NewRuntimeLOD.bHasUV = RuntimeLOD.bHasUV;
+		}
+		if (!NewRuntimeLOD.bHasVertexColors)
+		{
+			NewRuntimeLOD.bHasVertexColors = RuntimeLOD.bHasVertexColors;
+		}
+
+		// we have a skeleton to merge
+		if (RuntimeLOD.Skeleton.Num() > 0)
+		{
+
+		}
+		// check for overrides
+		else
+		{
+			for (int32 PrimitiveIndex = 0; PrimitiveIndex < RuntimeLOD.Primitives.Num(); PrimitiveIndex++)
+			{
+				const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+				// case for static meshes recursively merged as skinned
+				if (Primitive.OverrideBoneMap.Num() == 1 && Primitive.OverrideBoneMap.Contains(0) && Primitive.Joints.Num() == 0 && Primitive.Weights.Num() == 0)
+				{
+					FglTFRuntimePrimitive NewPrimitive = Primitive;
+					NewPrimitive.OverrideBoneMap.Empty();
+
+					// let's add the bone to the skeleton
+					FglTFRuntimeBone NewBone;
+					NewBone.BoneName = Primitive.OverrideBoneMap[0].ToString();
+					// name collision ?
+					if (BoneNames.Contains(NewBone.BoneName))
+					{
+						NewBone.BoneName += FString("_") + FGuid::NewGuid().ToString();
+					}
+					NewBone.ParentIndex = 0;
+					NewBone.Transform = FTransform::Identity;
+					if (RuntimeLOD.AdditionalTransforms.IsValidIndex(PrimitiveIndex))
+					{
+						NewBone.Transform = RuntimeLOD.AdditionalTransforms[PrimitiveIndex];
+					}
+
+					BoneNames.Add(NewBone.BoneName);
+
+					const int32 NewBoneIndex = NewRuntimeLOD.Skeleton.Add(NewBone);
+					// fix joints and weights
+					NewPrimitive.Joints.AddDefaulted();
+					NewPrimitive.Weights.AddDefaulted();
+					NewPrimitive.Joints[0].AddUninitialized(NewPrimitive.Positions.Num());
+					NewPrimitive.Weights[0].AddUninitialized(NewPrimitive.Positions.Num());
+					for (int32 VertexIndex = 0; VertexIndex < NewPrimitive.Joints[0].Num(); VertexIndex++)
+					{
+						NewPrimitive.Joints[0][VertexIndex].X = NewBoneIndex;
+						NewPrimitive.Joints[0][VertexIndex].Y = 0;
+						NewPrimitive.Joints[0][VertexIndex].Z = 0;
+						NewPrimitive.Joints[0][VertexIndex].W = 0;
+						NewPrimitive.Weights[0][VertexIndex].X = 1;
+						NewPrimitive.Weights[0][VertexIndex].Y = 0;
+						NewPrimitive.Weights[0][VertexIndex].Z = 0;
+						NewPrimitive.Weights[0][VertexIndex].W = 0;
+					}
+
+					NewRuntimeLOD.Primitives.Add(MoveTemp(NewPrimitive));
+				}
+			}
 		}
 	}
 

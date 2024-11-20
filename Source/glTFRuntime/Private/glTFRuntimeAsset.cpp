@@ -877,6 +877,19 @@ int32 UglTFRuntimeAsset::GetArraySizeFromPath(const TArray<FglTFRuntimePathItem>
 	return Parser->GetJSONArraySizeFromPath(Path, bFound);
 }
 
+TArray<FString> UglTFRuntimeAsset::GetObjectKeysFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	GLTF_CHECK_PARSER({});
+	return Parser->GetJSONObjectKeysFromPath(Path, bFound);
+}
+
+FVector4 UglTFRuntimeAsset::GetVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	GLTF_CHECK_PARSER(FVector4(0, 0, 0, 0));
+	return Parser->GetJSONVectorFromPath(Path, bFound);
+}
+
+
 bool UglTFRuntimeAsset::LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter)
 {
 	GLTF_CHECK_PARSER(false);
@@ -1088,15 +1101,55 @@ UTexture2D* UglTFRuntimeAsset::LoadImageFromBlob(const FglTFRuntimeImagesConfig&
 	if (Width > 0 && Height > 0)
 	{
 		FglTFRuntimeMipMap Mip(-1);
-		Mip.Pixels = UncompressedBytes;
+		Mip.Pixels = MoveTemp(UncompressedBytes);
 		Mip.Width = Width;
 		Mip.Height = Height;
 		Mip.PixelFormat = PixelFormat;
-		TArray<FglTFRuntimeMipMap> Mips = { Mip };
+		TArray<FglTFRuntimeMipMap> Mips;
+		Mips.Add(MoveTemp(Mip));
 		return Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
 	}
 
 	return nullptr;
+}
+
+void UglTFRuntimeAsset::LoadImageFromBlobAsync(const FglTFRuntimeTexture2DAsync& AsyncCallback, const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	Async(EAsyncExecution::Thread, [this, ImagesConfig, AsyncCallback]()
+		{
+			TArray64<uint8> UncompressedBytes;
+			int32 Width = 0;
+			int32 Height = 0;
+			EPixelFormat PixelFormat;
+
+			if (!Parser ||
+				!Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, PixelFormat, ImagesConfig) ||
+				Width <= 0 ||
+				Height <= 0)
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&, AsyncCallback]()
+					{
+						AsyncCallback.ExecuteIfBound(nullptr);
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+			FglTFRuntimeMipMap Mip(-1);
+			Mip.Pixels = MoveTemp(UncompressedBytes);
+			Mip.Width = Width;
+			Mip.Height = Height;
+			Mip.PixelFormat = PixelFormat;
+			TArray<FglTFRuntimeMipMap> Mips;
+			Mips.Add(MoveTemp(Mip));
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
+				{
+					AsyncCallback.ExecuteIfBound(Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler()));
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		}
+	);
 }
 
 UTexture2DArray* UglTFRuntimeAsset::LoadImageArrayFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig)
@@ -1140,6 +1193,56 @@ UTexture2DArray* UglTFRuntimeAsset::LoadImageArrayFromBlob(const FglTFRuntimeIma
 	return nullptr;
 }
 
+void UglTFRuntimeAsset::LoadImageArrayFromBlobAsync(const FglTFRuntimeTexture2DArrayAsync& AsyncCallback, const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	Async(EAsyncExecution::Thread, [this, ImagesConfig, AsyncCallback]()
+		{
+			TArray64<uint8> UncompressedBytes;
+			int32 Width = 0;
+			int32 Height = 0;
+			EPixelFormat PixelFormat;
+			if (!Parser || !Parser->LoadImageFromBlob(Parser->GetBlob(), MakeShared<FJsonObject>(), UncompressedBytes, Width, Height, PixelFormat, ImagesConfig) ||
+				Width <= 0 ||
+				Height <= 0)
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&, AsyncCallback]()
+					{
+						AsyncCallback.ExecuteIfBound(nullptr);
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
+			int64 ImageSize = GPixelFormats[PixelFormat].Get2DImageSizeInBytes(Width, Height);
+#else
+			const int64 BlockWidth = (Width + GPixelFormats[PixelFormat].BlockSizeX - 1) / GPixelFormats[PixelFormat].BlockSizeX;
+			const int64 BlockHeight = (Width + GPixelFormats[PixelFormat].BlockSizeY - 1) / GPixelFormats[PixelFormat].BlockSizeY;
+			int64 ImageSize = BlockWidth * BlockHeight * GPixelFormats[PixelFormat].BlockBytes;
+#endif
+			int32 NumberOfSlices = UncompressedBytes.Num() / ImageSize;
+			TArray<FglTFRuntimeMipMap> Mips;
+
+			for (int32 Slice = 0; Slice < NumberOfSlices; Slice++)
+			{
+				FglTFRuntimeMipMap Mip(-1);
+				Mip.Pixels.Append(UncompressedBytes.GetData() + (ImageSize * Slice), ImageSize);
+				Mip.Width = Width;
+				Mip.Height = Height;
+				Mip.PixelFormat = PixelFormat;
+
+				Mips.Add(MoveTemp(Mip));
+			}
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
+				{
+					AsyncCallback.ExecuteIfBound(Parser->BuildTextureArray(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler()));
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		}
+	);
+}
+
 UTexture2D* UglTFRuntimeAsset::LoadMipsFromBlob(const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);
@@ -1162,6 +1265,15 @@ void UglTFRuntimeAsset::LoadCubeMapFromBlobAsync(const bool bSpherical, const bo
 {
 	Async(EAsyncExecution::Thread, [this, bSpherical, bAutoRotate, ImagesConfig, AsyncCallback]()
 		{
+			if (!Parser)
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&, AsyncCallback]()
+					{
+						AsyncCallback.ExecuteIfBound(nullptr);
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
 			TArray<FglTFRuntimeMipMap> MipsXP;
 			TArray<FglTFRuntimeMipMap> MipsXN;
 			TArray<FglTFRuntimeMipMap> MipsYP;
@@ -1251,6 +1363,12 @@ bool UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Node
 	GLTF_CHECK_PARSER(false);
 	SkinIndex = OverrideSkinIndex;
 	return Parser->LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, SkinIndex, ExcludeNodes, RuntimeLOD, MaterialsConfig, SkeletonConfig, TransformApplyRecursiveMode);
+}
+
+void UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLODAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, int32& SkinIndex, const int32 OverrideSkinIndex, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
+{
+	GLTF_CHECK_PARSER_VOID();
+	Parser->LoadSkinnedMeshRecursiveAsRuntimeLODAsync(NodeName, SkinIndex, ExcludeNodes, AsyncCallback, MaterialsConfig, SkeletonConfig, TransformApplyRecursiveMode);
 }
 
 USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
@@ -1360,6 +1478,7 @@ bool UglTFRuntimeAsset::GetNodeGPUInstancingTransforms(const int32 NodeIndex, TA
 
 	for (int32 Index = 0; Index < Scales.Num(); Index++)
 	{
+		Transforms[Index].NormalizeRotation();
 		Transforms[Index] = Parser->RebaseTransform(Transforms[Index]);
 	}
 
@@ -1521,11 +1640,11 @@ float UglTFRuntimeAsset::GetDownloadTime() const
 	return Parser->GetDownloadTime();
 }
 
-TArray<FString> UglTFRuntimeAsset::GetAnimationsNames() const
+TArray<FString> UglTFRuntimeAsset::GetAnimationsNames(const bool bIncludeUnnameds) const
 {
 	GLTF_CHECK_PARSER(TArray<FString>());
 
-	return Parser->GetAnimationsNames();
+	return Parser->GetAnimationsNames(bIncludeUnnameds);
 }
 
 bool UglTFRuntimeAsset::HasErrors() const
@@ -1540,4 +1659,25 @@ TArray<FString> UglTFRuntimeAsset::GetErrors() const
 	GLTF_CHECK_PARSER(TArray<FString>());
 
 	return Parser->GetErrors();
+}
+
+bool UglTFRuntimeAsset::MeshHasMorphTargets(const int32 MeshIndex) const
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->MeshHasMorphTargets(MeshIndex);
+}
+
+FString UglTFRuntimeAsset::GetBaseDirectory() const
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->GetBaseDirectory();
+}
+
+FString UglTFRuntimeAsset::GetBaseFilename() const
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->GetBaseFilename();
 }

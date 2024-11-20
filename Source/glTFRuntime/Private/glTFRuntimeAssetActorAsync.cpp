@@ -4,6 +4,7 @@
 #include "glTFRuntimeAssetActorAsync.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/LightComponent.h"
 #include "Engine/StaticMeshSocket.h"
 
 // Sets default values
@@ -17,6 +18,8 @@ AglTFRuntimeAssetActorAsync::AglTFRuntimeAssetActorAsync()
 
 	bShowWhileLoading = true;
 	bStaticMeshesAsSkeletal = false;
+
+	bAllowLights = true;
 }
 
 // Called when the game starts or when spawned
@@ -89,6 +92,7 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 			AddInstanceComponent(StaticMeshComponent);
 			MeshesToLoad.Add(StaticMeshComponent, Node);
 			NewComponent = StaticMeshComponent;
+			ReceiveOnStaticMeshComponentCreated(StaticMeshComponent, Node);
 		}
 		else
 		{
@@ -99,8 +103,27 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 			AddInstanceComponent(SkeletalMeshComponent);
 			MeshesToLoad.Add(SkeletalMeshComponent, Node);
 			NewComponent = SkeletalMeshComponent;
+			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
 		}
 	}
+
+	if (bAllowLights)
+	{
+		int32 LightIndex;
+		if (Asset->GetNodeExtensionIndex(Node.Index, "KHR_lights_punctual", "light", LightIndex))
+		{
+			ULightComponent* LightComponent = Asset->LoadPunctualLight(LightIndex, this, LightConfig);
+			if (LightComponent)
+			{
+				LightComponent->SetupAttachment(NewComponent);
+				LightComponent->RegisterComponent();
+				LightComponent->SetRelativeTransform(FTransform::Identity);
+				AddInstanceComponent(LightComponent);
+			}
+		}
+	}
+
+	ReceiveOnNodeProcessed(Node.Index, NewComponent);
 
 	if (!NewComponent)
 	{
@@ -108,8 +131,8 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 	}
 	else
 	{
-		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("GLTFRuntime:NodeName:%s"), *Node.Name));
-		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("GLTFRuntime:NodeIndex:%d"), Node.Index));
+		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("glTFRuntime:NodeName:%s"), *Node.Name));
+		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("glTFRuntime:NodeIndex:%d"), Node.Index));
 
 		if (SocketName != NAME_None)
 		{
@@ -145,7 +168,7 @@ void AglTFRuntimeAssetActorAsync::LoadNextMeshAsync()
 		}
 		FglTFRuntimeStaticMeshAsync Delegate;
 		Delegate.BindDynamic(this, &AglTFRuntimeAssetActorAsync::LoadStaticMeshAsync);
-		Asset->LoadStaticMeshAsync(It->Value.MeshIndex, Delegate, StaticMeshConfig);
+		Asset->LoadStaticMeshAsync(It->Value.MeshIndex, Delegate, OverrideStaticMeshConfig(It->Value.Index, StaticMeshComponent));
 	}
 	else if (USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(It->Key))
 	{
@@ -261,4 +284,24 @@ void AglTFRuntimeAssetActorAsync::PostUnregisterAllComponents()
 		Asset = nullptr;
 	}
 	Super::PostUnregisterAllComponents();
+}
+
+void AglTFRuntimeAssetActorAsync::ReceiveOnNodeProcessed_Implementation(const int32 NodeIndex, USceneComponent* NodeSceneComponent)
+{
+
+}
+
+FglTFRuntimeStaticMeshConfig AglTFRuntimeAssetActorAsync::OverrideStaticMeshConfig_Implementation(const int32 NodeIndex, UStaticMeshComponent* NodeStaticMeshComponent)
+{
+	return StaticMeshConfig;
+}
+
+void AglTFRuntimeAssetActorAsync::ReceiveOnStaticMeshComponentCreated_Implementation(UStaticMeshComponent* StaticMeshComponent, const FglTFRuntimeNode& Node)
+{
+
+}
+
+void AglTFRuntimeAssetActorAsync::ReceiveOnSkeletalMeshComponentCreated_Implementation(USkeletalMeshComponent* SkeletalMeshComponent, const FglTFRuntimeNode& Node)
+{
+
 }

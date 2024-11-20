@@ -94,6 +94,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 	auto GetMaterialVector = [](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, const int32 Fields, bool& bHasParam, FLinearColor& ParamValue)
 		{
+			bHasParam = false;
+
 			const TArray<TSharedPtr<FJsonValue>>* JsonValues;
 			if (JsonMaterialObject->TryGetArrayField(ParamName, JsonValues))
 			{
@@ -114,6 +116,19 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				bHasParam = true;
 				ParamValue = FLinearColor(Values[0], Values[1], Values[2], Values[3]);
 			}
+		};
+
+	auto GetMaterialFactor = [](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, bool& bHasParam, double& Value)
+		{
+			if (JsonMaterialObject->TryGetNumberField(*ParamName, Value))
+			{
+				bHasParam = true;
+			}
+		};
+
+	auto GetMaterialScalar = [](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, double& Value)
+		{
+			JsonMaterialObject->TryGetNumberField(*ParamName, Value);
 		};
 
 	auto GetMaterialTexture = [this, MaterialsConfig](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, const bool sRGB, UTexture2D*& ParamTextureCache, TArray<FglTFRuntimeMipMap>& ParamMips, FglTFRuntimeTextureTransform& ParamTransform, FglTFRuntimeTextureSampler& Sampler, const bool bForceNormalMapCompression) -> const TSharedPtr<FJsonObject>
@@ -159,6 +174,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				}
 
 				ParamTextureCache = LoadTexture(TextureIndex, ParamMips, sRGB, MaterialsConfig, Sampler);
+
 				return *JsonTextureObject;
 			}
 			return nullptr;
@@ -194,6 +210,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 	GetMaterialTexture(JsonMaterialObject, "emissiveTexture", true, RuntimeMaterial.EmissiveTextureCache, RuntimeMaterial.EmissiveTextureMips, RuntimeMaterial.EmissiveTransform, RuntimeMaterial.EmissiveSampler, false);
 
+	bool bDummyValue = false;
+
 	const TSharedPtr<FJsonObject>* JsonExtensions;
 	if (JsonMaterialObject->TryGetObjectField(TEXT("extensions"), JsonExtensions))
 	{
@@ -206,10 +224,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 			GetMaterialVector(JsonPbrSpecularGlossiness->ToSharedRef(), "specularFactor", 3, RuntimeMaterial.bHasSpecularFactor, RuntimeMaterial.SpecularFactor);
 
-			if ((*JsonPbrSpecularGlossiness)->TryGetNumberField(TEXT("glossinessFactor"), RuntimeMaterial.GlossinessFactor))
-			{
-				RuntimeMaterial.bHasGlossinessFactor = true;
-			}
+			GetMaterialFactor(JsonPbrSpecularGlossiness->ToSharedRef(), "glossinessFactor", RuntimeMaterial.bHasGlossinessFactor, RuntimeMaterial.GlossinessFactor);
 
 			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "specularGlossinessTexture", true, RuntimeMaterial.SpecularGlossinessTextureCache, RuntimeMaterial.SpecularGlossinessTextureMips, RuntimeMaterial.SpecularGlossinessTransform, RuntimeMaterial.SpecularGlossinessSampler, false);
 
@@ -259,6 +274,17 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			RuntimeMaterial.bKHR_materials_specular = true;
 		}
 
+		// KHR_materials_emissive_strength
+		const TSharedPtr<FJsonObject>* JsonMaterialEmissiveStrength;
+		if ((*JsonExtensions)->TryGetObjectField(TEXT("KHR_materials_emissive_strength"), JsonMaterialEmissiveStrength))
+		{
+			if (!(*JsonMaterialEmissiveStrength)->TryGetNumberField(TEXT("emissiveStrength"), RuntimeMaterial.EmissiveStrength))
+			{
+				RuntimeMaterial.EmissiveStrength = 1;
+			}
+			RuntimeMaterial.bKHR_materials_emissive_strength = true;
+		}
+
 		// KHR_materials_clearcoat
 		const TSharedPtr<FJsonObject>* JsonMaterialClearCoat;
 		if ((*JsonExtensions)->TryGetObjectField(TEXT("KHR_materials_clearcoat"), JsonMaterialClearCoat))
@@ -273,7 +299,35 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				RuntimeMaterial.ClearCoatRoughnessFactor = 0;
 			}
 
+			GetMaterialTexture(JsonMaterialClearCoat->ToSharedRef(), "clearcoatTexture", false, RuntimeMaterial.ClearCoatTextureCache, RuntimeMaterial.ClearCoatTextureMips, RuntimeMaterial.ClearCoatTextureTransform, RuntimeMaterial.ClearCoatTextureSampler, false);
+			GetMaterialTexture(JsonMaterialClearCoat->ToSharedRef(), "clearcoatRoughnessTexture", false, RuntimeMaterial.ClearCoatRoughnessTextureCache, RuntimeMaterial.ClearCoatRoughnessTextureMips, RuntimeMaterial.ClearCoatRoughnessTextureTransform, RuntimeMaterial.ClearCoatRoughnessTextureSampler, false);
+			GetMaterialTexture(JsonMaterialClearCoat->ToSharedRef(), "clearcoatNormalTexture", false, RuntimeMaterial.ClearCoatNormalTextureCache, RuntimeMaterial.ClearCoatNormalTextureMips, RuntimeMaterial.ClearCoatNormalTextureTransform, RuntimeMaterial.ClearCoatNormalTextureSampler, true);
+
+
 			RuntimeMaterial.bKHR_materials_clearcoat = true;
+		}
+
+		// KHR_materials_volume
+		const TSharedPtr<FJsonObject>* JsonMaterialVolume;
+		if ((*JsonExtensions)->TryGetObjectField(TEXT("KHR_materials_volume"), JsonMaterialVolume))
+		{
+			GetMaterialFactor(JsonMaterialVolume->ToSharedRef(), "thicknessFactor", RuntimeMaterial.bHasThicknessFactor, RuntimeMaterial.ThicknessFactor);
+			GetMaterialTexture(JsonMaterialVolume->ToSharedRef(), "thicknessTexture", false, RuntimeMaterial.ThicknessTextureCache, RuntimeMaterial.ThicknessTextureMips, RuntimeMaterial.ThicknessTransform, RuntimeMaterial.ThicknessSampler, false);
+			GetMaterialScalar(JsonMaterialVolume->ToSharedRef(), "attenuationDistance", RuntimeMaterial.AttenuationDistance);
+			GetMaterialVector(JsonMaterialVolume->ToSharedRef(), "attenuationColor", 3, bDummyValue, RuntimeMaterial.AttenuationColor);
+			RuntimeMaterial.bKHR_materials_volume = true;
+		}
+
+		// KHR_materials_sheen
+		const TSharedPtr<FJsonObject>* JsonMaterialSheen;
+		if ((*JsonExtensions)->TryGetObjectField(TEXT("KHR_materials_sheen"), JsonMaterialSheen))
+		{
+			bool bDymmySheenValue = false;
+			GetMaterialVector(JsonMaterialSheen->ToSharedRef(), "sheenColorFactor", 3, bDymmySheenValue, RuntimeMaterial.SheenColorFactor);
+			GetMaterialFactor(JsonMaterialSheen->ToSharedRef(), "sheenRoughnessFactor", bDymmySheenValue, RuntimeMaterial.SheenRoughnessFactor);
+			GetMaterialTexture(JsonMaterialSheen->ToSharedRef(), "sheenColorTexture", true, RuntimeMaterial.SheenColorTextureCache, RuntimeMaterial.SheenColorTextureMips, RuntimeMaterial.SheenColorTextureTransform, RuntimeMaterial.SheenColorTextureSampler, false);
+			GetMaterialTexture(JsonMaterialSheen->ToSharedRef(), "sheenRoughnessTexture", false, RuntimeMaterial.SheenRoughnessTextureCache, RuntimeMaterial.SheenRoughnessTextureMips, RuntimeMaterial.SheenRoughnessTextureTransform, RuntimeMaterial.SheenRoughnessTextureSampler, false);
+			RuntimeMaterial.bKHR_materials_sheen = true;
 		}
 	}
 
@@ -403,6 +457,8 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
 
+	FillAssetUserData(Mips[0].TextureIndex, Texture);
+
 	return Texture;
 }
 
@@ -530,7 +586,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildVertexColorOnlyMaterial(const FglTF
 
 	if (IsInGameThread())
 	{
-		UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+		UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, GetTransientPackage());
 		if (!Material)
 		{
 			AddError("BuildVertexColorOnlyMaterial()", "Unable to create material instance, falling back to default material");
@@ -551,7 +607,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildVertexColorOnlyMaterial(const FglTF
 			{
 				return;
 			}
-			Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+			Material = UMaterialInstanceDynamic::Create(BaseMaterial, GetTransientPackage());
 			if (!Material)
 			{
 				AddError("BuildVertexColorOnlyMaterial()", "Unable to create material instance, falling back to default material");
@@ -580,14 +636,22 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	if (!ForceBaseMaterial)
 	{
-		if (MetallicRoughnessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		if (MaterialsConfig.MetallicRoughnessOverrideMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = MaterialsConfig.MetallicRoughnessOverrideMap[RuntimeMaterial.MaterialType];
+		}
+		else if (MetallicRoughnessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 		{
 			BaseMaterial = MetallicRoughnessMaterialsMap[RuntimeMaterial.MaterialType];
 		}
 
 		if (RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness)
 		{
-			if (SpecularGlossinessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+			if (MaterialsConfig.SpecularGlossinessOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			{
+				BaseMaterial = MaterialsConfig.SpecularGlossinessOverrideMap[RuntimeMaterial.MaterialType];
+			}
+			else if (SpecularGlossinessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 			{
 				BaseMaterial = SpecularGlossinessMaterialsMap[RuntimeMaterial.MaterialType];
 			}
@@ -595,7 +659,11 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 		if (RuntimeMaterial.bKHR_materials_unlit)
 		{
-			if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+			if (MaterialsConfig.UnlitOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			{
+				BaseMaterial = MaterialsConfig.UnlitOverrideMap[RuntimeMaterial.MaterialType];
+			}
+			else if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 			{
 				BaseMaterial = UnlitMaterialsMap[RuntimeMaterial.MaterialType];
 			}
@@ -603,16 +671,36 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 		if (RuntimeMaterial.bKHR_materials_clearcoat)
 		{
-			if (ClearCoatMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+			if (MaterialsConfig.ClearCoatOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			{
+				BaseMaterial = MaterialsConfig.ClearCoatOverrideMap[RuntimeMaterial.MaterialType];
+			}
+			else if (ClearCoatMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 			{
 				BaseMaterial = ClearCoatMaterialsMap[RuntimeMaterial.MaterialType];
+			}
+		}
+
+		if (RuntimeMaterial.bKHR_materials_sheen)
+		{
+			if (MaterialsConfig.SheenOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			{
+				BaseMaterial = MaterialsConfig.SheenOverrideMap[RuntimeMaterial.MaterialType];
+			}
+			else if (SheenMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+			{
+				BaseMaterial = SheenMaterialsMap[RuntimeMaterial.MaterialType];
 			}
 		}
 
 		// NOTE: ensure to have transmission as the last check given its incompatibility with other materials like clearcoat
 		if (RuntimeMaterial.bKHR_materials_transmission)
 		{
-			if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+			if (MaterialsConfig.TransmissionOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			{
+				BaseMaterial = MaterialsConfig.TransmissionOverrideMap[RuntimeMaterial.MaterialType];
+			}
+			else if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 			{
 				BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
 			}
@@ -649,7 +737,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		return UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
 	}
 
-	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, GetTransientPackage());
 	if (!Material)
 	{
 		AddError("BuildMaterial()", "Unable to create material instance, falling back to default material");
@@ -701,6 +789,13 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 				Material->SetVectorParameterValue(FName(TransformPrefix + "Offset"), Transform.Offset);
 				Material->SetScalarParameterValue(FName(TransformPrefix + "Rotation"), Transform.Rotation);
 				Material->SetVectorParameterValue(FName(TransformPrefix + "Scale"), Transform.Scale);
+
+				if (MaterialsConfig.bAddEpicInterchangeParams)
+				{
+					Material->SetVectorParameterValue(FName(TransformPrefix + "Texture_TexCoord"), FLinearColor(UVSet));
+					Material->SetVectorParameterValue(FName(TransformPrefix + "Texture_OffsetScale"), FLinearColor(Transform.Offset.R, Transform.Offset.G, Transform.Scale.R, Transform.Scale.G));
+					Material->SetScalarParameterValue(FName(TransformPrefix + "Texture_Rotation"), Transform.Rotation);
+				}
 			}
 		};
 
@@ -723,6 +818,11 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		"normal", RuntimeMaterial.NormalTransform,
 		TextureCompressionSettings::TC_Normalmap, false);
 	ApplyMaterialFactor(true, "normalTexScale", FLinearColor(RuntimeMaterial.NormalTextureScale, RuntimeMaterial.NormalTextureScale, 1, 1));
+
+	if (MaterialsConfig.bAddEpicInterchangeParams)
+	{
+		ApplyMaterialFloatFactor(true, "normalScale", RuntimeMaterial.NormalTextureScale);
+	}
 
 	ApplyMaterialTexture("occlusionTexture", RuntimeMaterial.OcclusionTextureCache, RuntimeMaterial.OcclusionTextureMips,
 		RuntimeMaterial.OcclusionSampler,
@@ -770,6 +870,17 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			TextureCompressionSettings::TC_Default, false);
 	}
 
+	if (RuntimeMaterial.bKHR_materials_volume)
+	{
+		ApplyMaterialTexture("thicknessTexture", RuntimeMaterial.ThicknessTextureCache, RuntimeMaterial.ThicknessTextureMips,
+			RuntimeMaterial.ThicknessSampler,
+			"thickness", RuntimeMaterial.ThicknessTransform,
+			TextureCompressionSettings::TC_Default, false);
+		ApplyMaterialFloatFactor(RuntimeMaterial.bHasThicknessFactor, "thicknessFactor", RuntimeMaterial.ThicknessFactor);
+		ApplyMaterialFloatFactor(true, "attenuationDistance", RuntimeMaterial.AttenuationDistance);
+		ApplyMaterialFactor(true, "attenuationColor", RuntimeMaterial.AttenuationColor);
+	}
+
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
 	Material->SetScalarParameterValue("AlphaMask", RuntimeMaterial.bMasked ? 1.0f : 0.0f);
 
@@ -777,6 +888,40 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatFactor", RuntimeMaterial.ClearCoatFactor);
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatRoughnessFactor", RuntimeMaterial.ClearCoatRoughnessFactor);
+	if (RuntimeMaterial.bKHR_materials_clearcoat)
+	{
+		ApplyMaterialTexture("clearcoatTexture", RuntimeMaterial.ClearCoatTextureCache, RuntimeMaterial.ClearCoatTextureMips,
+			RuntimeMaterial.ClearCoatTextureSampler,
+			"clearcoat", RuntimeMaterial.ClearCoatTextureTransform,
+			TextureCompressionSettings::TC_Default, false);
+
+		ApplyMaterialTexture("clearcoatRoughnessTexture", RuntimeMaterial.ClearCoatRoughnessTextureCache, RuntimeMaterial.ClearCoatRoughnessTextureMips,
+			RuntimeMaterial.ClearCoatRoughnessTextureSampler,
+			"clearcoatRoughness", RuntimeMaterial.ClearCoatRoughnessTextureTransform,
+			TextureCompressionSettings::TC_Default, false);
+
+		ApplyMaterialTexture("clearcoatNormalTexture", RuntimeMaterial.ClearCoatNormalTextureCache, RuntimeMaterial.ClearCoatNormalTextureMips,
+			RuntimeMaterial.ClearCoatNormalTextureSampler,
+			"clearcoatNormal", RuntimeMaterial.ClearCoatNormalTextureTransform,
+			TextureCompressionSettings::TC_Normalmap, false);
+	}
+
+	ApplyMaterialFactor(RuntimeMaterial.bKHR_materials_sheen, "sheenColorFactor", RuntimeMaterial.SheenColorFactor);
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_sheen, "sheenRoughnessFactor", RuntimeMaterial.SheenRoughnessFactor);
+	if (RuntimeMaterial.bKHR_materials_sheen)
+	{
+		ApplyMaterialTexture("sheenColorTexture", RuntimeMaterial.SheenColorTextureCache, RuntimeMaterial.SheenColorTextureMips,
+			RuntimeMaterial.SheenColorTextureSampler,
+			"sheenColor", RuntimeMaterial.SheenColorTextureTransform,
+			TextureCompressionSettings::TC_Default, true);
+
+		ApplyMaterialTexture("sheenRoughnessTexture", RuntimeMaterial.SheenRoughnessTextureCache, RuntimeMaterial.SheenRoughnessTextureMips,
+			RuntimeMaterial.SheenRoughnessTextureSampler,
+			"sheenRoughness", RuntimeMaterial.SheenRoughnessTextureTransform,
+			TextureCompressionSettings::TC_Default, false);
+	}
+
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_emissive_strength, "emissiveStrength", RuntimeMaterial.EmissiveStrength);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ScalarParamsOverrides)
 	{
@@ -1166,7 +1311,11 @@ bool FglTFRuntimeParser::LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJs
 				{
 					TArray64<FColor> ResizedMipData;
 					ResizedMipData.AddUninitialized(MipWidth * MipHeight);
+#if ENGINE_MAJOR_VERSION >= 5
+					FImageUtils::ImageResize(Width, Height, UncompressedColors, MipWidth, MipHeight, ResizedMipData, sRGB, false);
+#else
 					FImageUtils::ImageResize(Width, Height, UncompressedColors, MipWidth, MipHeight, ResizedMipData, sRGB);
+#endif
 					for (FColor& Color : ResizedMipData)
 					{
 						MipMap.Pixels.Add(Color.B);
@@ -1257,6 +1406,8 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		MaterialsNameCache.Add(Material, MaterialName);
 		MaterialsCache.Add(Index, Material);
 	}
+
+	FillAssetUserData(Index, Material);
 
 	return Material;
 }
@@ -1588,7 +1739,7 @@ void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipM
 	}
 	else
 	{
-		if (!(Ptr32[18] % DDPF_ALPHAPIXELS))
+		if (!(Ptr32[20] & DDPF_ALPHAPIXELS))
 		{
 			UE_LOG(LogGLTFRuntime, Warning, TEXT("DDS Uncompressed PixelFormat without Alpha is not supported"));
 			return;

@@ -2,7 +2,7 @@
 
 #include "glTFRuntimeParser.h"
 
-TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromRelativePath(TSharedRef<FJsonObject> JsonObject, const TArray<FglTFRuntimePathItem>& Path) const
+TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromRelativePath(TSharedRef<FJsonObject> JsonObject, const TArray<FglTFRuntimePathItem>& Path)
 {
 	if (Path.Num() == 0)
 	{
@@ -133,4 +133,55 @@ int32 FglTFRuntimeParser::GetJSONArraySizeFromPath(const TArray<FglTFRuntimePath
 		ReturnValue = IsArray->Num();
 	}
 	return ReturnValue;
+}
+
+FVector4 FglTFRuntimeParser::GetJSONVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	FVector4 Vector = FVector4(0, 0, 0, 1);
+
+	int32 ReturnValue = -1;
+	bFound = false;
+
+	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
+	if (!CurrentObject)
+	{
+		return Vector;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* IsArray = nullptr;
+	bFound = CurrentObject->TryGetArray(IsArray);
+	if (!bFound)
+	{
+		return Vector;
+	}
+
+	for (int32 Index = 0; Index < FMath::Min<int32>(IsArray->Num(), 4); Index++)
+	{
+		double Value = 0;
+		if ((*IsArray)[Index]->TryGetNumber(Value))
+		{
+			Vector[Index] = Value;
+		}
+	}
+
+	return Vector;
+}
+
+TArray<FString> FglTFRuntimeParser::GetJSONObjectKeysFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	bFound = false;
+	TArray<FString> Keys;
+
+	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
+	if (CurrentObject)
+	{
+		const TSharedPtr<FJsonObject>* JsonObject = nullptr;
+		if (CurrentObject->TryGetObject(JsonObject))
+		{
+			bFound = true;
+			(*JsonObject)->Values.GetKeys(Keys);
+		}
+	}
+
+	return Keys;
 }
