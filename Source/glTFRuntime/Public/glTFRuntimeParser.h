@@ -41,6 +41,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnStaticMeshCreated, USt
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnSkeletalMeshCreated, USkeletalMesh*, SkeletalMesh);
 
 #define GLTFRUNTIME_IMAGE_API_1
+#define GLTFRUNTIME_HAS_BONE_REMAPPER_LOD
 
 /*
 * Credits for giving me the idea for the blob structure
