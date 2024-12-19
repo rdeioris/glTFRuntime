@@ -2582,6 +2582,32 @@ bool FglTFRuntimeParser::FillReferenceSkeletonFromNode(const FglTFRuntimeNode& R
 	return TraverseJoints(Modifier, RootNode.Index, INDEX_NONE, RootNode, {}, BoneMap, {}, SkeletonConfig);
 }
 
+bool FglTFRuntimeParser::RemapRuntimeLODBoneNames(FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	for (int32 BoneIndex = 0; BoneIndex < RuntimeLOD.Skeleton.Num(); BoneIndex++)
+	{
+		FglTFRuntimeBone& Bone = RuntimeLOD.Skeleton[BoneIndex];
+		if (SkeletonConfig.BoneRemapper.Remapper.IsBound())
+		{
+			Bone.BoneName = SkeletonConfig.BoneRemapper.Remapper.Execute(BoneIndex, Bone.BoneName, SkeletonConfig.BoneRemapper.Context);
+		}
+		
+		if (SkeletonConfig.BonesNameMap.Contains(Bone.BoneName))
+		{
+			FString BoneNameMapValue = SkeletonConfig.BonesNameMap[Bone.BoneName];
+			if (BoneNameMapValue.IsEmpty())
+			{
+				AddError("RemapRuntimeLODBoneNames()", FString::Printf(TEXT("Invalid Bone Name Map for %s"), *Bone.BoneName));
+				return false;
+			}
+
+			Bone.BoneName = BoneNameMapValue;
+		}
+	}
+
+	return true;
+}
+
 bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, const int32 RootIndex, int32 Parent, const FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	TArray<FString> AppendBones;

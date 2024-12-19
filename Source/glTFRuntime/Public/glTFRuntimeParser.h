@@ -2271,6 +2271,8 @@ public:
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene);
 
+	bool RemapRuntimeLODBoneNames(FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
+
 	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	USkeletalMesh* LoadSkeletalMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	void LoadSkeletalMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
