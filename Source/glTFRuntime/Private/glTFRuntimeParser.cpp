@@ -6552,3 +6552,13 @@ void FglTFRuntimeParser::UpdateSceneBasis(const FMatrix& InSceneBasis)
 {
 	SceneBasis = InSceneBasis;
 }
+
+void FglTFRuntimeParser::UpdateSceneScale(const float& InSceneScale)
+{
+	SceneScale = InSceneScale;
+}
+
+float FglTFRuntimeParser::GetSceneScale() const
+{
+	return SceneScale;
+}

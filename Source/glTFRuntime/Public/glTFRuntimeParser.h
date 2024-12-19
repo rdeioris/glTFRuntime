@@ -2508,6 +2508,8 @@ public:
 	void FillAssetUserData(const int32 Index, IInterface_AssetUserData* InObject);
 
 	void UpdateSceneBasis(const FMatrix& InSceneBasis);
+	void UpdateSceneScale(const float& InSceneScale);
+	float GetSceneScale() const;
 protected:
 	void LoadAndFillBaseMaterials();
 	TSharedRef<FJsonObject> Root;
