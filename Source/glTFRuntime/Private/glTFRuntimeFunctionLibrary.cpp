@@ -747,7 +747,7 @@ UBlendSpace1D* UglTFRuntimeFunctionLibrary::CreateRuntimeBlendSpace1D(const FStr
 
 	BlendSpace->SetSkeleton(CurrentSkeleton);
 
-	FStructProperty* BlendParametersStructProperty = CastField<FStructProperty>(UBlendSpace::StaticClass()->FindPropertyByName("BlendParameters"));
+	FStructProperty* BlendParametersStructProperty = CastField<FStructProperty>(UBlendSpace1D::StaticClass()->FindPropertyByName("BlendParameters"));
 	if (!BlendParametersStructProperty)
 	{
 		return nullptr;
@@ -764,7 +764,7 @@ UBlendSpace1D* UglTFRuntimeFunctionLibrary::CreateRuntimeBlendSpace1D(const FStr
 	BlendParameterX->Max = Max;
 	BlendParameterX->GridNum = Samples.Num();
 
-	FStructProperty* BlendSpaceDataStructProperty = CastField<FStructProperty>(UBlendSpace::StaticClass()->FindPropertyByName("BlendSpaceData"));
+	FStructProperty* BlendSpaceDataStructProperty = CastField<FStructProperty>(UBlendSpace1D::StaticClass()->FindPropertyByName("BlendSpaceData"));
 	if (!BlendSpaceDataStructProperty)
 	{
 		return nullptr;
@@ -776,7 +776,7 @@ UBlendSpace1D* UglTFRuntimeFunctionLibrary::CreateRuntimeBlendSpace1D(const FStr
 		return nullptr;
 	}
 
-	FArrayProperty* DimensionIndicesArrayProperty = CastField<FArrayProperty>(UBlendSpace::StaticClass()->FindPropertyByName("DimensionIndices"));
+	FArrayProperty* DimensionIndicesArrayProperty = CastField<FArrayProperty>(UBlendSpace1D::StaticClass()->FindPropertyByName("DimensionIndices"));
 	if (!DimensionIndicesArrayProperty)
 	{
 		return nullptr;
@@ -787,7 +787,7 @@ UBlendSpace1D* UglTFRuntimeFunctionLibrary::CreateRuntimeBlendSpace1D(const FStr
 	int32* DimensionIndices0Value = DimensionIndicesArrayProperty->Inner->ContainerPtrToValuePtr<int32>(DimensionArrayHelper.GetRawPtr(0));
 	*DimensionIndices0Value = 0;
 
-	FArrayProperty* SampleDataArrayProperty = CastField<FArrayProperty>(UBlendSpace::StaticClass()->FindPropertyByName("SampleData"));
+	FArrayProperty* SampleDataArrayProperty = CastField<FArrayProperty>(UBlendSpace1D::StaticClass()->FindPropertyByName("SampleData"));
 	if (!SampleDataArrayProperty)
 	{
 		return nullptr;
