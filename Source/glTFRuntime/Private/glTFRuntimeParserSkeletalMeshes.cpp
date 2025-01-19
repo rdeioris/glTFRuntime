@@ -3060,16 +3060,23 @@ FglTFRuntimePoseTracksMap FglTFRuntimeParser::FixupAnimationTracks(const FglTFRu
 				}
 			}
 
-			UE_LOG(LogTemp, Warning, TEXT("%s ---- %s"), *RestWorldTransforms[TrackName].Rotator().ToString(), *RetargetWorldTransforms[TrackName].Rotator().ToString());
-
 			for (int32 FrameIndex = 0; FrameIndex < Track.RotKeys.Num(); FrameIndex++)
 			{
+#if ENGINE_MAJOR_VERSION >= 5
 				Track.RotKeys[FrameIndex] = FQuat4f(RetargetQuat(FQuat(Track.RotKeys[FrameIndex]),
 					RestWorldTransforms[TrackName].GetRotation(),
 					RetargetParentBoneIndex > INDEX_NONE ? RestWorldTransforms[RetargetParentBoneName].GetRotation() : FQuat::Identity,
 					RetargetWorldTransforms[TrackName].GetRotation(),
 					RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneName].GetRotation() : FQuat::Identity
 				).GetNormalized());
+#else
+				Track.RotKeys[FrameIndex] = RetargetQuat(Track.RotKeys[FrameIndex],
+					RestWorldTransforms[TrackName].GetRotation(),
+					RetargetParentBoneIndex > INDEX_NONE ? RestWorldTransforms[RetargetParentBoneName].GetRotation() : FQuat::Identity,
+					RetargetWorldTransforms[TrackName].GetRotation(),
+					RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneName].GetRotation() : FQuat::Identity
+				).GetNormalized();
+#endif
 			}
 			OutputTracks.Add(TrackName, Track);
 		}

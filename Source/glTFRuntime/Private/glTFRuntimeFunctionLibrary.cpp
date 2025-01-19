@@ -718,6 +718,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 
 UBlendSpace1D* UglTFRuntimeFunctionLibrary::CreateRuntimeBlendSpace1D(const FString& ParameterName, const float Min, const float Max, const TArray<FglTFRuntimeBlendSpaceSample>& Samples)
 {
+#if ENGINE_MAJOR_VERSION >= 5
 	if (Samples.Num() < 1)
 	{
 		return nullptr;
@@ -834,4 +835,7 @@ UBlendSpace1D* UglTFRuntimeFunctionLibrary::CreateRuntimeBlendSpace1D(const FStr
 	}
 
 	return BlendSpace;
+#else
+	return nullptr;
+#endif
 }
