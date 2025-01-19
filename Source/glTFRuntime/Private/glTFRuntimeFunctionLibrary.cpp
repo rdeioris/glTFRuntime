@@ -715,3 +715,123 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 		});
 
 }
+
+UBlendSpace1D* UglTFRuntimeFunctionLibrary::CreateRuntimeBlendSpace1D(const FString& ParameterName, const float Min, const float Max, const TArray<FglTFRuntimeBlendSpaceSample>& Samples)
+{
+	if (Samples.Num() < 1)
+	{
+		return nullptr;
+	}
+
+	USkeleton* CurrentSkeleton = nullptr;
+	for (const FglTFRuntimeBlendSpaceSample& BlendSpaceSample : Samples)
+	{
+		if (!BlendSpaceSample.Animation)
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("BlendSpace Animation Sample cannot be NULL"));
+			return nullptr;
+		}
+
+		if (!CurrentSkeleton)
+		{
+			CurrentSkeleton = BlendSpaceSample.Animation->GetSkeleton();
+		}
+		else if (BlendSpaceSample.Animation->GetSkeleton() != CurrentSkeleton)
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("BlendSpace Animation Skeleton mismatch"));
+			return nullptr;
+		}
+	}
+
+	UBlendSpace1D* BlendSpace = NewObject<UBlendSpace1D>();
+
+	BlendSpace->SetSkeleton(CurrentSkeleton);
+
+	FStructProperty* BlendParametersStructProperty = CastField<FStructProperty>(UBlendSpace::StaticClass()->FindPropertyByName("BlendParameters"));
+	if (!BlendParametersStructProperty)
+	{
+		return nullptr;
+	}
+
+	FBlendParameter* BlendParameterX = BlendParametersStructProperty->ContainerPtrToValuePtr<FBlendParameter>(BlendSpace, 0);
+	if (!BlendParameterX)
+	{
+		return nullptr;
+	}
+
+	BlendParameterX->DisplayName = ParameterName;
+	BlendParameterX->Min = Min;
+	BlendParameterX->Max = Max;
+	BlendParameterX->GridNum = Samples.Num();
+
+	FStructProperty* BlendSpaceDataStructProperty = CastField<FStructProperty>(UBlendSpace::StaticClass()->FindPropertyByName("BlendSpaceData"));
+	if (!BlendSpaceDataStructProperty)
+	{
+		return nullptr;
+	}
+
+	FBlendSpaceData* BlendSpaceData = BlendSpaceDataStructProperty->ContainerPtrToValuePtr<FBlendSpaceData>(BlendSpace);
+	if (!BlendSpaceData)
+	{
+		return nullptr;
+	}
+
+	FArrayProperty* DimensionIndicesArrayProperty = CastField<FArrayProperty>(UBlendSpace::StaticClass()->FindPropertyByName("DimensionIndices"));
+	if (!DimensionIndicesArrayProperty)
+	{
+		return nullptr;
+	}
+
+	FScriptArrayHelper_InContainer DimensionArrayHelper(DimensionIndicesArrayProperty, BlendSpace);
+	DimensionArrayHelper.Resize(1);
+	int32* DimensionIndices0Value = DimensionIndicesArrayProperty->Inner->ContainerPtrToValuePtr<int32>(DimensionArrayHelper.GetRawPtr(0));
+	*DimensionIndices0Value = 0;
+
+	FArrayProperty* SampleDataArrayProperty = CastField<FArrayProperty>(UBlendSpace::StaticClass()->FindPropertyByName("SampleData"));
+	if (!SampleDataArrayProperty)
+	{
+		return nullptr;
+	}
+
+	TArray<FglTFRuntimeBlendSpaceSample> SamplesSorted = Samples;
+	SamplesSorted.Sort([](const FglTFRuntimeBlendSpaceSample& A, const FglTFRuntimeBlendSpaceSample& B) { return A.Value < B.Value; });
+
+	BlendSpaceData->Empty();
+
+	FScriptArrayHelper_InContainer ArrayHelper(SampleDataArrayProperty, BlendSpace);
+	ArrayHelper.Resize(SamplesSorted.Num());
+
+	for (int32 SampleIndex = 0; SampleIndex < SamplesSorted.Num(); SampleIndex++)
+	{
+		FBlendSample* BlendSample = SampleDataArrayProperty->Inner->ContainerPtrToValuePtr<FBlendSample>(ArrayHelper.GetRawPtr(SampleIndex));
+		BlendSample->Animation = SamplesSorted[SampleIndex].Animation;
+		BlendSample->SampleValue = FVector(SamplesSorted[SampleIndex].Value, 0, 0);
+		if (BlendSample->Animation->GetPlayLength() > BlendSpace->AnimLength)
+		{
+			BlendSpace->AnimLength = BlendSample->Animation->GetPlayLength();
+		}
+#if WITH_EDITOR
+		BlendSample->bIsValid = 1;
+		BlendSample->CachedMarkerDataUpdateCounter = BlendSample->Animation->GetMarkerUpdateCounter();
+#endif
+		FBlendSpaceSegment BlendSpaceSegment;
+		if (SamplesSorted.Num() == 1)
+		{
+			BlendSpaceSegment.SampleIndices[0] = 0;
+			BlendSpaceSegment.SampleIndices[1] = 0;
+			BlendSpaceSegment.Vertices[0] = 0.0;
+			BlendSpaceSegment.Vertices[1] = 1.0;
+			BlendSpaceData->Segments.Add(BlendSpaceSegment);
+		}
+		else if (SampleIndex < SamplesSorted.Num() - 1)
+		{
+			BlendSpaceSegment.SampleIndices[0] = SampleIndex;
+			BlendSpaceSegment.SampleIndices[1] = SampleIndex + 1;
+			BlendSpaceSegment.Vertices[0] = (SamplesSorted[SampleIndex].Value - Min) / (Max - Min);
+			BlendSpaceSegment.Vertices[1] = (SamplesSorted[SampleIndex + 1].Value - Min) / (Max - Min);
+			BlendSpaceData->Segments.Add(BlendSpaceSegment);
+		}
+	}
+
+	return BlendSpace;
+}

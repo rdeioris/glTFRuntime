@@ -2910,6 +2910,179 @@ FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const f
 	return CubicValue;
 }
 
+FglTFRuntimePoseTracksMap FglTFRuntimeParser::FixupAnimationTracks(const FglTFRuntimePoseTracksMap& Tracks, const TMap<FString, FTransform>& RestTransforms, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	FglTFRuntimePoseTracksMap OutputTracks;
+	FReferenceSkeleton RetargetRefSkeleton;
+	TMap<FString, FTransform> RetargetWorldTransforms;
+	TMap<FString, FTransform> RestWorldTransforms;
+
+	auto RetargetQuat = [&](const FQuat LocalAnimQuat, const FQuat WorldPoseQuat, const FQuat WorldParentPoseQuat, const FQuat WorldRetargetPoseQuat, const FQuat WorldRetargetParentPoseQuat) -> FQuat
+		{
+			FQuat WorldPoseToRetarget = WorldPoseQuat.Inverse() * WorldRetargetPoseQuat;
+
+			FQuat WorldAnimQuat = WorldParentPoseQuat * LocalAnimQuat;
+
+			// check for singularity
+			if ((WorldAnimQuat | WorldPoseQuat) < 0)
+			{
+				WorldAnimQuat *= WorldPoseToRetarget * -1;
+			}
+			else
+			{
+				WorldAnimQuat *= WorldPoseToRetarget;
+			}
+
+			return WorldRetargetParentPoseQuat.Inverse() * WorldAnimQuat;
+		};
+
+	const bool bRetargetRotations = SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh;
+
+	if (bRetargetRotations)
+	{
+		RetargetRefSkeleton = SkeletalAnimationConfig.RetargetTo ? SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton() : SkeletalAnimationConfig.RetargetToSkeletalMesh->GetRefSkeleton();
+
+		TMap<FString, FTransform> RestTransformsCleaned;
+
+		for (const TPair<FString, FTransform>& Pair : RestTransforms)
+		{
+			FString RestTrackName = Pair.Key;
+			if (SkeletalAnimationConfig.CurvesNameMap.Contains(RestTrackName))
+			{
+				RestTrackName = SkeletalAnimationConfig.CurvesNameMap[RestTrackName];
+			}
+
+			if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
+			{
+				RestTrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(INDEX_NONE, RestTrackName, "", SkeletalAnimationConfig.CurveRemapper.Context);
+				// discard empty tracks
+				if (RestTrackName.IsEmpty())
+				{
+					continue;
+				}
+			}
+
+			RestTransformsCleaned.Add(RestTrackName, Pair.Value);
+		}
+
+		const TArray<FTransform>& BonesTransforms = RetargetRefSkeleton.GetRefBonePose();
+		for (int32 BoneIndex = 0; BoneIndex < RetargetRefSkeleton.GetNum(); BoneIndex++)
+		{
+			const FString BoneName = RetargetRefSkeleton.GetBoneName(BoneIndex).ToString();
+			FTransform BoneTransform = BonesTransforms[BoneIndex];
+			FTransform RestTransform = FTransform::Identity;
+
+			bool bHasRest = false;
+
+			if (RestTransformsCleaned.Contains(BoneName))
+			{
+				RestTransform = RestTransformsCleaned[BoneName];
+
+				bHasRest = true;
+			}
+
+			int32 RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(BoneIndex);
+			while (RetargetParentIndex > INDEX_NONE)
+			{
+				FString ParentBoneName = RetargetRefSkeleton.GetBoneName(RetargetParentIndex).ToString();
+				if (RestTransformsCleaned.Contains(ParentBoneName))
+				{
+					RestTransform *= RestTransformsCleaned[ParentBoneName];
+				}
+				else
+				{
+					bHasRest = false;
+				}
+				BoneTransform *= BonesTransforms[RetargetParentIndex];
+				RetargetParentIndex = RetargetRefSkeleton.GetParentIndex(RetargetParentIndex);
+			}
+
+			RetargetWorldTransforms.Add(BoneName, BoneTransform);
+
+			if (bHasRest)
+			{
+				RestWorldTransforms.Add(BoneName, RestTransform);
+			}
+
+		}
+	}
+
+
+
+	for (const TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
+	{
+		FString TrackName = Pair.Key;
+
+		if (SkeletalAnimationConfig.CurvesNameMap.Contains(TrackName))
+		{
+			TrackName = SkeletalAnimationConfig.CurvesNameMap[TrackName];
+		}
+
+		if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
+		{
+			TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(INDEX_NONE, TrackName, "", SkeletalAnimationConfig.CurveRemapper.Context);
+			// discard empty tracks
+			if (TrackName.IsEmpty())
+			{
+				continue;
+			}
+		}
+
+		if (SkeletalAnimationConfig.RemoveTracks.Contains(TrackName))
+		{
+			continue;
+		}
+
+		if (bRetargetRotations)
+		{
+			FRawAnimSequenceTrack Track = Pair.Value;
+
+			const int32 RetargetBoneIndex = RetargetRefSkeleton.FindBoneIndex(*TrackName);
+			// skip unknown bones
+			if (RetargetBoneIndex == INDEX_NONE)
+			{
+				continue;
+			}
+
+			if (!RestWorldTransforms.Contains(TrackName))
+			{
+				continue;
+			}
+
+			const int32 RetargetParentBoneIndex = RetargetRefSkeleton.GetParentIndex(RetargetBoneIndex);
+			FString RetargetParentBoneName;
+			if (RetargetParentBoneIndex > INDEX_NONE)
+			{
+				RetargetParentBoneName = RetargetRefSkeleton.GetBoneName(RetargetParentBoneIndex).ToString();
+				if (!RestWorldTransforms.Contains(RetargetParentBoneName))
+				{
+					continue;
+				}
+			}
+
+			UE_LOG(LogTemp, Warning, TEXT("%s ---- %s"), *RestWorldTransforms[TrackName].Rotator().ToString(), *RetargetWorldTransforms[TrackName].Rotator().ToString());
+
+			for (int32 FrameIndex = 0; FrameIndex < Track.RotKeys.Num(); FrameIndex++)
+			{
+				Track.RotKeys[FrameIndex] = FQuat4f(RetargetQuat(FQuat(Track.RotKeys[FrameIndex]),
+					RestWorldTransforms[TrackName].GetRotation(),
+					RetargetParentBoneIndex > INDEX_NONE ? RestWorldTransforms[RetargetParentBoneName].GetRotation() : FQuat::Identity,
+					RetargetWorldTransforms[TrackName].GetRotation(),
+					RetargetParentBoneIndex > INDEX_NONE ? RetargetWorldTransforms[RetargetParentBoneName].GetRotation() : FQuat::Identity
+				).GetNormalized());
+			}
+			OutputTracks.Add(TrackName, Track);
+		}
+		else
+		{
+			OutputTracks.Add(TrackName, Pair.Value);
+		}
+
+	}
+
+	return OutputTracks;
+}
+
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
 	TArray<FTransform> AnimWorldTransforms;

@@ -5,12 +5,24 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "glTFRuntimeAsset.h"
+#include "Animation/BlendSpace1D.h"
 #include "glTFRuntimeFunctionLibrary.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeHttpResponse, UglTFRuntimeAsset*, Asset);
 DECLARE_DYNAMIC_DELEGATE_ThreeParams(FglTFRuntimeHttpProgress, const FglTFRuntimeConfig&, LoaderConfig, int32, BytesProcessed, int32, TotalBytes);
 DECLARE_DYNAMIC_DELEGATE_ThreeParams(FglTFRuntimeCommandResponse, UglTFRuntimeAsset*, Asset, const int32, ExitCode, const FString&, StdErr);
 
+USTRUCT(BlueprintType)
+struct FglTFRuntimeBlendSpaceSample
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnyWhere, BlueprintReadWrite)
+	UAnimSequence* Animation = nullptr;
+
+	UPROPERTY(EditAnyWhere, BlueprintReadWrite)
+	float Value = 0;
+};
 
 /**
  * 
@@ -77,4 +89,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from FileMap Async", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromFileMapAsync(const TMap<FString, FString>& FileMap, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Create 1D BlendSpace"), Category = "glTFRuntime")
+	static UBlendSpace1D* CreateRuntimeBlendSpace1D(const FString& ParameterName, const float Min, const float Max, const TArray<FglTFRuntimeBlendSpaceSample>& Samples);
 };
