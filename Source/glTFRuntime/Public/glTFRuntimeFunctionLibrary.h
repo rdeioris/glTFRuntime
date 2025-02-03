@@ -17,10 +17,10 @@ struct FglTFRuntimeBlendSpaceSample
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnyWhere, BlueprintReadWrite)
+	UPROPERTY(EditAnyWhere, BlueprintReadWrite, Category="glTFRuntime")
 	UAnimSequence* Animation = nullptr;
 
-	UPROPERTY(EditAnyWhere, BlueprintReadWrite)
+	UPROPERTY(EditAnyWhere, BlueprintReadWrite, Category="glTFRuntime")
 	float Value = 0;
 };
 
