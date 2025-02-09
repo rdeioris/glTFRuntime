@@ -2065,7 +2065,7 @@ struct FglTFRuntimeMaterial
 	}
 };
 
-class FglTFRuntimeArchive
+class GLTFRUNTIME_API FglTFRuntimeArchive
 {
 public:
 	virtual ~FglTFRuntimeArchive() {}
@@ -2085,7 +2085,7 @@ protected:
 	TMap<FString, uint32> OffsetsMap;
 };
 
-class FglTFRuntimeArchiveZip : public FglTFRuntimeArchive
+class GLTFRUNTIME_API FglTFRuntimeArchiveZip : public FglTFRuntimeArchive
 {
 public:
 	bool FromData(const uint8* DataPtr, const int64 DataNum);
@@ -2158,7 +2158,7 @@ struct FglTFRuntimeAudioConfig
 	}
 };
 
-class FglTFRuntimeDDS
+class GLTFRUNTIME_API FglTFRuntimeDDS
 {
 public:
 	FglTFRuntimeDDS() = delete;
@@ -2981,6 +2981,8 @@ public:
 
 	const FString& GetBaseDirectory() const { return BaseDirectory; }
 	const FString& GetBaseFilename() const { return BaseFilename; }
+
+	void SetBaseDirectory(const FString& NewBaseDirectory) { BaseDirectory = NewBaseDirectory; }
 
 	bool LoadPathToBlob(const FString& Path, TArray64<uint8>& Blob);
 
