@@ -692,13 +692,19 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 			{
 				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed, ReturnCode, &Bytes]()
 					{
-						Completed.ExecuteIfBound(nullptr, ReturnCode, FString::FromBlob(Bytes.GetData(), Bytes.Num()));
+						FString StdErr;
+						FFileHelper::BufferToString(StdErr, Bytes.GetData(), Bytes.Num());
+						Completed.ExecuteIfBound(nullptr, ReturnCode, StdErr);
 					}, TStatId(), nullptr, ENamedThreads::GameThread);
 				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 				return;
 			}
 
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(Bytes, LoaderConfig);
+			if (!WorkingDirectory.IsEmpty())
+			{
+				Parser->SetBaseDirectory(WorkingDirectory);
+			}
 
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed, ReturnCode]()
 				{
