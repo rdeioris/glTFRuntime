@@ -8,6 +8,7 @@
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
 #include "glTFRuntimeSkeletalMeshComponent.h"
+#include "RHI.h"
 
 // Sets default values
 AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
@@ -199,14 +200,17 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				}
 			}
 
-			if (MeshIndices.Num() > 1)
+			if(!GUsingNullRHI)
 			{
-				TArray<float> ScreenCoverages;
-				if (Asset->GetNodeExtrasNumbers(Node.Index, "MSFT_screencoverage", ScreenCoverages))
+				if (MeshIndices.Num() > 1)
 				{
-					for (int32 SCIndex = 0; SCIndex < ScreenCoverages.Num(); SCIndex++)
+					TArray<float> ScreenCoverages;
+					if (Asset->GetNodeExtrasNumbers(Node.Index, "MSFT_screencoverage", ScreenCoverages))
 					{
-						StaticMeshConfig.LODScreenSize.Add(SCIndex, ScreenCoverages[SCIndex]);
+						for (int32 SCIndex = 0; SCIndex < ScreenCoverages.Num(); SCIndex++)
+						{
+							StaticMeshConfig.LODScreenSize.Add(SCIndex, ScreenCoverages[SCIndex]);
+						}
 					}
 				}
 			}
