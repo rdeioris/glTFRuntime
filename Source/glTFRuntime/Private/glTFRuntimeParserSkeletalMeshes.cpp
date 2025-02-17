@@ -1115,7 +1115,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 	else
 	{
-		if (CanReadFromCache(SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CacheMode) && SkeletonsCache.Contains(SkeletalMeshContext->SkinIndex))
+		if (CanReadFromCache(SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CacheMode) && SkeletalMeshContext->SkinIndex > -1 && SkeletonsCache.Contains(SkeletalMeshContext->SkinIndex))
 		{
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 			SkeletalMeshContext->SkeletalMesh->SetSkeleton(SkeletonsCache[SkeletalMeshContext->SkinIndex]);
@@ -1133,7 +1133,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalMeshContext->SkeletalMesh->Skeleton->MergeAllBonesToBoneTree(SkeletalMeshContext->SkeletalMesh);
 #endif
 
-			if (CanWriteToCache(SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CacheMode))
+			if (CanWriteToCache(SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CacheMode) && SkeletalMeshContext->SkinIndex > -1)
 			{
 				SkeletonsCache.Add(SkeletalMeshContext->SkinIndex, SkeletalMeshContext->GetSkeleton());
 			}
