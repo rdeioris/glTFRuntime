@@ -6,6 +6,7 @@
 #include "StaticMeshOperations.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Engine/World.h"
+#include "RHI.h"
 #if WITH_EDITOR
 #include "Editor/EditorEngine.h"
 #endif
@@ -891,166 +892,173 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext)
 {
-	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FinalizeStaticMesh, FColor::Magenta);
-
-	UStaticMesh* StaticMesh = StaticMeshContext->StaticMesh;
-	FStaticMeshRenderData* RenderData = StaticMeshContext->RenderData;
-	const FglTFRuntimeStaticMeshConfig& StaticMeshConfig = StaticMeshContext->StaticMeshConfig;
-
-#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
-	StaticMesh->SetStaticMaterials(StaticMeshContext->StaticMaterials);
-#else
-	StaticMesh->StaticMaterials = StaticMeshContext->StaticMaterials;
-#endif
-
-#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
-	UBodySetup* BodySetup = StaticMesh->GetBodySetup();
-#else
-	UBodySetup* BodySetup = StaticMesh->BodySetup;
-#endif
-
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
-	if (StaticMesh->bSupportRayTracing)
+	if (!GUsingNullRHI)
 	{
-		RenderData->InitializeRayTracingRepresentationFromRenderingLODs();
-	}
-#endif
+		SCOPED_NAMED_EVENT(FglTFRuntimeParser_FinalizeStaticMesh, FColor::Magenta);
 
-	StaticMesh->InitResources();
+		UStaticMesh* StaticMesh = StaticMeshContext->StaticMesh;
+		FStaticMeshRenderData* RenderData = StaticMeshContext->RenderData;
+		const FglTFRuntimeStaticMeshConfig& StaticMeshConfig = StaticMeshContext->StaticMeshConfig;
 
-	// set default LODs screen sizes
-	float DeltaScreenSize = (1.0f / RenderData->LODResources.Num()) / StaticMeshConfig.LODScreenSizeMultiplier;
-	float ScreenSize = 1;
-	for (int32 LODIndex = 0; LODIndex < RenderData->LODResources.Num(); LODIndex++)
-	{
-		RenderData->ScreenSize[LODIndex].Default = ScreenSize;
-		ScreenSize -= DeltaScreenSize;
-	}
+	#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+		StaticMesh->SetStaticMaterials(StaticMeshContext->StaticMaterials);
+	#else
+		StaticMesh->StaticMaterials = StaticMeshContext->StaticMaterials;
+	#endif
 
-	// Override LODs ScreenSize
-	for (const TPair<int32, float>& Pair : StaticMeshConfig.LODScreenSize)
-	{
-		int32 CurrentLODIndex = Pair.Key;
-		if (RenderData && CurrentLODIndex >= 0 && CurrentLODIndex < RenderData->LODResources.Num())
+	#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+		UBodySetup* BodySetup = StaticMesh->GetBodySetup();
+	#else
+		UBodySetup* BodySetup = StaticMesh->BodySetup;
+	#endif
+
+	#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+		if (StaticMesh->bSupportRayTracing)
 		{
-			RenderData->ScreenSize[CurrentLODIndex].Default = Pair.Value;
+			RenderData->InitializeRayTracingRepresentationFromRenderingLODs();
 		}
-	}
+	#endif
 
-	RenderData->Bounds = StaticMeshContext->BoundingBoxAndSphere;
-	StaticMesh->CalculateExtendedBounds();
+		StaticMesh->InitResources();
 
-	if (!BodySetup)
-	{
-		StaticMesh->CreateBodySetup();
-#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
-		BodySetup = StaticMesh->GetBodySetup();
-#else
-		BodySetup = StaticMesh->BodySetup;
-#endif
-	}
-
-	BodySetup->bHasCookedCollisionData = false;
-
-	BodySetup->bNeverNeedsCookedCollisionData = !StaticMeshConfig.bBuildComplexCollision;
-
-	BodySetup->bMeshCollideAll = false;
-
-	BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
-
-	BodySetup->InvalidatePhysicsData();
-
-	if (StaticMeshConfig.bBuildSimpleCollision)
-	{
-		FKBoxElem BoxElem;
-		BoxElem.Center = RenderData->Bounds.Origin;
-		BoxElem.X = RenderData->Bounds.BoxExtent.X * 2.0f;
-		BoxElem.Y = RenderData->Bounds.BoxExtent.Y * 2.0f;
-		BoxElem.Z = RenderData->Bounds.BoxExtent.Z * 2.0f;
-		BodySetup->AggGeom.BoxElems.Add(BoxElem);
-	}
-
-	for (const FBox& Box : StaticMeshConfig.BoxCollisions)
-	{
-		FKBoxElem BoxElem;
-		BoxElem.Center = Box.GetCenter();
-		FVector BoxSize = Box.GetSize();
-		BoxElem.X = BoxSize.X;
-		BoxElem.Y = BoxSize.Y;
-		BoxElem.Z = BoxSize.Z;
-		BodySetup->AggGeom.BoxElems.Add(BoxElem);
-	}
-
-	for (const FVector4 Sphere : StaticMeshConfig.SphereCollisions)
-	{
-		FKSphereElem SphereElem;
-		SphereElem.Center = Sphere;
-		SphereElem.Radius = Sphere.W;
-		BodySetup->AggGeom.SphereElems.Add(SphereElem);
-	}
-
-	if (StaticMeshConfig.bBuildComplexCollision || StaticMeshConfig.CollisionComplexity == ECollisionTraceFlag::CTF_UseComplexAsSimple)
-	{
-		if (!StaticMesh->bAllowCPUAccess || !StaticMeshConfig.Outer || !StaticMesh->GetWorld() || !StaticMesh->GetWorld()->IsGameWorld())
+		// set default LODs screen sizes
+		float DeltaScreenSize = (1.0f / RenderData->LODResources.Num()) / StaticMeshConfig.LODScreenSizeMultiplier;
+		float ScreenSize = 1;
+		for (int32 LODIndex = 0; LODIndex < RenderData->LODResources.Num(); LODIndex++)
 		{
-			AddError("FinalizeStaticMesh", "Unable to generate Complex collision without CpuAccess and a valid StaticMesh Outer (consider setting it to the related StaticMeshComponent)");
-		}
-		BodySetup->CreatePhysicsMeshes();
-	}
-
-	// recreate physics state (if possible)
-	if (UActorComponent* ActorComponent = Cast<UActorComponent>(StaticMesh->GetOuter()))
-	{
-		ActorComponent->RecreatePhysicsState();
-	}
-
-	for (const TPair<FString, FTransform>& Pair : StaticMeshConfig.Sockets)
-	{
-		UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
-		Socket->SocketName = FName(Pair.Key);
-		Socket->RelativeLocation = Pair.Value.GetLocation();
-		Socket->RelativeRotation = Pair.Value.Rotator();
-		Socket->RelativeScale = Pair.Value.GetScale3D();
-		StaticMesh->AddSocket(Socket);
-	}
-
-	for (const TPair<FString, FTransform>& Pair : StaticMeshContext->AdditionalSockets)
-	{
-		if (StaticMeshConfig.Sockets.Contains(Pair.Key))
-		{
-			continue;
+			RenderData->ScreenSize[LODIndex].Default = ScreenSize;
+			ScreenSize -= DeltaScreenSize;
 		}
 
-		UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
-		Socket->SocketName = FName(Pair.Key);
-		Socket->RelativeLocation = Pair.Value.GetLocation();
-		Socket->RelativeRotation = Pair.Value.Rotator();
-		Socket->RelativeScale = Pair.Value.GetScale3D();
-		StaticMesh->AddSocket(Socket);
-	}
+		// Override LODs ScreenSize
+		for (const TPair<int32, float>& Pair : StaticMeshConfig.LODScreenSize)
+		{
+			int32 CurrentLODIndex = Pair.Key;
+			if (RenderData && CurrentLODIndex >= 0 && CurrentLODIndex < RenderData->LODResources.Num())
+			{
+				RenderData->ScreenSize[CurrentLODIndex].Default = Pair.Value;
+			}
+		}
 
-	if (!StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
+		RenderData->Bounds = StaticMeshContext->BoundingBoxAndSphere;
+		StaticMesh->CalculateExtendedBounds();
+
+		if (!BodySetup)
+		{
+			StaticMesh->CreateBodySetup();
+	#if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
+			BodySetup = StaticMesh->GetBodySetup();
+	#else
+			BodySetup = StaticMesh->BodySetup;
+	#endif
+		}
+
+		BodySetup->bHasCookedCollisionData = false;
+
+		BodySetup->bNeverNeedsCookedCollisionData = !StaticMeshConfig.bBuildComplexCollision;
+
+		BodySetup->bMeshCollideAll = false;
+
+		BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
+
+		BodySetup->InvalidatePhysicsData();
+
+		if (StaticMeshConfig.bBuildSimpleCollision)
+		{
+			FKBoxElem BoxElem;
+			BoxElem.Center = RenderData->Bounds.Origin;
+			BoxElem.X = RenderData->Bounds.BoxExtent.X * 2.0f;
+			BoxElem.Y = RenderData->Bounds.BoxExtent.Y * 2.0f;
+			BoxElem.Z = RenderData->Bounds.BoxExtent.Z * 2.0f;
+			BodySetup->AggGeom.BoxElems.Add(BoxElem);
+		}
+
+		for (const FBox& Box : StaticMeshConfig.BoxCollisions)
+		{
+			FKBoxElem BoxElem;
+			BoxElem.Center = Box.GetCenter();
+			FVector BoxSize = Box.GetSize();
+			BoxElem.X = BoxSize.X;
+			BoxElem.Y = BoxSize.Y;
+			BoxElem.Z = BoxSize.Z;
+			BodySetup->AggGeom.BoxElems.Add(BoxElem);
+		}
+
+		for (const FVector4 Sphere : StaticMeshConfig.SphereCollisions)
+		{
+			FKSphereElem SphereElem;
+			SphereElem.Center = Sphere;
+			SphereElem.Radius = Sphere.W;
+			BodySetup->AggGeom.SphereElems.Add(SphereElem);
+		}
+
+		if (StaticMeshConfig.bBuildComplexCollision || StaticMeshConfig.CollisionComplexity == ECollisionTraceFlag::CTF_UseComplexAsSimple)
+		{
+			if (!StaticMesh->bAllowCPUAccess || !StaticMeshConfig.Outer || !StaticMesh->GetWorld() || !StaticMesh->GetWorld()->IsGameWorld())
+			{
+				AddError("FinalizeStaticMesh", "Unable to generate Complex collision without CpuAccess and a valid StaticMesh Outer (consider setting it to the related StaticMeshComponent)");
+			}
+			BodySetup->CreatePhysicsMeshes();
+		}
+
+		// recreate physics state (if possible)
+		if (UActorComponent* ActorComponent = Cast<UActorComponent>(StaticMesh->GetOuter()))
+		{
+			ActorComponent->RecreatePhysicsState();
+		}
+
+		for (const TPair<FString, FTransform>& Pair : StaticMeshConfig.Sockets)
+		{
+			UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
+			Socket->SocketName = FName(Pair.Key);
+			Socket->RelativeLocation = Pair.Value.GetLocation();
+			Socket->RelativeRotation = Pair.Value.Rotator();
+			Socket->RelativeScale = Pair.Value.GetScale3D();
+			StaticMesh->AddSocket(Socket);
+		}
+
+		for (const TPair<FString, FTransform>& Pair : StaticMeshContext->AdditionalSockets)
+		{
+			if (StaticMeshConfig.Sockets.Contains(Pair.Key))
+			{
+				continue;
+			}
+
+			UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
+			Socket->SocketName = FName(Pair.Key);
+			Socket->RelativeLocation = Pair.Value.GetLocation();
+			Socket->RelativeRotation = Pair.Value.Rotator();
+			Socket->RelativeScale = Pair.Value.GetScale3D();
+			StaticMesh->AddSocket(Socket);
+		}
+
+		if (!StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
+		{
+			UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
+			Socket->SocketName = FName(StaticMeshConfig.ExportOriginalPivotToSocket);
+			Socket->RelativeLocation = -StaticMeshContext->LOD0PivotDelta;
+			StaticMesh->AddSocket(Socket);
+		}
+
+		StaticMesh->bHasNavigationData = StaticMeshConfig.bBuildNavCollision;
+
+		if (StaticMesh->bHasNavigationData)
+		{
+			StaticMesh->CreateNavCollision();
+		}
+
+		OnFinalizedStaticMesh.Broadcast(AsShared(), StaticMesh, StaticMeshConfig);
+
+		OnStaticMeshCreated.Broadcast(StaticMesh);
+
+		FillAssetUserData(StaticMeshContext->MeshIndex, StaticMesh);
+
+		return StaticMesh;
+	}
+	else
 	{
-		UStaticMeshSocket* Socket = NewObject<UStaticMeshSocket>(StaticMesh);
-		Socket->SocketName = FName(StaticMeshConfig.ExportOriginalPivotToSocket);
-		Socket->RelativeLocation = -StaticMeshContext->LOD0PivotDelta;
-		StaticMesh->AddSocket(Socket);
+		return 0;
 	}
-
-	StaticMesh->bHasNavigationData = StaticMeshConfig.bBuildNavCollision;
-
-	if (StaticMesh->bHasNavigationData)
-	{
-		StaticMesh->CreateNavCollision();
-	}
-
-	OnFinalizedStaticMesh.Broadcast(AsShared(), StaticMesh, StaticMeshConfig);
-
-	OnStaticMeshCreated.Broadcast(StaticMesh);
-
-	FillAssetUserData(StaticMeshContext->MeshIndex, StaticMesh);
-
-	return StaticMesh;
 }
 
 bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
@@ -1184,33 +1192,39 @@ TArray<UStaticMesh*> FglTFRuntimeParser::LoadStaticMeshesFromPrimitives(const in
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMeshLODs(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
-
-	TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext = MakeShared<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>(AsShared(), -1, StaticMeshConfig);
-
-	for (const int32 MeshIndex : MeshIndices)
+if(!GUsingNullRHI)
 	{
-		TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
-		if (!JsonMeshObject)
+		TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext = MakeShared<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>(AsShared(), -1, StaticMeshConfig);
+
+		for (const int32 MeshIndex : MeshIndices)
 		{
-			return nullptr;
+			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
+			if (!JsonMeshObject)
+			{
+				return nullptr;
+			}
+
+			FglTFRuntimeMeshLOD* LOD = nullptr;
+
+			if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, StaticMeshConfig.MaterialsConfig))
+			{
+				return nullptr;
+			}
+
+			StaticMeshContext->LODs.Add(LOD);
 		}
 
-		FglTFRuntimeMeshLOD* LOD = nullptr;
-
-		if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, StaticMeshConfig.MaterialsConfig))
+		UStaticMesh* StaticMesh = LoadStaticMesh_Internal(StaticMeshContext);
+		if (StaticMesh)
 		{
-			return nullptr;
+			return FinalizeStaticMesh(StaticMeshContext);
 		}
-
-		StaticMeshContext->LODs.Add(LOD);
+		return nullptr;
 	}
-
-	UStaticMesh* StaticMesh = LoadStaticMesh_Internal(StaticMeshContext);
-	if (StaticMesh)
+	else
 	{
-		return FinalizeStaticMesh(StaticMeshContext);
+		return nullptr;
 	}
-	return nullptr;
 }
 
 void FglTFRuntimeParser::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
