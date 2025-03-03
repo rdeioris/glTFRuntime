@@ -455,7 +455,10 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	Texture->UpdateResource();
 
-	TexturesCache.Add(Mips[0].TextureIndex, Texture);
+	if (Mips[0].TextureIndex >= 0)
+	{
+		TexturesCache.Add(Mips[0].TextureIndex, Texture);
+	}
 
 	FillAssetUserData(Mips[0].TextureIndex, Texture);
 

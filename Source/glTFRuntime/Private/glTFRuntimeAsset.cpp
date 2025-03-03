@@ -1201,6 +1201,47 @@ UTexture2D* UglTFRuntimeAsset::LoadMipsFromBlob(const FglTFRuntimeImagesConfig& 
 	return Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler());
 }
 
+void UglTFRuntimeAsset::LoadMipsFromBlobAsync(const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTexture2DAsync& AsyncCallback)
+{
+	Async(EAsyncExecution::Thread, [this, ImagesConfig, AsyncCallback]()
+		{
+			if (!Parser)
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&, AsyncCallback]()
+					{
+						AsyncCallback.ExecuteIfBound(nullptr);
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				return;
+			}
+
+			TArray<FglTFRuntimeMipMap> Mips;
+			FglTFRuntimeParser::OnTextureMips.Broadcast(Parser.ToSharedRef(), -1, MakeShared<FJsonObject>(), MakeShared<FJsonObject>(), Parser->GetBlob(), Mips, ImagesConfig);
+			// if no Mips have been loaded, attempt parsing a DDS asset
+			if (Mips.Num() == 0)
+			{
+				if (FglTFRuntimeDDS::IsDDS(Parser->GetBlob()))
+				{
+					FglTFRuntimeDDS DDS(Parser->GetBlob());
+					DDS.LoadMips(-1, Mips, 0, ImagesConfig);
+				}
+			}
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&, AsyncCallback]()
+				{
+					if (Mips.Num() > 0)
+					{
+						AsyncCallback.ExecuteIfBound(Parser->BuildTexture(this, Mips, ImagesConfig, FglTFRuntimeTextureSampler()));
+					}
+					else
+					{
+						AsyncCallback.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+}
+
 void UglTFRuntimeAsset::LoadCubeMapFromBlobAsync(const bool bSpherical, const bool bAutoRotate, const FglTFRuntimeTextureCubeAsync& AsyncCallback, const FglTFRuntimeImagesConfig& ImagesConfig)
 {
 	Async(EAsyncExecution::Thread, [this, bSpherical, bAutoRotate, ImagesConfig, AsyncCallback]()
