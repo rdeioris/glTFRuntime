@@ -63,7 +63,6 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& 
 		{
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename, OverrideConfig);
 
-
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
 				{
 					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
@@ -151,6 +150,60 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64Async(const FString& Ba
 			}
 
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(BytesBase64, LoaderConfig);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset);
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+}
+
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUTF8String(const FString& String, const FglTFRuntimeConfig& LoaderConfig)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		return nullptr;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	auto UTF8String = StringCast<UTF8CHAR>(*String);
+
+	if (!Asset->LoadFromData(reinterpret_cast<const uint8*>(UTF8String.Get()), UTF8String.Length(), LoaderConfig))
+	{
+		return nullptr;
+	}
+
+	return Asset;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUTF8StringAsync(const FString& String, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr);
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	Async(EAsyncExecution::Thread, [String, Asset, LoaderConfig, Completed]()
+		{
+			auto UTF8String = StringCast<UTF8CHAR>(*String);
+
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(reinterpret_cast<const uint8*>(UTF8String.Get()), UTF8String.Length(), LoaderConfig);
 
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
 				{
