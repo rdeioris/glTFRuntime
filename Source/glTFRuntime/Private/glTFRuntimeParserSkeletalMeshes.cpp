@@ -2940,7 +2940,11 @@ FglTFRuntimePoseTracksMap FglTFRuntimeParser::FixupAnimationTracks(const FglTFRu
 
 	if (bRetargetRotations)
 	{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 		RetargetRefSkeleton = SkeletalAnimationConfig.RetargetTo ? SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton() : SkeletalAnimationConfig.RetargetToSkeletalMesh->GetRefSkeleton();
+#else
+		RetargetRefSkeleton = SkeletalAnimationConfig.RetargetTo ? SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton() : SkeletalAnimationConfig.RetargetToSkeletalMesh->RefSkeleton;
+#endif
 
 		TMap<FString, FTransform> RestTransformsCleaned;
 

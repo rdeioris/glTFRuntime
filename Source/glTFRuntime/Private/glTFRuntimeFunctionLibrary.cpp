@@ -177,7 +177,11 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUTF8String(cons
 	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
 	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
 
+#if ENGINE_MAJOR_VERSION >= 5
 	auto UTF8String = StringCast<UTF8CHAR>(*String);
+#else
+	FTCHARToUTF8 UTF8String(*String);
+#endif
 
 	if (!Asset->LoadFromData(reinterpret_cast<const uint8*>(UTF8String.Get()), UTF8String.Length(), LoaderConfig))
 	{
@@ -201,7 +205,11 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUTF8StringAsync(const FString
 
 	Async(EAsyncExecution::Thread, [String, Asset, LoaderConfig, Completed]()
 		{
+#if ENGINE_MAJOR_VERSION >= 5
 			auto UTF8String = StringCast<UTF8CHAR>(*String);
+#else
+			FTCHARToUTF8 UTF8String(*String);
+#endif
 
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(reinterpret_cast<const uint8*>(UTF8String.Get()), UTF8String.Length(), LoaderConfig);
 
