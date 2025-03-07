@@ -9,6 +9,7 @@
 #include "glTFRuntimeAssetActor.h"
 #include "IDesktopPlatform.h"
 #include "LevelEditor.h"
+#include "Framework/Application/SlateApplication.h"
 
 #define LOCTEXT_NAMESPACE "FglTFRuntimeEditorModule"
 

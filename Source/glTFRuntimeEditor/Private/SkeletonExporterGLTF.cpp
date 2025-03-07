@@ -5,6 +5,7 @@
 #include "Misc/Base64.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#include "Dom/JsonObject.h"
 
 USkeletonExporterGLTF::USkeletonExporterGLTF(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)

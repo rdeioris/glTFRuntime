@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "SkeletonExporterGLTF.h"
+#include "Engine/SkeletalMesh.h"
 #include "SkeletalMeshExporterGLTF.generated.h"
 
 class FglTFExportContextSkeletalMesh : public FglTFExportContextSkeleton

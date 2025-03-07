@@ -11,6 +11,7 @@
 #include "Misc/FileHelper.h"
 #include "GenericPlatform/GenericPlatformProcess.h"
 #include "Runtime/Launch/Resources/Version.h"
+#include "Animation/AnimSequence.h"
 
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig)
 {
