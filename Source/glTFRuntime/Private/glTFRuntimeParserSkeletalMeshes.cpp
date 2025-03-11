@@ -1,4 +1,4 @@
-// Copyright 2020-2023, Roberto De Ioris.
+// Copyright 2020-2025, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
 #include "Runtime/Launch/Resources/Version.h"
@@ -1788,6 +1788,54 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 	return nullptr;
 }
 
+UAnimSequence* FglTFRuntimeParser::LoadAndMergeSkeletalAnimationsByName(USkeletalMesh* SkeletalMesh, const TArray<FString> AnimationNames, const bool bIgnoreNonExistent, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	if (!SkeletalMesh)
+	{
+		return nullptr;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
+	if (!Root->TryGetArrayField(TEXT("animations"), JsonAnimations))
+	{
+		AddError("LoadSkeletalAnimationByName()", "No animations defined in the asset.");
+		return nullptr;
+	}
+
+	TArray<int32> AnimationIndices;
+
+	TMap<FString, int32> DiscoveredAnimations;
+
+	for (int32 AnimationIndex = 0; AnimationIndex < JsonAnimations->Num(); AnimationIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[AnimationIndex]->AsObject();
+		if (!JsonAnimationObject)
+		{
+			return nullptr;
+		}
+
+		FString JsonAnimationName;
+		if (JsonAnimationObject->TryGetStringField(TEXT("name"), JsonAnimationName))
+		{
+			DiscoveredAnimations.Add(JsonAnimationName, AnimationIndex);
+		}
+	}
+
+	for (const FString& AnimationName : AnimationNames)
+	{
+		if (DiscoveredAnimations.Contains(AnimationName))
+		{
+			AnimationIndices.Add(DiscoveredAnimations[AnimationName]);
+		}
+		else if (!bIgnoreNonExistent)
+		{
+			return nullptr;
+		}
+	}
+
+	return LoadAndMergeSkeletalAnimations(SkeletalMesh, AnimationIndices, bRandomize, SkeletalAnimationConfig);
+}
+
 UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
 	if (!SkeletalMesh)
@@ -2435,6 +2483,85 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	}
 
 	return LoadSkeletalAnimationFromTracksAndMorphTargets(SkeletalMesh, Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig);
+}
+
+UAnimSequence* FglTFRuntimeParser::LoadAndMergeSkeletalAnimations(USkeletalMesh* SkeletalMesh, const TArray<int32> AnimationIndices, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	if (!SkeletalMesh)
+	{
+		return nullptr;
+	}
+
+	float MergedDuration = 0;
+	TMap<FString, FRawAnimSequenceTrack> MergedTracks;
+	TMap<FName, TArray<TPair<float, float>>> MergedMorphTargetCurves;
+
+	TArray<int32> ReorganizedAnimationIndices = AnimationIndices;
+
+	if (bRandomize)
+	{
+		const int32 NumShuffles = ReorganizedAnimationIndices.Num() - 1;
+		for (int32 ShuffleIndex = 0; ShuffleIndex < NumShuffles; ShuffleIndex++)
+		{
+			const int32 SwapIndex = FMath::RandRange(ShuffleIndex, NumShuffles);
+			ReorganizedAnimationIndices.Swap(ShuffleIndex, SwapIndex);
+		}
+	}
+
+	for (const int32 AnimationIndex : ReorganizedAnimationIndices)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = GetJsonObjectFromRootIndex("animations", AnimationIndex);
+		if (!JsonAnimationObject)
+		{
+			AddError("LoadAndMergeSkeletalAnimations()", FString::Printf(TEXT("Unable to find animation %d"), AnimationIndex));
+			return nullptr;
+		}
+
+		float Duration;
+		TMap<FString, FRawAnimSequenceTrack> Tracks;
+
+		TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
+		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [](const FglTFRuntimeNode& Node) -> bool { return true; }))
+		{
+			return nullptr;
+		}
+
+		// combine Tracks (just appending)
+		for (const TPair<FString, FRawAnimSequenceTrack> Track : Tracks)
+		{
+			if (MergedTracks.Contains(Track.Key))
+			{
+				// append new data
+				MergedTracks[Track.Key].PosKeys.Append(Track.Value.PosKeys);
+				MergedTracks[Track.Key].RotKeys.Append(Track.Value.RotKeys);
+				MergedTracks[Track.Key].ScaleKeys.Append(Track.Value.ScaleKeys);
+			}
+			else
+			{
+				MergedTracks.Add(Track.Key, Track.Value);
+			}
+		}
+
+		// combine MorphTargets (needs time recomputing)
+		for (const TPair<FName, TArray<TPair<float, float>>> MorphTargetCurve : MorphTargetCurves)
+		{
+			if (MergedMorphTargetCurves.Contains(MorphTargetCurve.Key))
+			{
+				for (const TPair<float, float>& Pair : MorphTargetCurve.Value)
+				{
+					MergedMorphTargetCurves[MorphTargetCurve.Key].Add(TPair<float, float>(Pair.Key + MergedDuration, Pair.Value));
+				}
+			}
+			else
+			{
+				MergedMorphTargetCurves.Add(MorphTargetCurve.Key, MorphTargetCurve.Value);
+			}
+		}
+
+		MergedDuration += Duration;
+	}
+
+	return LoadSkeletalAnimationFromTracksAndMorphTargets(SkeletalMesh, MergedTracks, MergedMorphTargetCurves, MergedDuration, SkeletalAnimationConfig);
 }
 
 UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh* SkeletalMesh, const int32 SkinIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)

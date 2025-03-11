@@ -2285,6 +2285,10 @@ public:
 	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 	USkeleton* LoadSkeletonFromNode(const FglTFRuntimeNode& Node, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
+	UAnimSequence* LoadAndMergeSkeletalAnimations(USkeletalMesh* SkeletalMesh, const TArray<int32> AnimationIndices, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
+	UAnimSequence* LoadAndMergeSkeletalAnimationsByName(USkeletalMesh* SkeletalMesh, const TArray<FString> AnimationNames, const bool bIgnoreNonExistent, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
 	UAnimSequence* LoadSkeletalAnimationFromTracksAndMorphTargets(USkeletalMesh* SkeletalMesh, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	UAnimSequence* LoadSkeletalAnimationFromTracksAndMorphTargets(USkeleton* Skeleton, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
