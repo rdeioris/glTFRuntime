@@ -365,6 +365,68 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const
 	HttpRequest->ProcessRequest();
 }
 
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithCache(const FString& Url, const FString& CacheFilename, const TMap<FString, FString>& Headers, const bool bUseCacheOnError, const FglTFRuntimeHttpResponse& Completed, const FglTFRuntimeConfig& LoaderConfig)
+{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+#else
+	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
+#endif
+
+	HttpRequest->SetURL(Url);
+
+	bool bCacheFileValid = false;
+
+	if (!CacheFilename.IsEmpty() && FPaths::FileExists(CacheFilename))
+	{
+		const FDateTime ModificationTime = IFileManager::Get().GetTimeStamp(*CacheFilename);
+		HttpRequest->AppendToHeader("If-Modified-Since", ModificationTime.ToHttpDate());
+		bCacheFileValid = true;
+	}
+
+	for (TPair<FString, FString> Header : Headers)
+	{
+		HttpRequest->AppendToHeader(Header.Key, Header.Value);
+	}
+
+	float StartTime = FPlatformTime::Seconds();
+
+	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime, bCacheFileValid, bUseCacheOnError](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig, const FString& CacheFilename)
+		{
+			UglTFRuntimeAsset* Asset = nullptr;
+			if (!IsGarbageCollecting())
+			{
+				if (bSuccess)
+				{
+					if (ResponsePtr->GetResponseCode() == 304 && bCacheFileValid)
+					{
+						Asset = glTFLoadAssetFromFilename(CacheFilename, false, LoaderConfig);
+					}
+					else
+					{
+						if (!CacheFilename.IsEmpty())
+						{
+							FFileHelper::SaveArrayToFile(ResponsePtr->GetContent(), *CacheFilename);
+						}
+						Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+					}
+				}
+				else if (bCacheFileValid && bUseCacheOnError)
+				{
+					Asset = glTFLoadAssetFromFilename(CacheFilename, false, LoaderConfig);
+				}
+
+				if (Asset)
+				{
+					Asset->GetParser()->SetDownloadTime(FPlatformTime::Seconds() - StartTime);
+				}
+			}
+			Completed.ExecuteIfBound(Asset);
+		}, Completed, LoaderConfig, CacheFilename);
+
+	HttpRequest->ProcessRequest();
+}
+
 void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
 {
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
