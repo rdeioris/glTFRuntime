@@ -66,7 +66,11 @@ void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFR
 	// first check cache
 	if (CanReadFromCache(StaticMeshConfig.CacheMode) && StaticMeshesCache.Contains(MeshIndex))
 	{
-		AsyncCallback.ExecuteIfBound(StaticMeshesCache[MeshIndex]);
+		UStaticMesh* StaticMesh = StaticMeshesCache[MeshIndex];
+		FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([StaticMesh, AsyncCallback]()
+			{
+				AsyncCallback.ExecuteIfBound(StaticMesh);
+			}, TStatId(), nullptr, ENamedThreads::GameThread);
 		return;
 	}
 
