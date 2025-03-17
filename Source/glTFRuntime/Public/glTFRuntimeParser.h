@@ -1122,6 +1122,20 @@ struct FglTFRuntimeBoneBoundsFilterHook
 	UObject* Context = nullptr;
 };
 
+DECLARE_DYNAMIC_DELEGATE_RetVal_ThreeParams(FString, FglTFRuntimeMorphTargetRemapper, const int32, MorphTargetIndex, const FString&, MorphTargetName, UObject*, Context);
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeMorphTargetRemapperHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeMorphTargetRemapper Remapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalMeshConfig
 {
@@ -1228,6 +1242,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bUseHighPrecisionTangentBasis;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeMorphTargetRemapperHook MorphTargetRemapper;
 
 	FglTFRuntimeSkeletalMeshConfig()
 	{

@@ -979,6 +979,15 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 						MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex);
 					}
 
+					if (SkeletalMeshContext->SkeletalMeshConfig.MorphTargetRemapper.Remapper.IsBound())
+					{
+						const FString RemappedMorphTargetName = SkeletalMeshContext->SkeletalMeshConfig.MorphTargetRemapper.Remapper.Execute(MorphTargetIndex, MorphTargetName, SkeletalMeshContext->SkeletalMeshConfig.MorphTargetRemapper.Context);
+						if (!RemappedMorphTargetName.IsEmpty())
+						{
+							MorphTargetName = RemappedMorphTargetName;
+						}
+					}
+
 					bool bAddMorphTarget = false;
 					if (MorphTargetNamesHistory.Contains(MorphTargetName))
 					{
