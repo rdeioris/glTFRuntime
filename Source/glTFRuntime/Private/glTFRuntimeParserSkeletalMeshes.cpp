@@ -1069,6 +1069,17 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalMaterials[NewMatIndex].UVChannelData.bInitialized = true;
 
 			SkeletalMaterials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex]->Primitives[MatIndex].MaterialName)));
+			if (SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig.MaterialSlotRemapper.Remapper.IsBound())
+			{
+				FString RemappedMaterialName = SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig.MaterialSlotRemapper.Remapper.Execute(LODIndex,
+					MatIndex,
+					SkeletalMeshContext->LODs[LODIndex]->Primitives[MatIndex].MaterialName,
+					SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig.MaterialSlotRemapper.Context);
+				if (!RemappedMaterialName.IsEmpty())
+				{
+					SkeletalMaterials[NewMatIndex].MaterialSlotName = *RemappedMaterialName;
+				}
+			}
 		}
 	}
 

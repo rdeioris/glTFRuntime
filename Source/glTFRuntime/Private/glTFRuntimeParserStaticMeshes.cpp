@@ -186,6 +186,17 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		for (const FglTFRuntimePrimitive& Primitive : LOD->Primitives)
 		{
 			FName MaterialName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), CurrentLODIndex, StaticMeshContext->StaticMaterials.Num(), *Primitive.MaterialName));
+			if (StaticMeshContext->StaticMeshConfig.MaterialsConfig.MaterialSlotRemapper.Remapper.IsBound())
+			{
+				FString RemappedMaterialName = StaticMeshContext->StaticMeshConfig.MaterialsConfig.MaterialSlotRemapper.Remapper.Execute(CurrentLODIndex,
+					StaticMeshContext->StaticMaterials.Num(),
+					Primitive.MaterialName,
+					StaticMeshContext->StaticMeshConfig.MaterialsConfig.MaterialSlotRemapper.Context);
+				if (!RemappedMaterialName.IsEmpty())
+				{
+					MaterialName = *RemappedMaterialName;
+				}
+			}
 			FStaticMaterial StaticMaterial(Primitive.Material, MaterialName);
 			StaticMaterial.UVChannelData.bInitialized = true;
 
