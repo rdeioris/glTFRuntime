@@ -772,6 +772,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		}
 		LODResources.IndexBuffer.SetIndices(LODIndices, StaticMeshBuildVertices.Num() > MAX_uint16 ? EIndexBufferStride::Force32Bit : EIndexBufferStride::Force16Bit);
 
+		LODResources.BuffersSize = LODResources.IndexBuffer.GetAllocatedSize() +
+			LODResources.VertexBuffers.PositionVertexBuffer.GetAllocatedSize() +
+			LODResources.VertexBuffers.StaticMeshVertexBuffer.GetResourceSize() +
+			LODResources.VertexBuffers.ColorVertexBuffer.GetAllocatedSize();
+
 #if WITH_EDITOR
 		if (StaticMeshConfig.bGenerateStaticMeshDescription)
 		{
