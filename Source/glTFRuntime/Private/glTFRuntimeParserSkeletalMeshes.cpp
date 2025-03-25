@@ -2549,7 +2549,7 @@ UAnimSequence* FglTFRuntimeParser::LoadAndMergeSkeletalAnimations(USkeletalMesh*
 		}
 
 		// combine Tracks (just appending)
-		for (const TPair<FString, FRawAnimSequenceTrack> Track : Tracks)
+		for (const TPair<FString, FRawAnimSequenceTrack>& Track : Tracks)
 		{
 			if (MergedTracks.Contains(Track.Key))
 			{
@@ -2565,7 +2565,7 @@ UAnimSequence* FglTFRuntimeParser::LoadAndMergeSkeletalAnimations(USkeletalMesh*
 		}
 
 		// combine MorphTargets (needs time recomputing)
-		for (const TPair<FName, TArray<TPair<float, float>>> MorphTargetCurve : MorphTargetCurves)
+		for (const TPair<FName, TArray<TPair<float, float>>>& MorphTargetCurve : MorphTargetCurves)
 		{
 			if (MergedMorphTargetCurves.Contains(MorphTargetCurve.Key))
 			{
