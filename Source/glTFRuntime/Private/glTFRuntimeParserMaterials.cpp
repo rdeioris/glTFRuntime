@@ -1392,6 +1392,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		MaterialName = "";
 	}
 
+	if (MaterialName.IsEmpty() && MaterialsConfig.bForceEmptyMaterialNameToMaterialIndex)
+	{
+		MaterialName = FString::FromInt(Index);
+	}
+
 	if (!MaterialsConfig.bMaterialsOverrideMapInjectParams && MaterialsConfig.MaterialsOverrideByNameMap.Contains(MaterialName))
 	{
 		return MaterialsConfig.MaterialsOverrideByNameMap[MaterialName];

@@ -665,6 +665,9 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FglTFRuntimeMaterialSlotRemapperHook MaterialSlotRemapper;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bForceEmptyMaterialNameToMaterialIndex;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -686,6 +689,7 @@ struct FglTFRuntimeMaterialsConfig
 		LinesBaseMaterial = nullptr;
 		LinesScaleFactor = 1;
 		bAddEpicInterchangeParams = false;
+		bForceEmptyMaterialNameToMaterialIndex = false;
 	}
 };
 
