@@ -41,6 +41,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnStaticMeshCreated, USt
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnSkeletalMeshCreated, USkeletalMesh*, SkeletalMesh);
 
 #define GLTFRUNTIME_IMAGE_API_1
+#define GLTFRUNTIME_HAS_BONE_REMAPPER_LOD
 
 /*
 * Credits for giving me the idea for the blob structure
@@ -531,6 +532,20 @@ enum class EglTFRuntimeLinesTriangulationMode : uint8
 	Custom
 };
 
+DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FString, FglTFRuntimeMaterialSlotRemapper, const int32, LODIndex, const int32, MaterialIndex, const FString&, MaterialName, UObject*, Context);
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeMaterialSlotRemapperHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeMaterialSlotRemapper Remapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeMaterialsConfig
 {
@@ -647,6 +662,12 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SheenOverrideMap;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeMaterialSlotRemapperHook MaterialSlotRemapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bForceEmptyMaterialNameToMaterialIndex;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -668,6 +689,7 @@ struct FglTFRuntimeMaterialsConfig
 		LinesBaseMaterial = nullptr;
 		LinesScaleFactor = 1;
 		bAddEpicInterchangeParams = false;
+		bForceEmptyMaterialNameToMaterialIndex = false;
 	}
 };
 
@@ -764,6 +786,9 @@ struct FglTFRuntimeStaticMeshConfig
 		return nullptr;
 	}
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bUseHighPrecisionTangentBasis;
+
 	FglTFRuntimeStaticMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -782,6 +807,7 @@ struct FglTFRuntimeStaticMeshConfig
 		bBuildNavCollision = false;
 		LODScreenSizeMultiplier = 2;
 		bBuildLumenCards = false;
+		bUseHighPrecisionTangentBasis = false;
 	}
 };
 
@@ -1117,6 +1143,20 @@ struct FglTFRuntimeBoneBoundsFilterHook
 	UObject* Context = nullptr;
 };
 
+DECLARE_DYNAMIC_DELEGATE_RetVal_ThreeParams(FString, FglTFRuntimeMorphTargetRemapper, const int32, MorphTargetIndex, const FString&, MorphTargetName, UObject*, Context);
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeMorphTargetRemapperHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeMorphTargetRemapper Remapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalMeshConfig
 {
@@ -1221,6 +1261,12 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bAllowCPUAccess;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bUseHighPrecisionTangentBasis;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeMorphTargetRemapperHook MorphTargetRemapper;
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -1247,6 +1293,7 @@ struct FglTFRuntimeSkeletalMeshConfig
 		bAutoGeneratePhysicsAssetBodies = false;
 		bAutoGeneratePhysicsAssetConstraints = false;
 		bAllowCPUAccess = false;
+		bUseHighPrecisionTangentBasis = false;
 	}
 };
 
@@ -2064,7 +2111,7 @@ struct FglTFRuntimeMaterial
 	}
 };
 
-class FglTFRuntimeArchive
+class GLTFRUNTIME_API FglTFRuntimeArchive
 {
 public:
 	virtual ~FglTFRuntimeArchive() {}
@@ -2084,7 +2131,7 @@ protected:
 	TMap<FString, uint32> OffsetsMap;
 };
 
-class FglTFRuntimeArchiveZip : public FglTFRuntimeArchive
+class GLTFRUNTIME_API FglTFRuntimeArchiveZip : public FglTFRuntimeArchive
 {
 public:
 	bool FromData(const uint8* DataPtr, const int64 DataNum);
@@ -2157,7 +2204,7 @@ struct FglTFRuntimeAudioConfig
 	}
 };
 
-class FglTFRuntimeDDS
+class GLTFRUNTIME_API FglTFRuntimeDDS
 {
 public:
 	FglTFRuntimeDDS() = delete;
@@ -2271,6 +2318,8 @@ public:
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene);
 
+	bool RemapRuntimeLODBoneNames(FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
+
 	USkeletalMesh* LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	USkeletalMesh* LoadSkeletalMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	void LoadSkeletalMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
@@ -2282,8 +2331,14 @@ public:
 	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 	USkeleton* LoadSkeletonFromNode(const FglTFRuntimeNode& Node, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
+	UAnimSequence* LoadAndMergeSkeletalAnimations(USkeletalMesh* SkeletalMesh, const TArray<int32> AnimationIndices, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
+	UAnimSequence* LoadAndMergeSkeletalAnimationsByName(USkeletalMesh* SkeletalMesh, const TArray<FString> AnimationNames, const bool bIgnoreNonExistent, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
 	UAnimSequence* LoadSkeletalAnimationFromTracksAndMorphTargets(USkeletalMesh* SkeletalMesh, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	UAnimSequence* LoadSkeletalAnimationFromTracksAndMorphTargets(USkeleton* Skeleton, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
+	FglTFRuntimePoseTracksMap FixupAnimationTracks(const FglTFRuntimePoseTracksMap& Tracks, const TMap<FString, FTransform>& RestTransforms, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
 	void LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 	void LoadStaticMeshAsync(const int32 MeshIndex, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
@@ -2508,6 +2563,8 @@ public:
 	void FillAssetUserData(const int32 Index, IInterface_AssetUserData* InObject);
 
 	void UpdateSceneBasis(const FMatrix& InSceneBasis);
+	void UpdateSceneScale(const float& InSceneScale);
+	float GetSceneScale() const;
 protected:
 	void LoadAndFillBaseMaterials();
 	TSharedRef<FJsonObject> Root;
@@ -2974,6 +3031,8 @@ public:
 
 	const FString& GetBaseDirectory() const { return BaseDirectory; }
 	const FString& GetBaseFilename() const { return BaseFilename; }
+
+	void SetBaseDirectory(const FString& NewBaseDirectory) { BaseDirectory = NewBaseDirectory; }
 
 	bool LoadPathToBlob(const FString& Path, TArray64<uint8>& Blob);
 

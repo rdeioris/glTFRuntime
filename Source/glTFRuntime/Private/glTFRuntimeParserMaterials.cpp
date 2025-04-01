@@ -455,7 +455,10 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	Texture->UpdateResource();
 
-	TexturesCache.Add(Mips[0].TextureIndex, Texture);
+	if (Mips[0].TextureIndex >= 0)
+	{
+		TexturesCache.Add(Mips[0].TextureIndex, Texture);
+	}
 
 	FillAssetUserData(Mips[0].TextureIndex, Texture);
 
@@ -1387,6 +1390,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 	if (!JsonMaterialObject->TryGetStringField(TEXT("name"), MaterialName))
 	{
 		MaterialName = "";
+	}
+
+	if (MaterialName.IsEmpty() && MaterialsConfig.bForceEmptyMaterialNameToMaterialIndex)
+	{
+		MaterialName = FString::FromInt(Index);
 	}
 
 	if (!MaterialsConfig.bMaterialsOverrideMapInjectParams && MaterialsConfig.MaterialsOverrideByNameMap.Contains(MaterialName))

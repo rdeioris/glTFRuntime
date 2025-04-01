@@ -5,12 +5,24 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "glTFRuntimeAsset.h"
+#include "Animation/BlendSpace1D.h"
 #include "glTFRuntimeFunctionLibrary.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeHttpResponse, UglTFRuntimeAsset*, Asset);
 DECLARE_DYNAMIC_DELEGATE_ThreeParams(FglTFRuntimeHttpProgress, const FglTFRuntimeConfig&, LoaderConfig, int32, BytesProcessed, int32, TotalBytes);
 DECLARE_DYNAMIC_DELEGATE_ThreeParams(FglTFRuntimeCommandResponse, UglTFRuntimeAsset*, Asset, const int32, ExitCode, const FString&, StdErr);
 
+USTRUCT(BlueprintType)
+struct FglTFRuntimeBlendSpaceSample
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnyWhere, BlueprintReadWrite, Category="glTFRuntime")
+	UAnimSequence* Animation = nullptr;
+
+	UPROPERTY(EditAnyWhere, BlueprintReadWrite, Category="glTFRuntime")
+	float Value = 0;
+};
 
 /**
  * 
@@ -29,6 +41,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Url", AutoCreateRefTerm = "LoaderConfig, Headers"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromUrl(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Url with Cache", AutoCreateRefTerm = "LoaderConfig, Headers"), Category = "glTFRuntime")
+	static void glTFLoadAssetFromUrlWithCache(const FString& Url, const FString& CacheFilename, const TMap<FString, FString>& Headers, const bool bUseCacheOnError, const FglTFRuntimeHttpResponse& Completed, const FglTFRuntimeConfig& LoaderConfig);
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Url with Progress", AutoCreateRefTerm = "LoaderConfig, Headers"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromUrlWithProgress(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig);
@@ -63,6 +78,12 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from Base64 String Async", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromBase64Async(const FString& Base64, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed);
 
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from UTF8 String", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
+	static UglTFRuntimeAsset* glTFLoadAssetFromUTF8String(const FString& String, const FglTFRuntimeConfig& LoaderConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from UTF8 String Async", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
+	static void glTFLoadAssetFromUTF8StringAsync(const FString& String, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed);
+
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Merge multiple glTF Runtime LODs"), Category = "glTFRuntime")
 	static FglTFRuntimeMeshLOD glTFMergeRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs);
 
@@ -77,4 +98,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from FileMap Async", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime")
 	static void glTFLoadAssetFromFileMapAsync(const TMap<FString, FString>& FileMap, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Create 1D BlendSpace"), Category = "glTFRuntime")
+	static UBlendSpace1D* CreateRuntimeBlendSpace1D(const FString& ParameterName, const float Min, const float Max, const TArray<FglTFRuntimeBlendSpaceSample>& Samples);
 };
