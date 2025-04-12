@@ -78,11 +78,9 @@ void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFR
 
 	Async(EAsyncExecution::Thread, [this, StaticMeshContext, MeshIndex, AsyncCallback]()
 		{
-
 			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 			if (JsonMeshObject)
 			{
-
 				FglTFRuntimeMeshLOD* LOD = nullptr;
 				if (LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, StaticMeshContext->StaticMeshConfig.MaterialsConfig))
 				{
@@ -108,6 +106,8 @@ void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFR
 					}
 
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
+					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
+					StaticMeshContext->UnregisterGCObject();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
@@ -236,7 +236,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 			Section.MaterialIndex = MaterialIndex;
 
 #if WITH_EDITOR
-			FMeshSectionInfoMap& SectionInfoMap = StaticMeshContext->StaticMesh->GetSectionInfoMap();
+			FMeshSectionInfoMap& SectionInfoMap = StaticMesh->GetSectionInfoMap();
 			FMeshSectionInfo MeshSectionInfo;
 			MeshSectionInfo.MaterialIndex = MaterialIndex;
 			MeshSectionInfo.bCastShadow = Section.bCastShadow;
