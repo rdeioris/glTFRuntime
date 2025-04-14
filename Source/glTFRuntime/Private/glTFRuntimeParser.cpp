@@ -2591,7 +2591,7 @@ bool FglTFRuntimeParser::RemapRuntimeLODBoneNames(FglTFRuntimeMeshLOD& RuntimeLO
 		{
 			Bone.BoneName = SkeletonConfig.BoneRemapper.Remapper.Execute(BoneIndex, Bone.BoneName, SkeletonConfig.BoneRemapper.Context);
 		}
-		
+
 		if (SkeletonConfig.BonesNameMap.Contains(Bone.BoneName))
 		{
 			FString BoneNameMapValue = SkeletonConfig.BonesNameMap[Bone.BoneName];
@@ -6521,9 +6521,12 @@ TArray<FString> FglTFRuntimeParser::GetAnimationsNames(const bool bIncludeUnname
 	{
 		const TSharedRef<FJsonObject>& Animation = Animations[AnimationIndex];
 		FString Name;
-		if (bIncludeUnnameds && (!Animation->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty()))
+		if (!Animation->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty())
 		{
-			Name = FString::Printf(TEXT("Animation_%d"), AnimationIndex);
+			if (bIncludeUnnameds)
+			{
+				Name = FString::Printf(TEXT("Animation_%d"), AnimationIndex);
+			}
 		}
 
 		if (!Name.IsEmpty())

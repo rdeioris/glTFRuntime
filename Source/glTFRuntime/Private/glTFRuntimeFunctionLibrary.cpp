@@ -64,7 +64,6 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& 
 		{
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename, OverrideConfig);
 
-
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
 				{
 					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
@@ -152,6 +151,68 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64Async(const FString& Ba
 			}
 
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(BytesBase64, LoaderConfig);
+
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+				{
+					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
+					{
+						Completed.ExecuteIfBound(Asset);
+					}
+					else
+					{
+						Completed.ExecuteIfBound(nullptr);
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		});
+}
+
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUTF8String(const FString& String, const FglTFRuntimeConfig& LoaderConfig)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		return nullptr;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+#if ENGINE_MAJOR_VERSION >= 5
+	auto UTF8String = StringCast<UTF8CHAR>(*String);
+#else
+	FTCHARToUTF8 UTF8String(*String);
+#endif
+
+	if (!Asset->LoadFromData(reinterpret_cast<const uint8*>(UTF8String.Get()), UTF8String.Length(), LoaderConfig))
+	{
+		return nullptr;
+	}
+
+	return Asset;
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUTF8StringAsync(const FString& String, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+{
+	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
+	if (!Asset)
+	{
+		Completed.ExecuteIfBound(nullptr);
+		return;
+	}
+
+	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
+	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+
+	Async(EAsyncExecution::Thread, [String, Asset, LoaderConfig, Completed]()
+		{
+#if ENGINE_MAJOR_VERSION >= 5
+			auto UTF8String = StringCast<UTF8CHAR>(*String);
+#else
+			FTCHARToUTF8 UTF8String(*String);
+#endif
+
+			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(reinterpret_cast<const uint8*>(UTF8String.Get()), UTF8String.Length(), LoaderConfig);
 
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
 				{
@@ -301,6 +362,68 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const
 			}
 			Completed.ExecuteIfBound(Asset);
 		}, Completed, LoaderConfig);
+
+	HttpRequest->ProcessRequest();
+}
+
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithCache(const FString& Url, const FString& CacheFilename, const TMap<FString, FString>& Headers, const bool bUseCacheOnError, const FglTFRuntimeHttpResponse& Completed, const FglTFRuntimeConfig& LoaderConfig)
+{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+#else
+	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
+#endif
+
+	HttpRequest->SetURL(Url);
+
+	bool bCacheFileValid = false;
+
+	if (!CacheFilename.IsEmpty() && FPaths::FileExists(CacheFilename))
+	{
+		const FDateTime ModificationTime = IFileManager::Get().GetTimeStamp(*CacheFilename);
+		HttpRequest->AppendToHeader("If-Modified-Since", ModificationTime.ToHttpDate());
+		bCacheFileValid = true;
+	}
+
+	for (TPair<FString, FString> Header : Headers)
+	{
+		HttpRequest->AppendToHeader(Header.Key, Header.Value);
+	}
+
+	float StartTime = FPlatformTime::Seconds();
+
+	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime, bCacheFileValid, bUseCacheOnError](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig, const FString& CacheFilename)
+		{
+			UglTFRuntimeAsset* Asset = nullptr;
+			if (!IsGarbageCollecting())
+			{
+				if (bSuccess)
+				{
+					if (ResponsePtr->GetResponseCode() == 304 && bCacheFileValid)
+					{
+						Asset = glTFLoadAssetFromFilename(CacheFilename, false, LoaderConfig);
+					}
+					else
+					{
+						if (!CacheFilename.IsEmpty())
+						{
+							FFileHelper::SaveArrayToFile(ResponsePtr->GetContent(), *CacheFilename);
+						}
+						Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+					}
+				}
+				else if (bCacheFileValid && bUseCacheOnError)
+				{
+					Asset = glTFLoadAssetFromFilename(CacheFilename, false, LoaderConfig);
+				}
+
+				if (Asset)
+				{
+					Asset->GetParser()->SetDownloadTime(FPlatformTime::Seconds() - StartTime);
+				}
+			}
+			Completed.ExecuteIfBound(Asset);
+		}, Completed, LoaderConfig, CacheFilename);
 
 	HttpRequest->ProcessRequest();
 }
