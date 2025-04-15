@@ -75,6 +75,8 @@ struct FglTFRuntimeSkeletalMeshContextFinalizer
 					SkeletalMeshContext->SkeletalMesh = SkeletalMeshContext->Parser->FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
 				}
 				AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
+				// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
+				SkeletalMeshContext->UnregisterGCObject();
 			}, TStatId(), nullptr, ENamedThreads::GameThread);
 		FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 	}

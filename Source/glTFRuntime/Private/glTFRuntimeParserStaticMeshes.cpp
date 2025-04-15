@@ -1289,6 +1289,8 @@ void FglTFRuntimeParser::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndice
 					}
 
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
+					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
+					StaticMeshContext->UnregisterGCObject();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
@@ -1580,6 +1582,8 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 					}
 
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
+					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
+					StaticMeshContext->UnregisterGCObject();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
@@ -1642,6 +1646,8 @@ void FglTFRuntimeParser::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRu
 					}
 
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
+					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
+					StaticMeshContext->UnregisterGCObject();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		}
