@@ -1317,6 +1317,8 @@ struct FglTFRuntimePathItem
 DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FString, FglTFRuntimeAnimationCurveRemapper, const int32, NodeIndex, const FString&, CurveName, const FString&, Path, UObject*, Context);
 DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FVector, FglTFRuntimeAnimationFrameTranslationRemapper, const FString&, CurveName, const int32, FrameNumber, FVector, Translation, UObject*, Context);
 DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(FRotator, FglTFRuntimeAnimationFrameRotationRemapper, const FString&, CurveName, const int32, FrameNumber, FRotator, Rotation, UObject*, Context);
+DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(float, FglTFRuntimeAnimationFrameMorphTargetWeightRemapper, const FString&, CurveName, const int32, FrameNumber, float, Weight, UObject*, Context);
+
 
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalAnimationCurveRemapperHook
@@ -1349,6 +1351,18 @@ struct FglTFRuntimeSkeletalAnimationFrameRotationRemapperHook
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FglTFRuntimeAnimationFrameRotationRemapper Remapper;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+};
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeSkeletalAnimationFrameMorphTargetWeightRemapperHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeAnimationFrameMorphTargetWeightRemapper Remapper;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	UObject* Context = nullptr;
@@ -1424,6 +1438,9 @@ struct FglTFRuntimeSkeletalAnimationConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	UPoseAsset* PoseForRetargeting;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeSkeletalAnimationFrameMorphTargetWeightRemapperHook FrameMorphTargetWeightRemapper;
 
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
@@ -2325,7 +2342,7 @@ public:
 	void LoadSkeletalMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 
 	UAnimSequence* LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
-	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+	UAnimSequence* LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const bool bCaseSensitive = false);
 	UAnimSequence* LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	TMap<FString, UAnimSequence*> LoadNodeSkeletalAnimationsMap(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	USkeleton* LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
@@ -2618,7 +2635,7 @@ protected:
 	bool FillLODSkeleton(FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const TArray<FglTFRuntimeBone>& Skeleton);
 	bool TraverseJoints(FReferenceSkeletonModifier& Modifier, const int32 RootIndex, int32 Parent, const FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 
-	bool GetMorphTargetNames(const int32 MeshIndex, TArray<FName>& MorphTargetNames);
+	bool GetMorphTargetNames(const int32 MeshIndex, TArray<FString>& MorphTargetNames);
 
 	void FixNodeParent(FglTFRuntimeNode& Node);
 

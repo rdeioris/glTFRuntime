@@ -5143,7 +5143,7 @@ bool FglTFRuntimeParser::MeshHasMorphTargets(const int32 MeshIndex) const
 	return false;
 }
 
-bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName>& MorphTargetNames)
+bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FString>& MorphTargetNames)
 {
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 	if (!JsonMeshObject)
@@ -5188,7 +5188,7 @@ bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName
 
 		for (int32 MorphIndex = 0; MorphIndex < JsonTargetsArray->Num(); MorphIndex++)
 		{
-			FName MorphTargetName = FName(FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++));
+			const FString MorphTargetName = FString::Printf(TEXT("MorphTarget_%d"), MorphTargetIndex++);
 			MorphTargetNames.Add(MorphTargetName);
 		}
 
@@ -5206,7 +5206,7 @@ bool FglTFRuntimeParser::GetMorphTargetNames(const int32 MeshIndex, TArray<FName
 			{
 				if (MorphTargetNames.IsValidIndex(TargetNameIndex))
 				{
-					MorphTargetNames[TargetNameIndex] = FName((*JsonTargetNamesArray)[TargetNameIndex]->AsString());
+					MorphTargetNames[TargetNameIndex] = (*JsonTargetNamesArray)[TargetNameIndex]->AsString();
 				}
 			}
 		}

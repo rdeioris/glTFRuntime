@@ -1777,7 +1777,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString& NodeName,
 		});
 }
 
-UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const bool bCaseSensitive)
 {
 	if (!SkeletalMesh)
 	{
@@ -1802,7 +1802,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 		FString JsonAnimationName;
 		if (JsonAnimationObject->TryGetStringField(TEXT("name"), JsonAnimationName))
 		{
-			if (JsonAnimationName == AnimationName)
+			if (JsonAnimationName.Equals(AnimationName, bCaseSensitive ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase))
 			{
 				return LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, SkeletalAnimationConfig);
 			}
@@ -3671,7 +3671,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			}
 			else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
 			{
-				TArray<FName> MorphTargetNames;
+				TArray<FString> MorphTargetNames;
 				if (!GetMorphTargetNames(Node.MeshIndex, MorphTargetNames))
 				{
 					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Mesh %d has no MorphTargets"), Node.Index));
@@ -3686,15 +3686,29 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 				for (int32 MorphTargetIndex = 0; MorphTargetIndex < MorphTargetNames.Num(); MorphTargetIndex++)
 				{
-					FName MorphTargetName = MorphTargetNames[MorphTargetIndex];
+					FString MorphTargetName = MorphTargetNames[MorphTargetIndex];
+					if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
+					{
+						const FString NewMorphTargetName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(Node.Index, MorphTargetName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
+						// morph target curves cannot be discarded
+						if (!NewMorphTargetName.IsEmpty())
+						{
+							MorphTargetName = NewMorphTargetName;
+						}
+					}
 					TArray<TPair<float, float>> Curves;
 
 					for (int32 TimelineIndex = 0; TimelineIndex < Curve.Timeline.Num(); TimelineIndex++)
 					{
-						TPair<float, float> NewCurve = TPair<float, float>(Curve.Timeline[TimelineIndex], Curve.Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
+						float MorphTargetCurveValue = Curve.Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X;
+						if (SkeletalAnimationConfig.FrameMorphTargetWeightRemapper.Remapper.IsBound())
+						{
+							MorphTargetCurveValue = SkeletalAnimationConfig.FrameMorphTargetWeightRemapper.Remapper.Execute(MorphTargetName, TimelineIndex, MorphTargetCurveValue, SkeletalAnimationConfig.FrameMorphTargetWeightRemapper.Context);
+						}
+						TPair<float, float> NewCurve = TPair<float, float>(Curve.Timeline[TimelineIndex], MorphTargetCurveValue);
 						Curves.Add(NewCurve);
 					}
-					MorphTargetCurves.Add(MorphTargetName, Curves);
+					MorphTargetCurves.Add(*MorphTargetName, Curves);
 				}
 			}
 		};
