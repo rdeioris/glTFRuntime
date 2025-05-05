@@ -2061,6 +2061,8 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 
 	AnimSequence->SetSkeleton(Skeleton);
 
+	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
+
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
 	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
@@ -2124,8 +2126,6 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 #endif
 #endif
 
-	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
-
 	bool bHasTracks = false;
 	for (TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
 	{
@@ -2153,6 +2153,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 		AnimSequence->AddNewRawTrack(BoneName, &Pair.Value);
 #endif
 #else
+		const int32 BoneIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(BoneName);
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
 #endif
 		bHasTracks = true;
