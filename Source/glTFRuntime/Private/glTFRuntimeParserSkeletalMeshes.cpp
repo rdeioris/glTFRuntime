@@ -75,7 +75,7 @@ struct FglTFRuntimeSkeletalMeshContextFinalizer
 					SkeletalMeshContext->SkeletalMesh = SkeletalMeshContext->Parser->FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
 				}
 				AsyncCallback.ExecuteIfBound(SkeletalMeshContext->SkeletalMesh);
-#if ENGINE_MAJOR_VERSION >= 5
+#if (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2) || ENGINE_MAJOR_VERSION > 5
 				// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
 				SkeletalMeshContext->UnregisterGCObject();
 #endif
@@ -2147,7 +2147,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
 		FBoneAnimationTrack BoneTrack;
 		BoneTrack.Name = BoneName;
-		BoneTrack.BoneTreeIndex = BoneIndex;
+		BoneTrack.BoneTreeIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(BoneName);
 		BoneTrack.InternalTrackData = Pair.Value;
 		BoneTracks.Add(BoneTrack);
 #endif

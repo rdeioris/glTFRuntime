@@ -106,7 +106,7 @@ void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFR
 					}
 
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
-#if ENGINE_MAJOR_VERSION >= 5
+#if (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2) || ENGINE_MAJOR_VERSION > 5
 					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
 					StaticMeshContext->UnregisterGCObject();
 #endif
@@ -1291,7 +1291,7 @@ void FglTFRuntimeParser::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndice
 					}
 
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
-#if ENGINE_MAJOR_VERSION >= 5
+#if (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2) || ENGINE_MAJOR_VERSION > 5
 					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
 					StaticMeshContext->UnregisterGCObject();
 #endif
@@ -1586,7 +1586,7 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 					}
 
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
-#if ENGINE_MAJOR_VERSION >= 5
+#if (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2) || ENGINE_MAJOR_VERSION > 5
 					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
 					StaticMeshContext->UnregisterGCObject();
 #endif
@@ -1652,7 +1652,7 @@ void FglTFRuntimeParser::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRu
 					}
 
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
-#if ENGINE_MAJOR_VERSION >= 5
+#if (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2) || ENGINE_MAJOR_VERSION > 5
 					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
 					StaticMeshContext->UnregisterGCObject();
 #endif
