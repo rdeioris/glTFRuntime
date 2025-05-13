@@ -5317,7 +5317,7 @@ bool FglTFRuntimeArchiveZip::FromData(const uint8* DataPtr, const int64 DataNum)
 		FString Filename = FString(UTF8_TO_TCHAR(FilenameBytes.GetData()));
 
 		OffsetsMap.Add(Filename, EntryOffset);
-		GlobalSizeMap.Add(Filename, { GlobalCompressedSize, GlobalUncompressedSize });
+		GlobalSizeMap.Add(Filename, TPair<uint32, uint32>(GlobalCompressedSize, GlobalUncompressedSize));
 
 		CentralDirectoryOffset += CentralDirectoryMinSize + FilenameLen + ExtraFieldLen + EntryCommentLen;
 	}
