@@ -5284,10 +5284,17 @@ bool FglTFRuntimeArchiveZip::FromData(const uint8* DataPtr, const int64 DataNum)
 			return false;
 		}
 
+		uint32 GlobalCompressedSize = 0;
+		uint32 GlobalUncompressedSize = 0;
 		uint16 FilenameLen = 0;
 		uint16 ExtraFieldLen = 0;
 		uint16 EntryCommentLen = 0;
 		uint32 EntryOffset = 0;
+
+		// seek to CompressedSize
+		Data.Seek(CentralDirectoryOffset + 20);
+		Data << GlobalCompressedSize;
+		Data << GlobalUncompressedSize;
 
 		// seek to FilenameLen
 		Data.Seek(CentralDirectoryOffset + 28);
@@ -5310,6 +5317,7 @@ bool FglTFRuntimeArchiveZip::FromData(const uint8* DataPtr, const int64 DataNum)
 		FString Filename = FString(UTF8_TO_TCHAR(FilenameBytes.GetData()));
 
 		OffsetsMap.Add(Filename, EntryOffset);
+		GlobalSizeMap.Add(Filename, { GlobalCompressedSize, GlobalUncompressedSize });
 
 		CentralDirectoryOffset += CentralDirectoryMinSize + FilenameLen + ExtraFieldLen + EntryCommentLen;
 	}
@@ -5397,6 +5405,18 @@ bool FglTFRuntimeArchiveZip::GetFileContent(const FString& Filename, TArray64<ui
 		}
 
 		CompressedData = DecryptedData.GetData() + 12;
+	}
+
+	// for streamed zips
+
+	if (CompressedSize == 0 && GlobalSizeMap.Contains(Filename))
+	{
+		CompressedSize = GlobalSizeMap[Filename].Key;
+	}
+
+	if (UncompressedSize == 0 && GlobalSizeMap.Contains(Filename))
+	{
+		UncompressedSize = GlobalSizeMap[Filename].Value;
 	}
 
 	if (Compression == 8)

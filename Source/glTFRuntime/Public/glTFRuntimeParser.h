@@ -2146,6 +2146,7 @@ public:
 
 protected:
 	TMap<FString, uint32> OffsetsMap;
+	TMap<FString, TPair<uint32, uint32>> GlobalSizeMap;
 };
 
 class GLTFRUNTIME_API FglTFRuntimeArchiveZip : public FglTFRuntimeArchive
@@ -2352,6 +2353,8 @@ public:
 
 	UAnimSequence* LoadAndMergeSkeletalAnimationsByName(USkeletalMesh* SkeletalMesh, const TArray<FString> AnimationNames, const bool bIgnoreNonExistent, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
+	int32 GetAnimationIndexByName(const FString& AnimationName, const bool bCaseSensitive) const;
+
 	UAnimSequence* LoadSkeletalAnimationFromTracksAndMorphTargets(USkeletalMesh* SkeletalMesh, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 	UAnimSequence* LoadSkeletalAnimationFromTracksAndMorphTargets(USkeleton* Skeleton, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, const float Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 
@@ -2446,6 +2449,7 @@ public:
 	int32 GetJSONArraySizeFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 	FVector4 GetJSONVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 	TArray<FString> GetJSONObjectKeysFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+	TArray<FString> GetJSONStringArrayFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
 	bool GetStringMapFromExtras(const FString& Key, TMap<FString, FString>& StringMap) const;
 	bool GetStringArrayFromExtras(const FString& Key, TArray<FString>& StringArray) const;

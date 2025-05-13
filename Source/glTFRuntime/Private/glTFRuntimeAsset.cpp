@@ -837,6 +837,12 @@ TArray<FString> UglTFRuntimeAsset::GetObjectKeysFromPath(const TArray<FglTFRunti
 	return Parser->GetJSONObjectKeysFromPath(Path, bFound);
 }
 
+TArray<FString> UglTFRuntimeAsset::GetStringArrayFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	GLTF_CHECK_PARSER({});
+	return Parser->GetJSONStringArrayFromPath(Path, bFound);
+}
+
 FVector4 UglTFRuntimeAsset::GetVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(FVector4(0, 0, 0, 0));

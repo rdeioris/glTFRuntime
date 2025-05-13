@@ -229,6 +229,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
 	TArray<FString> GetObjectKeysFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
+	TArray<FString> GetStringArrayFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
 
