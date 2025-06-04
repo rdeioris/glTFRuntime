@@ -2,6 +2,7 @@
 
 
 #include "glTFRuntimeFunctionLibrary.h"
+#include "Animation/AnimSequence.h"
 #include "Async/Async.h"
 #include "HttpModule.h"
 #include "HAL/PlatformApplicationMisc.h"
@@ -9,6 +10,7 @@
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/Base64.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "GenericPlatform/GenericPlatformProcess.h"
 #include "Runtime/Launch/Resources/Version.h"
 

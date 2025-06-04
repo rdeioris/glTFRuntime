@@ -2103,10 +2103,22 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 #if !WITH_EDITOR
 	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
 	CompressionCodec->Tracks.AddDefaulted(BonesPoses.Num());
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.AddDefaulted(BonesPoses.Num());
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.AddDefaulted(BonesPoses.Num());
+#endif
 	for (int32 BoneIndex = 0; BoneIndex < BonesPoses.Num(); BoneIndex++)
 	{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+			AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable[BoneIndex] = BoneIndex;
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 		AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable[BoneIndex] = BoneIndex;
+#endif
 		for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -2281,7 +2293,13 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 3
 		FAnimCompressedCurveIndexedName IndexedName;
 		IndexedName.CurveName = Pair.Key;
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+			AnimSequence->CompressedData.IndexedCurveNames.Add(IndexedName);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 		AnimSequence->CompressedData.IndexedCurveNames.Add(IndexedName);
+#endif
 		const_cast<FCurveMetaData*>(AnimSequence->GetSkeleton()->GetCurveMetaData(Pair.Key))->Type.bMorphtarget = true;
 #else
 		AnimSequence->CompressedData.CompressedCurveNames.Add(SmartName);
@@ -2317,14 +2335,39 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 	AnimSequence->PostProcessSequence();
 #endif
 #else
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
+#endif
 #if ENGINE_MAJOR_VERSION > 4
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
 #endif
+#endif
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
+#endif
 	UglTFAnimCurveCompressionCodec* AnimCurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
 	AnimCurveCompressionCodec->AnimSequence = AnimSequence;
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->CompressedData.CurveCompressionCodec = AnimCurveCompressionCodec;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 	AnimSequence->CompressedData.CurveCompressionCodec = AnimCurveCompressionCodec;
+#endif
+
 	AnimSequence->PostLoad();
 #endif
 
@@ -2546,10 +2589,22 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh* Skelet
 #if !WITH_EDITOR
 	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
 	CompressionCodec->Tracks.AddDefaulted(BonesPoses.Num());
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.AddDefaulted(BonesPoses.Num());
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.AddDefaulted(BonesPoses.Num());
+#endif
 	for (int32 BoneIndex = 0; BoneIndex < BonesPoses.Num(); BoneIndex++)
 	{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+			AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable[BoneIndex] = BoneIndex;
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 		AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable[BoneIndex] = BoneIndex;
+#endif
 		for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
 		{
 #if ENGINE_MAJOR_VERSION > 4
@@ -2687,12 +2742,21 @@ UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh* Skelet
 	AnimSequence->PostProcessSequence();
 #endif
 #else
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
+	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
+	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
+	AnimSequence->CompressedData.CurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
 #if ENGINE_MAJOR_VERSION > 4
 	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
 #endif
 	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
 	AnimSequence->CompressedData.CurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
+#endif
 	AnimSequence->PostLoad();
 #endif
 
@@ -2902,7 +2966,13 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 3
 		FAnimCompressedCurveIndexedName IndexedName;
 		IndexedName.CurveName = Pair.Key;
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+			AnimSequence->CompressedData.IndexedCurveNames.Add(IndexedName);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 		AnimSequence->CompressedData.IndexedCurveNames.Add(IndexedName);
+#endif
 		const_cast<FCurveMetaData*>(AnimSequence->GetSkeleton()->GetCurveMetaData(Pair.Key))->Type.bMorphtarget = true;
 #else
 		AnimSequence->CompressedData.CompressedCurveNames.Add(SmartName);
@@ -2931,6 +3001,16 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 #endif
 #else
 	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
+	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
+	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
+	UglTFAnimCurveCompressionCodec* AnimCurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
+	AnimCurveCompressionCodec->AnimSequence = AnimSequence;
+	AnimSequence->CompressedData.CurveCompressionCodec = AnimCurveCompressionCodec;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
 	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
 #if ENGINE_MAJOR_VERSION > 4
 	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
@@ -2939,6 +3019,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	UglTFAnimCurveCompressionCodec* AnimCurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
 	AnimCurveCompressionCodec->AnimSequence = AnimSequence;
 	AnimSequence->CompressedData.CurveCompressionCodec = AnimCurveCompressionCodec;
+#endif
 	AnimSequence->PostLoad();
 #endif
 

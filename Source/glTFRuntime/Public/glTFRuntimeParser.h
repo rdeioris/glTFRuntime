@@ -146,6 +146,53 @@ struct FglTFRuntimeBasisMatrix
 	}
 };
 
+DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(FString, FglTFRuntimePasswordPrompt, const FString&, FileName, UObject*, Context);
+DECLARE_DELEGATE_RetVal_TwoParams(FString, FglTFRuntimeNativePasswordPrompt, const FString&, UObject*);
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimePasswordPromptHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimePasswordPrompt Prompt;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bReusePassword = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+
+	FglTFRuntimeNativePasswordPrompt NativePrompt;
+
+	bool IsBound() const
+	{
+		return Prompt.IsBound() || NativePrompt.IsBound();
+	}
+};
+
+DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(TArray<uint8>, FglTFRuntimeAESDecrypter, const uint8, AESEncryptionStrength, const TArray<uint8>&, EncryptedBytes, const TArray<uint8>&, Password, UObject*, Context);
+DECLARE_DELEGATE_RetVal_FourParams(TArray<uint8>, FglTFRuntimeNativeAESDecrypter, const uint8, const TArray<uint8>&, const TArray<uint8>&, UObject*);
+
+USTRUCT(BlueprintType)
+struct FglTFRuntimeAESDecrypterHook
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeAESDecrypter AESDecrypter;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	UObject* Context = nullptr;
+
+	FglTFRuntimeNativeAESDecrypter NativeAESDecrypter;
+
+	bool IsBound() const
+	{
+		return AESDecrypter.IsBound() || NativeAESDecrypter.IsBound();
+	}
+};
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeConfig
 {
@@ -206,6 +253,12 @@ struct FglTFRuntimeConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bNoArchive;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimePasswordPromptHook PasswordPromptHook;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FglTFRuntimeAESDecrypterHook AESDecrypterHook;
 
 	FglTFRuntimeConfig()
 	{
@@ -2157,6 +2210,9 @@ public:
 	bool GetFileContent(const FString& Filename, TArray64<uint8>& OutData) override;
 
 	void SetPassword(const FString& EncryptionKey);
+
+	FglTFRuntimePasswordPromptHook PromptHook;
+	FglTFRuntimeAESDecrypterHook AESDecrypterHook;
 
 protected:
 	FArrayReader Data;

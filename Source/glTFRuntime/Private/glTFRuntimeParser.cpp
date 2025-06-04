@@ -490,6 +490,16 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 			ZipFile->SetPassword(LoaderConfig.EncryptionKey);
 		}
 
+		if (LoaderConfig.PasswordPromptHook.IsBound())
+		{
+			ZipFile->PromptHook = LoaderConfig.PasswordPromptHook;
+		}
+
+		if (LoaderConfig.AESDecrypterHook.IsBound())
+		{
+			ZipFile->AESDecrypterHook = LoaderConfig.AESDecrypterHook;
+		}
+
 		if (!ZipFile->FromData(DataPtr, DataNum))
 		{
 			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to parse Zip archive."));
@@ -5365,48 +5375,6 @@ bool FglTFRuntimeArchiveZip::GetFileContent(const FString& Filename, TArray64<ui
 
 	const uint8* CompressedData = Data.GetData() + *Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen;
 
-	// encrypted ?
-	TArray64<uint8> DecryptedData;
-	if (Flags & 1 && Password.Num() > 0)
-	{
-		if (*Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen + CompressedSize + 12 > Data.Num())
-		{
-			return false;
-		}
-		DecryptedData.AddUninitialized(CompressedSize + 12);
-
-		uint32 Key0 = 305419896;
-		uint32 Key1 = 591751049;
-		uint32 Key2 = 878082192;
-
-		auto Crc32 = [](const uint8 Byte, const uint32 Crc) -> uint32
-			{
-				return (Crc >> 8) ^ FCrc::CRCTablesSB8[0][(Crc ^ Byte) & 0xFF];
-			};
-
-		auto UpdateKeys = [&Key0, &Key1, &Key2, &Crc32](const uint8 Byte)
-			{
-				Key0 = Crc32(Byte, Key0);
-				Key1 = Key1 + (Key0 & 0xFF);
-				Key1 = Key1 * 134775813 + 1;
-				Key2 = Crc32(Key1 >> 24, Key2);
-			};
-
-		for (const uint8& Byte : Password)
-		{
-			UpdateKeys(Byte);
-		}
-
-		for (int64 EncryptedIndex = 0; EncryptedIndex < CompressedSize + 12; EncryptedIndex++)
-		{
-			const uint16 Temp = Key2 | 2;
-			DecryptedData[EncryptedIndex] = CompressedData[EncryptedIndex] ^ ((Temp * (Temp ^ 1)) >> 8);
-			UpdateKeys(DecryptedData[EncryptedIndex]);
-		}
-
-		CompressedData = DecryptedData.GetData() + 12;
-	}
-
 	// for streamed zips
 
 	if (CompressedSize == 0 && GlobalSizeMap.Contains(Filename))
@@ -5417,6 +5385,184 @@ bool FglTFRuntimeArchiveZip::GetFileContent(const FString& Filename, TArray64<ui
 	if (UncompressedSize == 0 && GlobalSizeMap.Contains(Filename))
 	{
 		UncompressedSize = GlobalSizeMap[Filename].Value;
+	}
+
+	// encrypted ?
+
+	// first check for password prompt
+	bool bClearPassword = false;
+	if (Flags & 1 && Password.Num() <= 0 && PromptHook.IsBound())
+	{
+		if (IsInGameThread())
+		{
+			if (PromptHook.Prompt.IsBound())
+			{
+				SetPassword(PromptHook.Prompt.Execute(Filename, PromptHook.Context));
+			}
+			else if (PromptHook.NativePrompt.IsBound())
+			{
+				SetPassword(PromptHook.NativePrompt.Execute(Filename, PromptHook.Context));
+			}
+		}
+		else
+		{
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
+				{
+					if (PromptHook.Prompt.IsBound())
+					{
+						SetPassword(PromptHook.Prompt.Execute(Filename, PromptHook.Context));
+					}
+					else if (PromptHook.NativePrompt.IsBound())
+					{
+						SetPassword(PromptHook.NativePrompt.Execute(Filename, PromptHook.Context));
+					}
+				}, TStatId(), nullptr, ENamedThreads::GameThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+		}
+
+		bClearPassword = !PromptHook.bReusePassword;
+	}
+
+	TArray64<uint8> DecryptedData;
+	if (Flags & 1)
+	{
+		if (Password.Num() <= 0)
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("No ZIP Decryption key provided"));
+			return false;
+		}
+
+		if (Compression == 99) // AES?
+		{
+			if (!AESDecrypterHook.IsBound())
+			{
+				return false;
+			}
+
+			// TODO, probably I should generalize it to allow custom fields to be managed by the user
+			TArray64<uint8> ExtraField;
+			ExtraField.Append(Data.GetData() + *Offset + LocalEntryMinSize + FilenameLen, ExtraFieldLen);
+			uint32 ExtraFieldsOffset = 0;
+			// 0 is not a valid AES strength so it acts as a marker
+			uint8 AESEncryptionStrength = 0;
+
+			while (ExtraFieldsOffset < ExtraFieldLen)
+			{
+				if ((ExtraFieldsOffset + sizeof(uint16) + sizeof(uint16)) > ExtraFieldLen)
+				{
+					return false;
+				}
+
+				const uint16* ExtraFieldType = reinterpret_cast<const uint16*>(ExtraField.GetData() + ExtraFieldsOffset);
+				const uint16* ExtraFieldSize = reinterpret_cast<const uint16*>(ExtraField.GetData() + ExtraFieldsOffset + sizeof(uint16));
+
+				ExtraFieldsOffset += sizeof(uint16) + sizeof(uint16);
+				if ((ExtraFieldsOffset + *ExtraFieldSize) > ExtraFieldLen)
+				{
+					return false;
+				}
+
+				if (*ExtraFieldType == 0x9901)
+				{
+					// AES
+					if (*ExtraFieldSize < 7)
+					{
+						return false;
+					}
+
+					const uint16* AESZipVersion = reinterpret_cast<const uint16*>(ExtraField.GetData() + ExtraFieldsOffset);
+					const uint16* AESZipVendor = reinterpret_cast<const uint16*>(ExtraField.GetData() + ExtraFieldsOffset + sizeof(uint16));
+					AESEncryptionStrength = *(ExtraField.GetData() + ExtraFieldsOffset + sizeof(uint16) + sizeof(uint16));
+					Compression = *(reinterpret_cast<const uint16*>(ExtraField.GetData() + ExtraFieldsOffset + sizeof(uint16) + sizeof(uint16) + sizeof(uint8)));
+					break;
+				}
+
+				ExtraFieldsOffset += *ExtraFieldSize;
+			}
+
+			if (AESEncryptionStrength == 0)
+			{
+				return false;
+			}
+
+			TArray<uint8> EnryptedData;
+			EnryptedData.Append(CompressedData, CompressedSize);
+
+			if (IsInGameThread())
+			{
+				if (AESDecrypterHook.AESDecrypter.IsBound())
+				{
+					DecryptedData = AESDecrypterHook.AESDecrypter.Execute(AESEncryptionStrength, EnryptedData, Password, AESDecrypterHook.Context);
+				}
+				else if (AESDecrypterHook.NativeAESDecrypter.IsBound())
+				{
+					DecryptedData = AESDecrypterHook.NativeAESDecrypter.Execute(AESEncryptionStrength, EnryptedData, Password, AESDecrypterHook.Context);
+				}
+			}
+			else
+			{
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
+					{
+						if (AESDecrypterHook.AESDecrypter.IsBound())
+						{
+							DecryptedData = AESDecrypterHook.AESDecrypter.Execute(AESEncryptionStrength, EnryptedData, Password, AESDecrypterHook.Context);
+						}
+						else if (AESDecrypterHook.NativeAESDecrypter.IsBound())
+						{
+							DecryptedData = AESDecrypterHook.NativeAESDecrypter.Execute(AESEncryptionStrength, EnryptedData, Password, AESDecrypterHook.Context);
+						}
+					}, TStatId(), nullptr, ENamedThreads::GameThread);
+				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+			}
+
+			CompressedData = DecryptedData.GetData();
+			CompressedSize = DecryptedData.Num();
+		}
+		else // ZipCrypto?
+		{
+			if (*Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen + CompressedSize + 12 > Data.Num())
+			{
+				return false;
+			}
+			DecryptedData.AddUninitialized(CompressedSize + 12);
+
+			uint32 Key0 = 305419896;
+			uint32 Key1 = 591751049;
+			uint32 Key2 = 878082192;
+
+			auto Crc32 = [](const uint8 Byte, const uint32 Crc) -> uint32
+				{
+					return (Crc >> 8) ^ FCrc::CRCTablesSB8[0][(Crc ^ Byte) & 0xFF];
+				};
+
+			auto UpdateKeys = [&Key0, &Key1, &Key2, &Crc32](const uint8 Byte)
+				{
+					Key0 = Crc32(Byte, Key0);
+					Key1 = Key1 + (Key0 & 0xFF);
+					Key1 = Key1 * 134775813 + 1;
+					Key2 = Crc32(Key1 >> 24, Key2);
+				};
+
+			for (const uint8& Byte : Password)
+			{
+				UpdateKeys(Byte);
+			}
+
+			for (int64 EncryptedIndex = 0; EncryptedIndex < CompressedSize + 12; EncryptedIndex++)
+			{
+				const uint16 Temp = Key2 | 2;
+				DecryptedData[EncryptedIndex] = CompressedData[EncryptedIndex] ^ ((Temp * (Temp ^ 1)) >> 8);
+				UpdateKeys(DecryptedData[EncryptedIndex]);
+			}
+
+			CompressedData = DecryptedData.GetData() + 12;
+			CompressedSize = DecryptedData.Num() - 12;
+		}
+	}
+
+	if (bClearPassword)
+	{
+		SetPassword(TEXT(""));
 	}
 
 	if (Compression == 8)
@@ -5433,6 +5579,7 @@ bool FglTFRuntimeArchiveZip::GetFileContent(const FString& Filename, TArray64<ui
 	}
 	else
 	{
+		UE_LOG(LogGLTFRuntime, Error, TEXT("Unknown ZIP Compression format"));
 		return false;
 	}
 
