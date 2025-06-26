@@ -1,4 +1,4 @@
-// Copyright 2020-2022, Roberto De Ioris.
+// Copyright 2020-2025, Roberto De Ioris.
 
 #include "glTFRuntimeEditor.h"
 
@@ -14,6 +14,66 @@
 
 static const FText LoadGLTFText = FText::FromString("Load GLTF Asset from File");
 static const FText LoadGLTFTextFromClipboard = FText::FromString("Load GLTF Asset from Clipboard");
+
+#include "Widgets/SCompoundWidget.h"
+
+// WIP: generalize it
+class SPasswordPromptWidget : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SPasswordPromptWidget) {}
+		SLATE_ARGUMENT(TWeakPtr<SWindow>, ParentWindow)
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs)
+	{
+		ParentWindow = InArgs._ParentWindow;
+
+		ChildSlot
+			[
+				SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.FillWidth(0.8)
+					.Padding(4)
+					[
+						SAssignNew(PasswordTextBox, SEditableTextBox).IsPassword(true)
+						.OnTextCommitted(this, &SPasswordPromptWidget::OnPasswordCommitted)
+					]
+					+ SHorizontalBox::Slot()
+					.FillWidth(0.2)
+					.HAlign(HAlign_Right)
+					.Padding(4)
+					[
+						SNew(SButton)
+							.Text(FText::FromString("OK"))
+							.OnClicked(this, &SPasswordPromptWidget::OnConfirmClicked)
+					]
+			];
+	}
+
+	FString GetPassword() const
+	{
+		return PasswordTextBox->GetText().ToString();
+	}
+
+private:
+	TWeakPtr<SWindow> ParentWindow;
+	TSharedPtr<SEditableTextBox> PasswordTextBox;
+
+	void OnPasswordCommitted(const FText& Text, ETextCommit::Type CommitType)
+	{
+		OnConfirmClicked();
+	}
+
+	FReply OnConfirmClicked()
+	{
+		if (ParentWindow.IsValid())
+		{
+			ParentWindow.Pin()->RequestDestroyWindow();
+		}
+		return FReply::Handled();
+	}
+};
 
 void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 {
@@ -33,6 +93,20 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 		{
 			FglTFRuntimeConfig LoaderConfig;
 			LoaderConfig.bAllowExternalFiles = true;
+			LoaderConfig.PasswordPromptHook.bReusePassword = true;
+			LoaderConfig.PasswordPromptHook.NativePrompt.BindLambda([](const FString& Filename, UObject* Context)
+				{
+					TSharedRef<SWindow> PasswordWindow = SNew(SWindow)
+						.Title(FText::FromString("Archive password"))
+						.ClientSize(FVector2D(300, 30))
+						.SupportsMinimize(false).SupportsMaximize(false);
+
+					TSharedRef<SPasswordPromptWidget> PasswordPromptWidget = SNew(SPasswordPromptWidget).ParentWindow(PasswordWindow);
+					PasswordWindow->SetContent(PasswordPromptWidget);
+
+					FSlateApplication::Get().AddModalWindow(PasswordWindow, nullptr);
+					return PasswordPromptWidget->GetPassword();
+				});
 			UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(OutFilenames[0], false, LoaderConfig);
 			if (Asset)
 			{
@@ -40,7 +114,7 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 				AglTFRuntimeAssetActor* NewActor = LevelEditorModule.GetFirstLevelEditor()->GetWorld()->SpawnActorDeferred<AglTFRuntimeAssetActor>(AglTFRuntimeAssetActor::StaticClass(), Transform);
 				if (NewActor)
 				{
-                    NewActor->SetFlags(RF_Transient);
+					NewActor->SetFlags(RF_Transient);
 					NewActor->Asset = Asset;
 					NewActor->bAllowSkeletalAnimations = false;
 					NewActor->bAllowNodeAnimations = false;

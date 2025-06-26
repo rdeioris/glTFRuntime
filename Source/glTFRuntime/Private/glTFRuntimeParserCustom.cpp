@@ -185,3 +185,36 @@ TArray<FString> FglTFRuntimeParser::GetJSONObjectKeysFromPath(const TArray<FglTF
 
 	return Keys;
 }
+
+TArray<FString> FglTFRuntimeParser::GetJSONStringArrayFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	bFound = false;
+	TArray<FString> Strings;
+
+	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
+	if (CurrentObject)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* IsArray = nullptr;
+		bFound = CurrentObject->TryGetArray(IsArray);
+		if (!bFound)
+		{
+			return {};
+		}
+
+		for (int32 Index = 0; Index < IsArray->Num(); Index++)
+		{
+			FString Value;
+			if ((*IsArray)[Index]->TryGetString(Value))
+			{
+				Strings.Add(Value);
+			}
+			else
+			{
+				Strings.Add("");
+			}
+		}
+
+	}
+
+	return Strings;
+}

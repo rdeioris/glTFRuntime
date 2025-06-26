@@ -625,11 +625,11 @@ UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalM
 	return Parser->LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, SkeletalAnimationConfig);
 }
 
-UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const bool bCaseSensitive)
 {
 	GLTF_CHECK_PARSER(nullptr);
 
-	return Parser->LoadSkeletalAnimationByName(SkeletalMesh, AnimationName, SkeletalAnimationConfig);
+	return Parser->LoadSkeletalAnimationByName(SkeletalMesh, AnimationName, SkeletalAnimationConfig, bCaseSensitive);
 }
 
 UAnimSequence* UglTFRuntimeAsset::LoadAndMergeSkeletalAnimations(USkeletalMesh* SkeletalMesh, const TArray<int32> AnimationIndices, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
@@ -895,6 +895,12 @@ TArray<FString> UglTFRuntimeAsset::GetObjectKeysFromPath(const TArray<FglTFRunti
 {
 	GLTF_CHECK_PARSER({});
 	return Parser->GetJSONObjectKeysFromPath(Path, bFound);
+}
+
+TArray<FString> UglTFRuntimeAsset::GetStringArrayFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	GLTF_CHECK_PARSER({});
+	return Parser->GetJSONStringArrayFromPath(Path, bFound);
 }
 
 FVector4 UglTFRuntimeAsset::GetVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
