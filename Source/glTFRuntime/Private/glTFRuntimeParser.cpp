@@ -1598,13 +1598,28 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 	}
 
 	Matrix.ScaleTranslation(FVector(SceneScale, SceneScale, SceneScale));
-	Node.Transform = FTransform(SceneBasis.Inverse() * Matrix * SceneBasis);
+
+	const FMatrix FinalMatrix = SceneBasis.Inverse() * Matrix * SceneBasis;
+	Node.Transform = FTransform(FinalMatrix);
 	// this is a hack for allowing very small scaling factors (common in quantized meshes)
 	// it is required as the FTransform ctor generates 0 scaling for small numbers
 	if (bMatrixScaleNeedsToBeReapplied)
 	{
 		Node.Transform.SetScale3D(MatrixScaleToReapply);
 	}
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 6
+	// workaround for double/float loss of precision in UE < 5.6
+	else
+	{
+		const FVector CurrentScale = Node.Transform.GetScale3D();
+		if (CurrentScale.X == 0.0 || CurrentScale.Y == 0.0 || CurrentScale.Z == 0.0)
+		{
+			FMatrix FinalMatrixCopy = FinalMatrix;
+			Node.Transform.SetScale3D(FinalMatrixCopy.ExtractScaling(0));
+			Node.Transform.SetRotation(FinalMatrixCopy.ToQuat());
+		}
+	}
+#endif
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonChildren;
 	if (JsonNodeObject->TryGetArrayField(TEXT("children"), JsonChildren))
