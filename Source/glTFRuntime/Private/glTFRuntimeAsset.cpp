@@ -1359,6 +1359,12 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODs(const TArray<FglTF
 	return Parser->LoadStaticMeshFromRuntimeLODs(RuntimeLODs, StaticMeshConfig);
 }
 
+UGeometryCache* UglTFRuntimeAsset::LoadGeometryCacheFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+	return Parser->LoadGeometryCacheFromRuntimeLODs(RuntimeLODs, StaticMeshConfig);
+}
+
 bool UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, int32& SkinIndex, const int32 OverrideSkinIndex, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
 {
 	GLTF_CHECK_PARSER(false);

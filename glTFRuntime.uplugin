@@ -32,6 +32,10 @@
     {
       "Name": "ProceduralMeshComponent",
       "Enabled": true
+    },
+    {
+      "Name": "GeometryCache",
+      "Enabled": true
     }
   ]
 }

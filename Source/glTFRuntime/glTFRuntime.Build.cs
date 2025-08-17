@@ -25,7 +25,8 @@ public class glTFRuntime : ModuleRules
             new string[]
             {
                 "Core",
-                "ProceduralMeshComponent"
+                "ProceduralMeshComponent",
+                "GeometryCache"
             }
             );
 
