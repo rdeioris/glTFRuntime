@@ -205,9 +205,6 @@ public:
 	UFUNCTION()
 	void OnSkeletalMeshCreatedProxy(USkeletalMesh* SkeletalMesh);
 
-	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ProceduralMeshConfig", AutoCreateRefTerm = "ProceduralMeshConfig"), Category = "glTFRuntime")
-	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
-
 	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
 	FString GetStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
@@ -371,9 +368,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	FString GetBaseFilename() const;
-
-	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "StaticMeshConfig", AutoCreateRefTerm = "StaticMeshConfig"), Category = "glTFRuntime")
-	UGeometryCache* LoadGeometryCacheFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig);
 
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;

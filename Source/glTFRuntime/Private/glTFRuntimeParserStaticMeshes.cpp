@@ -12,7 +12,6 @@
 #include "PhysicsEngine/BodySetup.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "StaticMeshResources.h"
-#include "glTFRuntimeGeometryCacheTrack.h"
 #if ENGINE_MAJOR_VERSION >= 5
 #if ENGINE_MINOR_VERSION < 2
 #include "MeshCardRepresentation.h"
@@ -1301,61 +1300,6 @@ void FglTFRuntimeParser::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndice
 		});
 }
 
-bool FglTFRuntimeParser::LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig)
-{
-	if (!ProceduralMeshComponent)
-	{
-		return false;
-	}
-
-	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
-	if (!JsonMeshObject)
-	{
-		return false;
-	}
-
-	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, ProceduralMeshConfig.MaterialsConfig, true))
-	{
-		return false;
-	}
-
-	ProceduralMeshComponent->bUseComplexAsSimpleCollision = ProceduralMeshConfig.bUseComplexAsSimpleCollision;
-
-	int32 SectionIndex = ProceduralMeshComponent->GetNumSections();
-	for (FglTFRuntimePrimitive& Primitive : Primitives)
-	{
-		TArray<FVector2D> UV;
-		if (Primitive.UVs.Num() > 0)
-		{
-			UV = Primitive.UVs[0];
-		}
-		TArray<int32> Triangles;
-		Triangles.AddUninitialized(Primitive.Indices.Num());
-		for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
-		{
-			Triangles[Index] = Primitive.Indices[Index];
-		}
-		TArray<FLinearColor> Colors;
-		Colors.AddUninitialized(Primitive.Colors.Num());
-		for (int32 Index = 0; Index < Primitive.Colors.Num(); Index++)
-		{
-			Colors[Index] = FLinearColor(Primitive.Colors[Index]);
-		}
-		TArray<FProcMeshTangent> Tangents;
-		Tangents.AddUninitialized(Primitive.Tangents.Num());
-		for (int32 Index = 0; Index < Primitive.Tangents.Num(); Index++)
-		{
-			Tangents[Index] = FProcMeshTangent(Primitive.Tangents[Index], false);
-		}
-		ProceduralMeshComponent->CreateMeshSection_LinearColor(SectionIndex, Primitive.Positions, Triangles, Primitive.Normals, UV, Colors, Tangents, ProceduralMeshConfig.bBuildSimpleCollision);
-		ProceduralMeshComponent->SetMaterial(SectionIndex, Primitive.Material);
-		SectionIndex++;
-	}
-
-	return true;
-}
-
 UStaticMesh* FglTFRuntimeParser::LoadStaticMeshByName(const FString Name, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 	const TArray<TSharedPtr<FJsonValue>>* JsonMeshes;
@@ -1630,43 +1574,6 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshFromRuntimeLODs(const TArray<FglT
 	}
 
 	return FinalizeStaticMesh(StaticMeshContext);
-}
-
-const bool UglTFRuntimeGeometryCacheTrack::UpdateBoundsData(const float Time, const bool bLooping, const bool bIsPlayingBackward, int32& InOutBoundsSampleIndex, FBox& OutBounds)
-{
-	InOutBoundsSampleIndex = 0;
-	OutBounds = FBox::BuildAABB(FVector::ZeroVector, FVector(300, 300, 300));
-	UE_LOG(LogTemp, Error, TEXT("UpdateBoundsData %f %d %d %d"), Time, bLooping, bIsPlayingBackward, InOutBoundsSampleIndex);
-	return true;
-}
-
-const FGeometryCacheTrackSampleInfo& UglTFRuntimeGeometryCacheTrack::GetSampleInfo(float Time, const bool bLooping)
-{
-	SampleInfo = FGeometryCacheTrackSampleInfo(0, FBox::BuildAABB(FVector::ZeroVector, FVector(300, 300, 300)), 3, 3);
-	return SampleInfo;
-}
-
-const bool UglTFRuntimeGeometryCacheTrack::UpdateMeshData(const float Time, const bool bLooping, int32& InOutMeshSampleIndex, FGeometryCacheMeshData*& OutMeshData)
-{
-	UE_LOG(LogTemp, Error, TEXT("UpdateMeshData %f %d %d"), Time, bLooping, InOutMeshSampleIndex);
-	return true;
-}
-
-UGeometryCache* FglTFRuntimeParser::LoadGeometryCacheFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
-{
-	UGeometryCache* GeometryCache = NewObject<UGeometryCache>(StaticMeshConfig.Outer ? StaticMeshConfig.Outer : GetTransientPackage(), NAME_None, RF_Public);
-
-	UglTFRuntimeGeometryCacheTrack* Track = NewObject<UglTFRuntimeGeometryCacheTrack>(GeometryCache, NAME_None, RF_Public);
-
-	Track->AddMatrixSample(FMatrix::Identity, 0);
-
-	Track->SetDuration(1.0);
-
-	//Track->UpdateMeshData()
-
-	GeometryCache->Tracks.Add(Track);
-
-	return GeometryCache;
 }
 
 void FglTFRuntimeParser::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)

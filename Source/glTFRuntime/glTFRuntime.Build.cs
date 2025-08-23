@@ -24,9 +24,7 @@ public class glTFRuntime : ModuleRules
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
-                "Core",
-                "ProceduralMeshComponent",
-                "GeometryCache"
+                "Core"
             }
             );
 

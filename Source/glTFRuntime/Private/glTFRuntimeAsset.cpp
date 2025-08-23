@@ -781,13 +781,6 @@ bool UglTFRuntimeAsset::FindNodeByNameInArray(const TArray<int32>& NodeIndices, 
 	return false;
 }
 
-bool UglTFRuntimeAsset::LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig)
-{
-	GLTF_CHECK_PARSER(false);
-
-	return Parser->LoadStaticMeshIntoProceduralMeshComponent(MeshIndex, ProceduralMeshComponent, ProceduralMeshConfig);
-}
-
 UMaterialInterface* UglTFRuntimeAsset::LoadMaterial(const int32 MaterialIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
 	GLTF_CHECK_PARSER(nullptr);
@@ -1357,12 +1350,6 @@ UStaticMesh* UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODs(const TArray<FglTF
 {
 	GLTF_CHECK_PARSER(nullptr);
 	return Parser->LoadStaticMeshFromRuntimeLODs(RuntimeLODs, StaticMeshConfig);
-}
-
-UGeometryCache* UglTFRuntimeAsset::LoadGeometryCacheFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
-{
-	GLTF_CHECK_PARSER(nullptr);
-	return Parser->LoadGeometryCacheFromRuntimeLODs(RuntimeLODs, StaticMeshConfig);
 }
 
 bool UglTFRuntimeAsset::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& NodeName, const TArray<FString>& ExcludeNodes, FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const FglTFRuntimeSkeletonConfig& SkeletonConfig, int32& SkinIndex, const int32 OverrideSkinIndex, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)

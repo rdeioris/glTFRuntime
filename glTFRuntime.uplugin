@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
   "Version": 1,
-  "VersionName": "20250604",
+  "VersionName": "20250823",
   "FriendlyName": "glTFRuntime",
   "Description": "Manage glTF files at runtime",
   "Category": "Runtime",
@@ -26,16 +26,6 @@
       "Type": "Editor",
       "LoadingPhase": "Default",
       "WhitelistPlatforms": [ "Win64", "Mac", "Linux" ]
-    }
-  ],
-  "Plugins": [
-    {
-      "Name": "ProceduralMeshComponent",
-      "Enabled": true
-    },
-    {
-      "Name": "GeometryCache",
-      "Enabled": true
     }
   ]
 }
