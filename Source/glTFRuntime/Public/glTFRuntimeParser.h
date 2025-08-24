@@ -864,41 +864,6 @@ struct FglTFRuntimeStaticMeshConfig
 };
 
 USTRUCT(BlueprintType)
-struct FglTFRuntimeProceduralMeshConfig
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bReverseWinding;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bBuildSimpleCollision;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TArray<FBox> BoxCollisions;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TArray<FVector4> SphereCollisions;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	bool bUseComplexAsSimpleCollision;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	EglTFRuntimePivotPosition PivotPosition;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	FglTFRuntimeMaterialsConfig MaterialsConfig;
-
-	FglTFRuntimeProceduralMeshConfig()
-	{
-		bReverseWinding = false;
-		bBuildSimpleCollision = false;
-		bUseComplexAsSimpleCollision = false;
-		PivotPosition = EglTFRuntimePivotPosition::Asset;
-	}
-};
-
-USTRUCT(BlueprintType)
 struct FglTFRuntimeLightConfig
 {
 	GENERATED_BODY()
