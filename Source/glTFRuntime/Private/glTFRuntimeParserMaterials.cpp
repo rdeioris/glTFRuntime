@@ -75,7 +75,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	{
 		RuntimeMaterial.MaterialType = EglTFRuntimeMaterialType::TwoSidedTranslucent;
 	}
-	if (RuntimeMaterial.bMasked && RuntimeMaterial.bTwoSided)
+	else if (RuntimeMaterial.bMasked && RuntimeMaterial.bTwoSided)
 	{
 		RuntimeMaterial.MaterialType = EglTFRuntimeMaterialType::TwoSidedMasked;
 	}
