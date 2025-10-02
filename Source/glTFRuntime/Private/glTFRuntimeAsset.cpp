@@ -632,6 +632,20 @@ UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByName(USkeletalMesh* Ske
 	return Parser->LoadSkeletalAnimationByName(SkeletalMesh, AnimationName, SkeletalAnimationConfig, bCaseSensitive);
 }
 
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationOnSkeleton(USkeleton* Skeleton, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadSkeletalAnimationOnSkeleton(Skeleton, AnimationIndex, SkeletalAnimationConfig);
+}
+
+UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimationByNameOnSkeleton(USkeleton* Skeleton, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const bool bCaseSensitive)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	return Parser->LoadSkeletalAnimationByNameOnSkeleton(Skeleton, AnimationName, SkeletalAnimationConfig, bCaseSensitive);
+}
+
 UAnimSequence* UglTFRuntimeAsset::LoadAndMergeSkeletalAnimations(USkeletalMesh* SkeletalMesh, const TArray<int32> AnimationIndices, const bool bRandomize, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
 	GLTF_CHECK_PARSER(nullptr);

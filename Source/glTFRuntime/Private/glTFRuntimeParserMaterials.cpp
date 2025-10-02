@@ -1402,6 +1402,14 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 		return MaterialsConfig.MaterialsOverrideByNameMap[MaterialName];
 	}
 
+	if (MaterialsConfig.MaterialRemapper.Remapper.IsBound())
+	{
+		return MaterialsConfig.MaterialRemapper.Remapper.Execute(
+			Index,
+			MaterialName,
+			MaterialsConfig.MaterialRemapper.Context);
+	}
+
 	UMaterialInterface* Material = LoadMaterial_Internal(Index, MaterialName, JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors, ForceBaseMaterial);
 	if (!Material)
 	{

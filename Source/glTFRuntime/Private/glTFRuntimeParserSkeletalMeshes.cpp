@@ -1779,7 +1779,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString& NodeName,
 		});
 }
 
-UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const bool bCaseSensitive)
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* SkeletalMesh, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const bool bCaseSensitive)
 {
 	if (!SkeletalMesh)
 	{
@@ -1807,6 +1807,41 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 			if (JsonAnimationName.Equals(AnimationName, bCaseSensitive ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase))
 			{
 				return LoadSkeletalAnimation(SkeletalMesh, AnimationIndex, SkeletalAnimationConfig);
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByNameOnSkeleton(USkeleton* Skeleton, const FString& AnimationName, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, const bool bCaseSensitive)
+{
+	if (!Skeleton)
+	{
+		return nullptr;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
+	if (!Root->TryGetArrayField(TEXT("animations"), JsonAnimations))
+	{
+		AddError("LoadSkeletalAnimationByNameOnSkeleton()", "No animations defined in the asset.");
+		return nullptr;
+	}
+
+	for (int32 AnimationIndex = 0; AnimationIndex < JsonAnimations->Num(); AnimationIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[AnimationIndex]->AsObject();
+		if (!JsonAnimationObject)
+		{
+			return nullptr;
+		}
+
+		FString JsonAnimationName;
+		if (JsonAnimationObject->TryGetStringField(TEXT("name"), JsonAnimationName))
+		{
+			if (JsonAnimationName.Equals(AnimationName, bCaseSensitive ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase))
+			{
+				return LoadSkeletalAnimationOnSkeleton(Skeleton, AnimationIndex, SkeletalAnimationConfig);
 			}
 		}
 	}
@@ -2455,6 +2490,29 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 	}
 
 	UAnimSequence* AnimSequence = LoadSkeletalAnimationFromTracksAndMorphTargets(SkeletalMesh, Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig);
+
+	FillAssetUserData(AnimationIndex, AnimSequence);
+
+	return AnimSequence;
+}
+
+UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationOnSkeleton(USkeleton* Skeleton, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	if (!Skeleton)
+	{
+		return nullptr;
+	}
+
+	TMap<FString, FRawAnimSequenceTrack> Tracks;
+	TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
+	float Duration = 0;
+
+	if (!LoadAnimationAsTracksAndMorphTargets(AnimationIndex, Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig))
+	{
+		return nullptr;
+	}
+
+	UAnimSequence* AnimSequence = LoadSkeletalAnimationFromTracksAndMorphTargets(Skeleton, Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig);
 
 	FillAssetUserData(AnimationIndex, AnimSequence);
 
