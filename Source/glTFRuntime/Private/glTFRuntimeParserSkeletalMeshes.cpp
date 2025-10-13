@@ -358,7 +358,11 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 	SkeletalMeshContext->SkeletalMesh->NeverStream = true;
 
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7
+	SkeletalMeshContext->SkeletalMesh->SetNumSourceModels(0);
+#else
 	SkeletalMeshContext->SkeletalMesh->ResetLODInfo();
+#endif
 
 	const float TangentsDirection = SkeletalMeshContext->SkeletalMeshConfig.bReverseTangents ? -1 : 1;
 
