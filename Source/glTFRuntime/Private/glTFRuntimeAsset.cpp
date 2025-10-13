@@ -1696,3 +1696,23 @@ FString UglTFRuntimeAsset::GetBaseFilename() const
 
 	return Parser->GetBaseFilename();
 }
+
+UTexture2D* UglTFRuntimeAsset::LoadTexture(const int32 TextureIndex, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	TArray<FglTFRuntimeMipMap> Mips;
+	FglTFRuntimeTextureSampler Sampler;
+	UTexture2D* Texture = Parser->LoadTexture(TextureIndex, Mips, MaterialsConfig.ImagesConfig.bSRGB, MaterialsConfig, Sampler);
+	if (Texture)
+	{
+		return Texture;
+	}
+
+	if (Mips.Num() > 0)
+	{
+		return Parser->BuildTexture(GetTransientPackage(), Mips, MaterialsConfig.ImagesConfig, Sampler);
+	}
+
+	return nullptr;
+}
