@@ -218,3 +218,38 @@ TArray<FString> FglTFRuntimeParser::GetJSONStringArrayFromPath(const TArray<FglT
 
 	return Strings;
 }
+
+TMap<FString, FString> FglTFRuntimeParser::GetJSONStringMapFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	bFound = false;
+	TMap<FString, FString> StringMap;
+
+	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
+	if (CurrentObject)
+	{
+		const TSharedPtr<FJsonObject>* JsonObject = nullptr;
+		if (CurrentObject->TryGetObject(JsonObject))
+		{
+			bFound = true;
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*JsonObject)->Values)
+			{
+				if (!Pair.Value.IsValid())
+				{
+					StringMap.Add(Pair.Key, "");
+					continue;
+				}
+
+				FString Value;
+				if (!Pair.Value->TryGetString(Value))
+				{
+					StringMap.Add(Pair.Key, "");
+					continue;
+				}
+
+				StringMap.Add(Pair.Key, Value);
+			}
+		}
+	}
+
+	return StringMap;
+}
