@@ -6603,6 +6603,11 @@ FString FglTFRuntimeParser::GetGenerator() const
 	return GetJsonObjectString(Asset.ToSharedRef(), "generator", "");
 }
 
+TSharedPtr<FJsonObject> FglTFRuntimeParser::GetAssetMeta() const
+{
+	return GetJsonObjectFromObject(GetJsonRoot().ToSharedRef(), "asset");
+}
+
 bool FglTFRuntimeParser::IsArchive() const
 {
 	return Archive.IsValid();

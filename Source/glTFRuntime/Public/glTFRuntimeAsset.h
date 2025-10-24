@@ -244,6 +244,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
 	TMap<FString, FString> GetStringMapFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (AutoCreateRefTerm = "Path"), Category = "glTFRuntime")
+	FString GetJsonFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
+
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
 
@@ -359,6 +362,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	FString GetGenerator() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	TMap<FString, FString> GetAssetMeta() const;
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	void ClearCache();

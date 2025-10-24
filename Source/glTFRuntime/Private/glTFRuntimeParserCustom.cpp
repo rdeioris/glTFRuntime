@@ -84,6 +84,24 @@ FString FglTFRuntimeParser::GetJSONStringFromPath(const TArray<FglTFRuntimePathI
 	return ReturnValue;
 }
 
+FString FglTFRuntimeParser::GetJSONSerializedStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	FString Json = "";
+	bFound = false;
+
+	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
+	if (!CurrentObject)
+	{
+		return Json;
+	}
+
+	bFound = true;
+
+	TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&Json);
+	FJsonSerializer::Serialize(CurrentObject, "", JsonWriter);
+
+	return Json;
+}
 
 double FglTFRuntimeParser::GetJSONNumberFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {

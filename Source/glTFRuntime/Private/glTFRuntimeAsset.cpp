@@ -863,6 +863,12 @@ TMap<FString, FString> UglTFRuntimeAsset::GetStringMapFromPath(const TArray<FglT
 	return Parser->GetJSONStringMapFromPath(Path, bFound);
 }
 
+FString UglTFRuntimeAsset::GetJsonFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
+{
+	GLTF_CHECK_PARSER("");
+	return Parser->GetJSONSerializedStringFromPath(Path, bFound);
+}
+
 FVector4 UglTFRuntimeAsset::GetVectorFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const
 {
 	GLTF_CHECK_PARSER(FVector4(0, 0, 0, 0));
@@ -1616,6 +1622,38 @@ FString UglTFRuntimeAsset::GetGenerator() const
 	GLTF_CHECK_PARSER("");
 
 	return Parser->GetGenerator();
+}
+
+TMap<FString, FString> UglTFRuntimeAsset::GetAssetMeta() const
+{
+	GLTF_CHECK_PARSER({});
+
+	TMap<FString, FString> Meta;
+
+	TSharedPtr<FJsonObject> JsonObject = Parser->GetAssetMeta();
+
+	if (JsonObject)
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : JsonObject->Values)
+		{
+			if (!Pair.Value.IsValid())
+			{
+				Meta.Add(Pair.Key, "");
+				continue;
+			}
+
+			FString Value;
+			if (!Pair.Value->TryGetString(Value))
+			{
+				Meta.Add(Pair.Key, "");
+				continue;
+			}
+
+			Meta.Add(Pair.Key, Value);
+		}
+	}
+
+	return Meta;
 }
 
 void UglTFRuntimeAsset::ClearCache()

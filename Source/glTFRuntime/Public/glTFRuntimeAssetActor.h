@@ -116,6 +116,15 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	UAnimSequence* GetSkeletalAnimationByName(USkeletalMeshComponent* SkeletalMeshComponent, const FString& AnimationName) const;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "glTFRuntime")
+	TArray<FString> ExtensionsRequired;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "glTFRuntime")
+	TArray<FString> ExtensionsUsed;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "glTFRuntime")
+	TMap<FString, FString> AssetMeta;
+
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")
 	USceneComponent* AssetRoot;

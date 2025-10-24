@@ -40,6 +40,10 @@ void AglTFRuntimeAssetActor::BeginPlay()
 		return;
 	}
 
+	ExtensionsRequired = Asset->GetExtensionsRequired();
+	ExtensionsUsed = Asset->GetExtensionsUsed();
+	AssetMeta = Asset->GetAssetMeta();
+
 	double LoadingStartTime = FPlatformTime::Seconds();
 
 	if (RootNodeIndex > INDEX_NONE)
@@ -352,7 +356,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				if (SkeletalAnimationsMap.Num() > 0)
 				{
 					DiscoveredSkeletalAnimations.Add(SkeletalMeshComponent, SkeletalAnimationsMap);
-					
+
 					for (const TPair<FString, UAnimSequence*>& Pair : SkeletalAnimationsMap)
 					{
 						AllSkeletalAnimations.Add(Pair.Value);
