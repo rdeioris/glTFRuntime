@@ -314,7 +314,16 @@ bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData, const FglTFRunti
 		return false;
 	}
 
-	Parser = FglTFRuntimeParser::FromString(JsonData, LoaderConfig, nullptr);
+	if (LoaderConfig.bAsBlob)
+	{
+		FTCHARToUTF8 UTF8String(*JsonData);
+		Parser = FglTFRuntimeParser::FromData(reinterpret_cast<const uint8*>(UTF8String.Get()), UTF8String.Length(), LoaderConfig);
+	}
+	else
+	{
+		Parser = FglTFRuntimeParser::FromString(JsonData, LoaderConfig, nullptr);
+	}
+
 	if (Parser)
 	{
 		FScriptDelegate Delegate;
