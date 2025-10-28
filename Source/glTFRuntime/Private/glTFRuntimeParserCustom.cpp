@@ -1,6 +1,8 @@
-// Copyright 2021-2022, Roberto De Ioris.
+// Copyright 2021-2025, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 
 TSharedPtr<FJsonValue> FglTFRuntimeParser::GetJSONObjectFromRelativePath(TSharedRef<FJsonObject> JsonObject, const TArray<FglTFRuntimePathItem>& Path)
 {
