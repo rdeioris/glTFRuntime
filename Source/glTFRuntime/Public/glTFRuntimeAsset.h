@@ -23,6 +23,9 @@ public:
 	TArray<FglTFRuntimeScene> GetScenes();
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool GetDefaultScene(FglTFRuntimeScene& DefaultScene);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FglTFRuntimeNode> GetNodes();
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")

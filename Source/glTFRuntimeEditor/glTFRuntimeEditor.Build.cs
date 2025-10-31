@@ -1,4 +1,4 @@
-// Copyright 2020, Roberto De Ioris.
+// Copyright 2020-2025, Roberto De Ioris.
 
 using UnrealBuildTool;
 
@@ -46,7 +46,8 @@ public class glTFRuntimeEditor : ModuleRules
                 "LevelEditor",
                 "glTFRuntime",
                 "DesktopPlatform",
-		"EditorStyle"
+                "EditorStyle",
+                "Projects"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

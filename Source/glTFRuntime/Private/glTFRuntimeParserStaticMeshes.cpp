@@ -1606,7 +1606,7 @@ bool FglTFRuntimeParser::LoadMeshAsRuntimeLOD(const int32 MeshIndex, FglTFRuntim
 	FglTFRuntimeMeshLOD* LOD;
 	if (LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, MaterialsConfig))
 	{
-		RuntimeLOD = *LOD; // slow copy :(
+		RuntimeLOD = MoveTemp(*LOD);
 		return true;
 	}
 

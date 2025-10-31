@@ -396,6 +396,18 @@ TArray<FglTFRuntimeScene> UglTFRuntimeAsset::GetScenes()
 	return Scenes;
 }
 
+bool UglTFRuntimeAsset::GetDefaultScene(FglTFRuntimeScene& DefaultScene)
+{
+	GLTF_CHECK_PARSER(false);
+	const int32 SceneIndex = Parser->GetDefaultSceneIndex();
+	if (SceneIndex <= INDEX_NONE)
+	{
+		Parser->AddError("UglTFRuntimeAsset::GetDefaultScene()", "Unable to retrieve Default Scene from glTF Asset.");
+		return false;
+	}
+	return Parser->LoadScene(SceneIndex, DefaultScene);
+}
+
 TArray<FglTFRuntimeNode> UglTFRuntimeAsset::GetNodes()
 {
 	GLTF_CHECK_PARSER(TArray<FglTFRuntimeNode>());

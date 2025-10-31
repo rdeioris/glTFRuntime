@@ -738,6 +738,9 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FglTFRuntimeMaterialRemapperHook MaterialRemapper;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FString> CollectWeightMaps;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -1606,6 +1609,8 @@ struct FglTFRuntimePrimitive
 	bool bDisableShadows;
 	bool bHasIndices;
 
+	TMap<FString, TArray<float>> WeightMaps;
+
 	FglTFRuntimePrimitive()
 	{
 		AdditionalBufferView = INDEX_NONE;
@@ -2408,6 +2413,7 @@ public:
 
 	bool LoadScenes(TArray<FglTFRuntimeScene>& Scenes);
 	bool LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene);
+	int32 GetDefaultSceneIndex() const;
 
 	bool RemapRuntimeLODBoneNames(FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeSkeletonConfig& SkeletonConfig);
 

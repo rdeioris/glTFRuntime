@@ -6,6 +6,33 @@
 #include "Modules/ModuleManager.h"
 #include "UObject/StrongObjectPtr.h"
 
+namespace glTFRuntime
+{
+	namespace Tests
+	{
+		struct FFixture
+		{
+			FFixture(const FString& Filename);
+
+			TArray64<uint8> Blob;
+		};
+
+		struct FFixture32
+		{
+			FFixture32(const FString& Filename);
+
+			TArray<uint8> Blob;
+		};
+
+		struct FFixturePath
+		{
+			FFixturePath(const FString& Filename);
+
+			FString Path;
+		};
+	}
+};
+
 class FglTFRuntimeEditorModule : public IModuleInterface
 {
 public:

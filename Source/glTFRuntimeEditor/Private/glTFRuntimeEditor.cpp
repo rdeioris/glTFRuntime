@@ -9,6 +9,9 @@
 #include "glTFRuntimeAssetActor.h"
 #include "IDesktopPlatform.h"
 #include "LevelEditor.h"
+#include "Interfaces/IPluginManager.h"
+#include "Misc/Paths.h"
+#include "Misc/FileHelper.h"
 
 #define LOCTEXT_NAMESPACE "FglTFRuntimeEditorModule"
 
@@ -37,7 +40,7 @@ public:
 					.Padding(4)
 					[
 						SAssignNew(PasswordTextBox, SEditableTextBox).IsPassword(true)
-						.OnTextCommitted(this, &SPasswordPromptWidget::OnPasswordCommitted)
+							.OnTextCommitted(this, &SPasswordPromptWidget::OnPasswordCommitted)
 					]
 					+ SHorizontalBox::Slot()
 					.FillWidth(0.2)
@@ -174,6 +177,26 @@ void FglTFRuntimeEditorModule::StartupModule()
 
 void FglTFRuntimeEditorModule::ShutdownModule()
 {
+}
+
+glTFRuntime::Tests::FFixture::FFixture(const FString& Filename)
+{
+	const FString PluginDir = IPluginManager::Get().FindPlugin(TEXT("glTFRuntime"))->GetBaseDir();
+	const FString FixturePath = FPaths::Combine(PluginDir, TEXT("Source/glTFRuntimeEditor/Private/Tests/Fixtures"), Filename);
+	FFileHelper::LoadFileToArray(Blob, *FixturePath);
+}
+
+glTFRuntime::Tests::FFixture32::FFixture32(const FString& Filename)
+{
+	const FString PluginDir = IPluginManager::Get().FindPlugin(TEXT("glTFRuntime"))->GetBaseDir();
+	const FString FixturePath = FPaths::Combine(PluginDir, TEXT("Source/glTFRuntimeEditor/Private/Tests/Fixtures"), Filename);
+	FFileHelper::LoadFileToArray(Blob, *FixturePath);
+}
+
+glTFRuntime::Tests::FFixturePath::FFixturePath(const FString& Filename)
+{
+	const FString PluginDir = IPluginManager::Get().FindPlugin(TEXT("glTFRuntime"))->GetBaseDir();
+	Path = FPaths::Combine(PluginDir, TEXT("Source/glTFRuntimeEditor/Private/Tests/Fixtures"), Filename);
 }
 
 #undef LOCTEXT_NAMESPACE
