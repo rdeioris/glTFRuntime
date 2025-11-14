@@ -1786,7 +1786,8 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			int64 NodeIndex;
 			if (!(*JsonTargetObject)->TryGetNumberField(TEXT("node"), NodeIndex))
 			{
-				return false;
+				// "node" is not required, so do not block parsing
+				continue;
 			}
 
 			if (!LoadNode(NodeIndex, Node))
@@ -2018,7 +2019,7 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 		bAnimationFound = false;
 		AnimationCurve = NewObject<UglTFRuntimeAnimationCurve>(GetTransientPackage(), NAME_None, RF_Public);
 		AnimationCurve->SetDefaultValues(OriginalTransform.GetLocation(), OriginalTransform.GetRotation(), OriginalTransform.GetRotation().Rotator(), OriginalTransform.GetScale3D());
-		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, Name, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }, {}))
+		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, Name, Callback, [&](const FglTFRuntimeNode& Node) -> bool { UE_LOG(LogTemp, Error, TEXT("Node: %d %d"), Node.Index, NodeIndex); return Node.Index == NodeIndex; }, {}))
 		{
 			continue;
 		}
@@ -5723,7 +5724,7 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 	return Bytes.Num() > 0;
 }
 
-FVector FglTFRuntimeParser::ComputeTangentY(const FVector Normal, const FVector TangetX)
+FVector glTFRuntime::ComputeTangentY(const FVector Normal, const FVector TangetX)
 {
 	float Determinant = GetBasisDeterminantSign(Normal.GetSafeNormal(),
 		(Normal ^ TangetX).GetSafeNormal(),
@@ -5732,7 +5733,7 @@ FVector FglTFRuntimeParser::ComputeTangentY(const FVector Normal, const FVector 
 	return (Normal ^ TangetX) * Determinant;
 }
 
-FVector FglTFRuntimeParser::ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W)
+FVector glTFRuntime::ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W)
 {
 	return (Normal ^ TangetX) * W;
 }

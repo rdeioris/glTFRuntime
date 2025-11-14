@@ -212,6 +212,565 @@ void FglTFRuntimeParser::CopySkeletonRotationsFrom(FReferenceSkeleton& RefSkelet
 	}
 }
 
+bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData, const TArray<FglTFRuntimeMeshLOD*>& LODs, const FReferenceSkeleton& RefSkeleton, const int32 SkinIndex, const TMap<int32, FName>& MainBoneMap, FBox& BoundingBox, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, TFunction<void(const FString& ErrorContext, const FString& ErrorMessage)> ErrorCallback)
+{
+	TMap<int32, int32> MainBonesCache;
+
+	const float TangentsDirection = SkeletalMeshConfig.bReverseTangents ? -1 : 1;
+
+	for (FglTFRuntimeMeshLOD* LOD : LODs)
+	{
+		TArray<uint32> LODIndices;
+
+		LOD->bHasTangents = true;
+		LOD->bHasNormals = true;
+		LOD->bHasVertexColors = false;
+
+		FSkeletalMeshLODRenderData* LodRenderData = new FSkeletalMeshLODRenderData();
+		int32 LODIndex = RenderData->LODRenderData.Add(LodRenderData);
+
+		LodRenderData->RenderSections.SetNumUninitialized(LOD->Primitives.Num());
+
+		bool bUseHighPrecisionUVs = false;
+		bool bUseHighPrecisionWeights = false;
+
+		int32 NumLODIndices = 0;
+		int32 NumLODPositions = 0;
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
+		{
+			NumLODIndices += LOD->Primitives[PrimitiveIndex].bHasIndices ? LOD->Primitives[PrimitiveIndex].Indices.Num() : LOD->Primitives[PrimitiveIndex].Positions.Num();
+			NumLODPositions += LOD->Primitives[PrimitiveIndex].Positions.Num();
+
+			if (LOD->Primitives[PrimitiveIndex].bHighPrecisionUVs)
+			{
+				bUseHighPrecisionUVs = true;
+			}
+			if (LOD->Primitives[PrimitiveIndex].bHighPrecisionWeights)
+			{
+				bUseHighPrecisionWeights = true;
+			}
+			if (LOD->Primitives[PrimitiveIndex].Colors.Num() > 0)
+			{
+				LOD->bHasVertexColors = true;
+			}
+		}
+
+		LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumLODPositions);
+		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bUseHighPrecisionUVs || SkeletalMeshConfig.bUseHighPrecisionUVs);
+		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseHighPrecisionTangentBasis(SkeletalMeshConfig.bUseHighPrecisionTangentBasis);
+		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumLODPositions, 1);
+		if (LOD->bHasVertexColors)
+		{
+			LodRenderData->StaticVertexBuffers.ColorVertexBuffer.Init(NumLODPositions);
+		}
+
+		const int32 NumBones = RefSkeleton.GetNum();
+
+		for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
+		{
+			LodRenderData->RequiredBones.Add(BoneIndex);
+			LodRenderData->ActiveBoneIndices.Add(BoneIndex);
+		}
+
+		TArray<FSkinWeightInfo> InWeights;
+		InWeights.AddZeroed(NumLODPositions);
+
+		int32 BaseIndex = 0;
+		int32 BaseVertexIndex = 0;
+		int32 MaxBoneInfluences = 4;
+
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
+		{
+			FglTFRuntimePrimitive& Primitive = LOD->Primitives[PrimitiveIndex];
+
+			new(&LodRenderData->RenderSections[PrimitiveIndex]) FSkelMeshRenderSection();
+			FSkelMeshRenderSection& MeshSection = LodRenderData->RenderSections[PrimitiveIndex];
+
+			MeshSection.MaterialIndex = PrimitiveIndex;
+			MeshSection.BaseIndex = BaseIndex;
+			MeshSection.NumTriangles = (Primitive.bHasIndices ? Primitive.Indices.Num() : Primitive.Positions.Num()) / 3;
+			MeshSection.BaseVertexIndex = BaseVertexIndex;
+			MeshSection.MaxBoneInfluences = FMath::Min(Primitive.Joints.Num() * 4, MAX_TOTAL_INFLUENCES);
+
+			if (MeshSection.MaxBoneInfluences > MaxBoneInfluences)
+			{
+				MaxBoneInfluences = MeshSection.MaxBoneInfluences;
+			}
+
+			MeshSection.NumVertices = Primitive.Positions.Num();
+
+			BaseIndex += Primitive.bHasIndices ? Primitive.Indices.Num() : Primitive.Positions.Num();
+
+			TMap<int32, TArray<int32>> OverlappingVertices;
+			MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
+
+			// this is used for non-skinned asset loaded as skinned ones
+			int32 OverrideVertexToCheck = 0;
+
+			for (int32 VertexIndex = 0; VertexIndex < Primitive.Positions.Num(); VertexIndex++)
+			{
+				FModelVertex ModelVertex;
+
+				float TangentXW = 1;
+
+#if ENGINE_MAJOR_VERSION > 4
+				ModelVertex.Position = FVector3f(Primitive.Positions[VertexIndex]);
+				BoundingBox += FVector(ModelVertex.Position) * SkeletalMeshConfig.BoundsScale;
+				ModelVertex.TangentX = FVector3f::ZeroVector;
+				ModelVertex.TangentZ = FVector3f::ZeroVector;
+#else
+				ModelVertex.Position = Primitive.Positions[VertexIndex];
+				BoundingBox += ModelVertex.Position * SkeletalMeshConfig.BoundsScale;
+				ModelVertex.TangentX = FVector::ZeroVector;
+				ModelVertex.TangentZ = FVector::ZeroVector;
+#endif
+				if (VertexIndex < Primitive.Normals.Num())
+				{
+#if ENGINE_MAJOR_VERSION > 4
+					ModelVertex.TangentZ = FVector3f(FVector(Primitive.Normals[VertexIndex]));
+#else
+					ModelVertex.TangentZ = Primitive.Normals[VertexIndex];
+#endif
+				}
+				else
+				{
+					LOD->bHasNormals = false;
+				}
+
+				if (VertexIndex < Primitive.Tangents.Num())
+				{
+#if ENGINE_MAJOR_VERSION > 4
+					TangentXW = Primitive.Tangents[VertexIndex].W;
+					ModelVertex.TangentX = FVector4f(Primitive.Tangents[VertexIndex]);
+#else
+					ModelVertex.TangentX = Primitive.Tangents[VertexIndex];
+#endif
+				}
+				else
+				{
+					LOD->bHasTangents = false;
+				}
+
+				if (Primitive.UVs.Num() > 0 && VertexIndex < Primitive.UVs[0].Num())
+				{
+
+#if ENGINE_MAJOR_VERSION > 4
+					ModelVertex.TexCoord = FVector2f(Primitive.UVs[0][VertexIndex]);
+#else
+					ModelVertex.TexCoord = Primitive.UVs[0][VertexIndex];
+#endif
+					LOD->bHasUV = true;
+				}
+				else
+				{
+#if ENGINE_MAJOR_VERSION > 4
+					ModelVertex.TexCoord = FVector2f::ZeroVector;
+#else
+					ModelVertex.TexCoord = FVector2D::ZeroVector;
+#endif
+					LOD->bHasUV = false;
+				}
+
+#if ENGINE_MAJOR_VERSION > 4
+				FVector3f TangentY = FVector3f(ComputeTangentYWithW(FVector(ModelVertex.TangentZ), FVector(ModelVertex.TangentX), TangentXW * TangentsDirection));
+#else
+				FVector TangentY = ComputeTangentYWithW(ModelVertex.TangentZ, ModelVertex.TangentX, TangentXW * TangentsDirection);
+#endif
+				FColor Color = FColor::White;
+				if (VertexIndex < Primitive.Colors.Num())
+				{
+					Color = FLinearColor(Primitive.Colors[VertexIndex]).ToFColor(true);
+				}
+
+				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(BaseVertexIndex) = ModelVertex.Position;
+				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(BaseVertexIndex, ModelVertex.TangentX, TangentY, ModelVertex.TangentZ);
+				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(BaseVertexIndex, 0, ModelVertex.TexCoord);
+				if (LOD->bHasVertexColors)
+				{
+					LodRenderData->StaticVertexBuffers.ColorVertexBuffer.VertexColor(BaseVertexIndex) = Color;
+				}
+
+				const TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : MainBoneMap;
+				TMap<int32, int32>& BonesCacheInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.BonesCache : MainBonesCache;
+
+				if ((!SkeletalMeshConfig.bIgnoreSkin && SkinIndex > INDEX_NONE) || LOD->Skeleton.Num() > 0)
+				{
+					uint32 TotalWeight = 0;
+					const int32 JointsNum = FMath::Min(Primitive.Joints.Num(), MeshSection.MaxBoneInfluences / 4);
+					for (int32 JointsIndex = 0; JointsIndex < JointsNum; JointsIndex++)
+					{
+						const FglTFRuntimeUInt16Vector4& Joints = Primitive.Joints[JointsIndex][VertexIndex];
+						const FVector4& Weights = Primitive.Weights[JointsIndex][VertexIndex];
+						for (int32 j = 0; j < 4; j++)
+						{
+							if (BoneMapInUse.Contains(Joints[j]))
+							{
+								int32 BoneIndex = INDEX_NONE;
+								if (BonesCacheInUse.Contains(Joints[j]))
+								{
+									BoneIndex = BonesCacheInUse[Joints[j]];
+								}
+								else
+								{
+									BoneIndex = RefSkeleton.FindBoneIndex(BoneMapInUse[Joints[j]]);
+									BonesCacheInUse.Add(Joints[j], BoneIndex);
+								}
+
+								BONE_INFLUENCE_TYPE QuantizedWeight = FMath::Clamp((BONE_INFLUENCE_TYPE)(Weights[j] * ((double)MAX_BONE_INFLUENCE_WEIGHT)), (BONE_INFLUENCE_TYPE)0x00, (BONE_INFLUENCE_TYPE)MAX_BONE_INFLUENCE_WEIGHT);
+
+								if (QuantizedWeight + TotalWeight > MAX_BONE_INFLUENCE_WEIGHT)
+								{
+									QuantizedWeight = MAX_BONE_INFLUENCE_WEIGHT - TotalWeight;
+								}
+
+								InWeights[BaseVertexIndex].InfluenceWeights[JointsIndex * 4 + j] = QuantizedWeight;
+								InWeights[BaseVertexIndex].InfluenceBones[JointsIndex * 4 + j] = BoneIndex;
+
+								TotalWeight += QuantizedWeight;
+							}
+							else if (!SkeletalMeshConfig.bIgnoreMissingBones)
+							{
+								ErrorCallback("FillSkeletalMeshRenderData()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
+								return false;
+							}
+						}
+					}
+
+					// fix weight
+					if (TotalWeight < MAX_BONE_INFLUENCE_WEIGHT)
+					{
+						InWeights[BaseVertexIndex].InfluenceWeights[0] += MAX_BONE_INFLUENCE_WEIGHT - TotalWeight;
+					}
+				}
+				else if (SkeletalMeshConfig.SkeletonConfig.bFallbackToNodesTree)
+				{
+					if (BoneMapInUse.Contains(VertexIndex))
+					{
+						OverrideVertexToCheck = VertexIndex;
+					}
+					if (BoneMapInUse.Contains(OverrideVertexToCheck))
+					{
+						int32 BoneIndex = INDEX_NONE;
+						if (BonesCacheInUse.Contains(OverrideVertexToCheck))
+						{
+							BoneIndex = BonesCacheInUse[OverrideVertexToCheck];
+						}
+						else
+						{
+							BoneIndex = RefSkeleton.FindBoneIndex(BoneMapInUse[OverrideVertexToCheck]);
+							BonesCacheInUse.Add(OverrideVertexToCheck, BoneIndex);
+						}
+						InWeights[BaseVertexIndex].InfluenceWeights[0] = MAX_BONE_INFLUENCE_WEIGHT;
+						InWeights[BaseVertexIndex].InfluenceBones[0] = BoneIndex;
+						InWeights[BaseVertexIndex].InfluenceWeights[1] = 0;
+						InWeights[BaseVertexIndex].InfluenceBones[1] = 0;
+						InWeights[BaseVertexIndex].InfluenceWeights[2] = 0;
+						InWeights[BaseVertexIndex].InfluenceBones[2] = 0;
+						InWeights[BaseVertexIndex].InfluenceWeights[3] = 0;
+						InWeights[BaseVertexIndex].InfluenceBones[3] = 0;
+
+						MeshSection.MaxBoneInfluences = 1;
+					}
+					else if (!SkeletalMeshConfig.bIgnoreMissingBones)
+					{
+						ErrorCallback("FillSkeletalMeshRenderData()", "Unable to find map for node based bones");
+						return false;
+					}
+				}
+				else
+				{
+					// reset it to be meaningful
+					MeshSection.MaxBoneInfluences = 1;
+					for (int32 j = 0; j < MeshSection.MaxBoneInfluences; j++)
+					{
+						InWeights[BaseVertexIndex].InfluenceWeights[j] = j == 0 ? MAX_BONE_INFLUENCE_WEIGHT : 0;
+						InWeights[BaseVertexIndex].InfluenceBones[j] = 0;
+					}
+				}
+
+				BaseVertexIndex++;
+			}
+
+			for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
+			{
+				MeshSection.BoneMap.Add(BoneIndex);
+			}
+		}
+
+		if (SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Always)
+		{
+			LOD->bHasNormals = false;
+		}
+		else if (SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Never)
+		{
+			LOD->bHasNormals = true;
+		}
+
+		if (SkeletalMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Always)
+		{
+			LOD->bHasTangents = false;
+		}
+		else if (SkeletalMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Never)
+		{
+			LOD->bHasTangents = true;
+		}
+
+		// generate indices (and eventually normals/tangents)
+		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(NumLODIndices > MAX_uint16 ? sizeof(uint32) : sizeof(uint16));
+
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
+		{
+			FglTFRuntimePrimitive& Primitive = LOD->Primitives[PrimitiveIndex];
+			const int32 NumVertexInstancesPerSection = Primitive.bHasIndices ? Primitive.Indices.Num() : Primitive.Positions.Num();
+
+			TArray<uint32> CurrentIndices;
+			CurrentIndices.Reserve(NumVertexInstancesPerSection);
+
+			if (Primitive.bHasIndices)
+			{
+				for (const uint32 Index : Primitive.Indices)
+				{
+					LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
+					CurrentIndices.Add(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
+				}
+			}
+			else
+			{
+				for (int32 Index = 0; Index < Primitive.Positions.Num(); Index++)
+				{
+					LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
+					CurrentIndices.Add(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
+				}
+			}
+
+
+			if ((!LOD->bHasTangents || !LOD->bHasNormals) && ((NumVertexInstancesPerSection % 3) == 0))
+			{
+
+				//normals with NaNs are incorrectly handled on Android
+				auto FixVectorIfNan = [](FVector& Tangent, int32 Index)
+					{
+						if (Tangent.ContainsNaN() && Index >= 0 && Index < 3)
+						{
+							Tangent.Set(0.0, 0.0, 0.0);
+							Tangent[Index] = 1.0;
+						}
+					};
+
+				TSet<uint32> ProcessedVertices;
+				ProcessedVertices.Reserve(NumVertexInstancesPerSection);
+
+				FCriticalSection TangentsGenerationLock;
+
+				ParallelFor(NumVertexInstancesPerSection / 3, [&](const int32 VertexTriangleIndex)
+					{
+						bool bSetVertex0 = false;
+						bool bSetVertex1 = false;
+						bool bSetVertex2 = false;
+
+						const int32 VertexIndex0 = CurrentIndices[VertexTriangleIndex];
+						const int32 VertexIndex1 = CurrentIndices[VertexTriangleIndex + 1];
+						const int32 VertexIndex2 = CurrentIndices[VertexTriangleIndex + 2];
+
+						if (Primitive.bHasIndices)
+						{
+							FScopeLock Lock(&TangentsGenerationLock);
+
+							if (!ProcessedVertices.Contains(VertexIndex0))
+							{
+								ProcessedVertices.Add(VertexIndex0);
+								bSetVertex0 = true;
+							}
+
+							if (!ProcessedVertices.Contains(VertexIndex1))
+							{
+								ProcessedVertices.Add(VertexIndex1);
+								bSetVertex1 = true;
+							}
+
+							if (!ProcessedVertices.Contains(VertexIndex2))
+							{
+								ProcessedVertices.Add(VertexIndex2);
+								bSetVertex2 = true;
+							}
+
+							if (!bSetVertex0 && !bSetVertex1 && !bSetVertex2)
+							{
+								return;
+							}
+						}
+						else
+						{
+							bSetVertex0 = true;
+							bSetVertex1 = true;
+							bSetVertex2 = true;
+						}
+
+#if ENGINE_MAJOR_VERSION > 4
+						FVector Position0 = FVector(LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex0));
+						FVector4 TangentZ0 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex0));
+#else
+						FVector Position0 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex0);
+						FVector4 TangentZ0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex0);
+#endif
+
+
+#if ENGINE_MAJOR_VERSION > 4
+						FVector Position1 = FVector(LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex1));
+						FVector4 TangentZ1 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex1));
+#else
+						FVector Position1 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex1);
+						FVector4 TangentZ1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex1);
+#endif
+
+
+#if ENGINE_MAJOR_VERSION > 4
+						FVector Position2 = FVector(LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex2));
+						FVector4 TangentZ2 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex2));
+#else
+						FVector Position2 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex2);
+						FVector4 TangentZ2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex2);
+#endif
+
+						if (!LOD->bHasNormals)
+						{
+							const FVector SideA = Position1 - Position0;
+							const FVector SideB = Position2 - Position0;
+
+							const FVector NormalFromCross = FVector::CrossProduct(SideB, SideA).GetSafeNormal();
+
+							TangentZ0 = NormalFromCross;
+							TangentZ1 = NormalFromCross;
+							TangentZ2 = NormalFromCross;
+						}
+
+						// if we do not have tangents but we have normals and a UV channel, we can compute them
+						if (!LOD->bHasTangents)
+						{
+							const FVector DeltaPosition0 = Position1 - Position0;
+							const FVector DeltaPosition1 = Position2 - Position0;
+
+							FVector TangentX0;
+							FVector TangentX1;
+							FVector TangentX2;
+
+							if (LOD->bHasUV)
+							{
+#if ENGINE_MAJOR_VERSION > 4
+								const FVector2f& UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex0, 0);
+								const FVector2f& UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex1, 0);
+								const FVector2f& UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex2, 0);
+								const FVector2f DeltaUV0 = UV1 - UV0;
+								const FVector2f DeltaUV1 = UV2 - UV0;
+#else
+								const FVector2D& UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex0, 0);
+								const FVector2D& UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex1, 0);
+								const FVector2D& UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex2, 0);
+								const FVector2D DeltaUV0 = UV1 - UV0;
+								const FVector2D DeltaUV1 = UV2 - UV0;
+#endif
+
+								const float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
+
+								const FVector TriangleTangentX = ((DeltaPosition0 * DeltaUV1.Y) - (DeltaPosition1 * DeltaUV0.Y)) * Factor;
+								const FVector TriangleTangentY = ((DeltaPosition0 * DeltaUV1.X) - (DeltaPosition1 * DeltaUV0.X)) * Factor;
+
+								TangentX0 = TriangleTangentX - (TangentZ0 * FVector::DotProduct(TangentZ0, TriangleTangentX));
+								TangentX0.Normalize();
+
+								TangentX1 = TriangleTangentX - (TangentZ1 * FVector::DotProduct(TangentZ1, TriangleTangentX));
+								TangentX1.Normalize();
+
+								TangentX2 = TriangleTangentX - (TangentZ2 * FVector::DotProduct(TangentZ2, TriangleTangentX));
+								TangentX2.Normalize();
+							}
+							else
+							{
+								TangentX0 = FVector::CrossProduct(TangentZ0, FVector::UpVector);
+								TangentX1 = FVector::CrossProduct(TangentZ1, FVector::UpVector);
+								TangentX2 = FVector::CrossProduct(TangentZ2, FVector::UpVector);
+							}
+
+#if PLATFORM_ANDROID
+							FixVectorIfNan(TangentX0, 0);
+							FixVectorIfNan(TangentX1, 0);
+							FixVectorIfNan(TangentX2, 0);
+#endif
+
+							FVector TangentY0 = ComputeTangentY(TangentZ0, TangentX0) * TangentsDirection;
+							FVector TangentY1 = ComputeTangentY(TangentZ1, TangentX1) * TangentsDirection;
+							FVector TangentY2 = ComputeTangentY(TangentZ2, TangentX2) * TangentsDirection;
+#if PLATFORM_ANDROID
+							FixVectorIfNan(TangentY0, 1);
+							FixVectorIfNan(TangentY1, 1);
+							FixVectorIfNan(TangentY2, 1);
+#endif
+
+
+#if ENGINE_MAJOR_VERSION > 4
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex0, FVector3f(TangentX0), FVector3f(TangentY0), FVector3f(FVector(TangentZ0)));
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex1, FVector3f(TangentX1), FVector3f(TangentY1), FVector3f(FVector(TangentZ1)));
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex2, FVector3f(TangentX2), FVector3f(TangentY2), FVector3f(FVector(TangentZ2)));
+#else
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex0, TangentX0, TangentY0, TangentZ0);
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex1, TangentX1, TangentY1, TangentZ1);
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex2, TangentX2, TangentY2, TangentZ2);
+#endif
+						}
+						else if (!LOD->bHasNormals) // if we are here we need to reapply normals
+						{
+#if ENGINE_MAJOR_VERSION > 4
+							FVector4f TangentX0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex0);
+							FVector4f TangentX1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex1);
+							FVector4f TangentX2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex2);
+							FVector3f TangentY0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex0);
+							FVector3f TangentY1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex1);
+							FVector3f TangentY2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex2);
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex0, TangentX0, TangentY0, FVector4f(TangentZ0));
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex1, TangentX1, TangentY1, FVector4f(TangentZ1));
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex2, TangentX2, TangentY2, FVector4f(TangentZ2));
+#else
+							FVector4 TangentX0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex0);
+							FVector4 TangentX1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex1);
+							FVector4 TangentX2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex2);
+							FVector TangentY0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex0);
+							FVector TangentY1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex1);
+							FVector TangentY2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex2);
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex0, TangentX0, TangentY0, TangentZ0);
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex1, TangentX1, TangentY1, TangentZ1);
+							LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex2, TangentX2, TangentY2, TangentZ2);
+#endif
+						}
+					});
+			}
+		}
+
+		LodRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(SkeletalMeshConfig.bPerPolyCollision || SkeletalMeshConfig.bAllowCPUAccess);
+#if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION <= 25 && WITH_EDITOR
+		// very annoying hack for support UE4.25 (unfortunately we cannot set bone influences)
+		TArray<FSoftSkinVertex> SoftSkinVertices;
+		SoftSkinVertices.AddUninitialized(InWeights.Num());
+		for (int32 SoftSkinIndex = 0; SoftSkinIndex < InWeights.Num(); SoftSkinIndex++)
+		{
+			FMemory::Memcpy(&SoftSkinVertices[SoftSkinIndex].InfluenceBones, &InWeights[SoftSkinIndex].InfluenceBones, sizeof(InWeights[SoftSkinIndex].InfluenceBones));
+			FMemory::Memcpy(&SoftSkinVertices[SoftSkinIndex].InfluenceWeights, &InWeights[SoftSkinIndex].InfluenceWeights, sizeof(InWeights[SoftSkinIndex].InfluenceWeights));
+		}
+		LodRenderData->SkinWeightVertexBuffer.Init(SoftSkinVertices);
+#else
+		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences > 0 ? MaxBoneInfluences : 1);
+
+		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneIndex(NumBones > MAX_uint8);
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
+		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneWeight(bUseHighPrecisionWeights);
+#endif
+
+		LodRenderData->SkinWeightVertexBuffer = InWeights;
+#endif
+	}
+
+	return true;
+}
+
 USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
 	if (!SkeletalMeshContext->SkeletalMesh)
@@ -353,9 +912,6 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		}
 	}
 
-	TMap<int32, int32> MainBonesCache;
-	int32 MatIndex = 0;
-
 	SkeletalMeshContext->SkeletalMesh->NeverStream = true;
 
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7
@@ -364,488 +920,15 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	SkeletalMeshContext->SkeletalMesh->ResetLODInfo();
 #endif
 
-	const float TangentsDirection = SkeletalMeshContext->SkeletalMeshConfig.bReverseTangents ? -1 : 1;
-
 	SkeletalMeshContext->SkeletalMesh->AllocateResourceForRendering();
 
 	OnPreCreatedSkeletalMesh.Broadcast(SkeletalMeshContext);
 
-	for (FglTFRuntimeMeshLOD* LOD : SkeletalMeshContext->LODs)
+	if (!glTFRuntime::FillSkeletalMeshRenderData(SkeletalMeshContext->SkeletalMesh->GetResourceForRendering(), SkeletalMeshContext->LODs, RefSkeleton, SkeletalMeshContext->SkinIndex, MainBoneMap, SkeletalMeshContext->BoundingBox, SkeletalMeshContext->SkeletalMeshConfig, [this](const FString& ErrorContext, const FString& ErrorMessage) {
+		AddError(ErrorContext, ErrorMessage);
+		}))
 	{
-		LOD->bHasTangents = true;
-		LOD->bHasNormals = true;
-		LOD->bHasVertexColors = false;
-
-		FSkeletalMeshLODRenderData* LodRenderData = new FSkeletalMeshLODRenderData();
-		int32 LODIndex = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData.Add(LodRenderData);
-
-		LodRenderData->RenderSections.SetNumUninitialized(LOD->Primitives.Num());
-
-		bool bUseHighPrecisionUVs = false;
-		bool bUseHighPrecisionWeights = false;
-
-		int32 NumIndices = 0;
-		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
-		{
-			NumIndices += LOD->Primitives[PrimitiveIndex].Indices.Num();
-			if (LOD->Primitives[PrimitiveIndex].bHighPrecisionUVs)
-			{
-				bUseHighPrecisionUVs = true;
-			}
-			if (LOD->Primitives[PrimitiveIndex].bHighPrecisionWeights)
-			{
-				bUseHighPrecisionWeights = true;
-			}
-			if (LOD->Primitives[PrimitiveIndex].Colors.Num() > 0)
-			{
-				LOD->bHasVertexColors = true;
-			}
-		}
-
-		LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumIndices);
-		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bUseHighPrecisionUVs || SkeletalMeshContext->SkeletalMeshConfig.bUseHighPrecisionUVs);
-		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseHighPrecisionTangentBasis(SkeletalMeshContext->SkeletalMeshConfig.bUseHighPrecisionTangentBasis);
-		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumIndices, 1);
-		if (LOD->bHasVertexColors)
-		{
-			LodRenderData->StaticVertexBuffers.ColorVertexBuffer.Init(NumIndices);
-		}
-
-		int32 NumBones = RefSkeleton.GetNum();
-
-		for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
-		{
-			LodRenderData->RequiredBones.Add(BoneIndex);
-			LodRenderData->ActiveBoneIndices.Add(BoneIndex);
-		}
-
-		TArray<FSkinWeightInfo> InWeights;
-		InWeights.AddZeroed(NumIndices);
-
-		int32 TotalVertexIndex = 0;
-		int32 Base = 0;
-		int32 MaxBoneInfluences = 4;
-
-		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
-		{
-			FglTFRuntimePrimitive& Primitive = LOD->Primitives[PrimitiveIndex];
-
-			new(&LodRenderData->RenderSections[PrimitiveIndex]) FSkelMeshRenderSection();
-			FSkelMeshRenderSection& MeshSection = LodRenderData->RenderSections[PrimitiveIndex];
-
-			MeshSection.MaterialIndex = PrimitiveIndex;
-			MeshSection.BaseIndex = TotalVertexIndex;
-			MeshSection.NumTriangles = Primitive.Indices.Num() / 3;
-			MeshSection.BaseVertexIndex = Base;
-			MeshSection.MaxBoneInfluences = FMath::Min(Primitive.Joints.Num() * 4, MAX_TOTAL_INFLUENCES);
-
-			if (MeshSection.MaxBoneInfluences > MaxBoneInfluences)
-			{
-				MaxBoneInfluences = MeshSection.MaxBoneInfluences;
-			}
-
-			MeshSection.NumVertices = Primitive.Indices.Num();
-
-			Base += MeshSection.NumVertices;
-
-			TMap<int32, TArray<int32>> OverlappingVertices;
-			MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
-
-			// this is used for non-skinned asset loaded as skinned ones
-			int32 OverrideIndexToCheck = 0;
-
-			for (int32 VertexIndex = 0; VertexIndex < Primitive.Indices.Num(); VertexIndex++)
-			{
-				int32 Index = Primitive.Indices[VertexIndex];
-				FModelVertex ModelVertex;
-
-				float TangentXW = 1;
-
-#if ENGINE_MAJOR_VERSION > 4
-				ModelVertex.Position = FVector3f(Primitive.Positions[Index]);
-				SkeletalMeshContext->BoundingBox += FVector(ModelVertex.Position) * SkeletalMeshContext->SkeletalMeshConfig.BoundsScale;
-				ModelVertex.TangentX = FVector3f::ZeroVector;
-				ModelVertex.TangentZ = FVector3f::ZeroVector;
-#else
-				ModelVertex.Position = Primitive.Positions[Index];
-				SkeletalMeshContext->BoundingBox += ModelVertex.Position * SkeletalMeshContext->SkeletalMeshConfig.BoundsScale;
-				ModelVertex.TangentX = FVector::ZeroVector;
-				ModelVertex.TangentZ = FVector::ZeroVector;
-#endif
-				if (Index < Primitive.Normals.Num())
-				{
-#if ENGINE_MAJOR_VERSION > 4
-					ModelVertex.TangentZ = FVector3f(FVector(Primitive.Normals[Index]));
-#else
-					ModelVertex.TangentZ = Primitive.Normals[Index];
-#endif
-				}
-				else
-				{
-					LOD->bHasNormals = false;
-				}
-
-				if (Index < Primitive.Tangents.Num())
-				{
-#if ENGINE_MAJOR_VERSION > 4
-					TangentXW = Primitive.Tangents[Index].W;
-					ModelVertex.TangentX = FVector4f(Primitive.Tangents[Index]);
-#else
-					ModelVertex.TangentX = Primitive.Tangents[Index];
-#endif
-				}
-				else
-				{
-					LOD->bHasTangents = false;
-				}
-
-				if (Primitive.UVs.Num() > 0 && Index < Primitive.UVs[0].Num())
-				{
-
-#if ENGINE_MAJOR_VERSION > 4
-					ModelVertex.TexCoord = FVector2f(Primitive.UVs[0][Index]);
-#else
-					ModelVertex.TexCoord = Primitive.UVs[0][Index];
-#endif
-					LOD->bHasUV = true;
-				}
-				else
-				{
-#if ENGINE_MAJOR_VERSION > 4
-					ModelVertex.TexCoord = FVector2f::ZeroVector;
-#else
-					ModelVertex.TexCoord = FVector2D::ZeroVector;
-#endif
-					LOD->bHasUV = false;
-				}
-
-#if ENGINE_MAJOR_VERSION > 4
-				FVector3f TangentY = FVector3f(ComputeTangentYWithW(FVector(ModelVertex.TangentZ), FVector(ModelVertex.TangentX), TangentXW * TangentsDirection));
-#else
-				FVector TangentY = ComputeTangentYWithW(ModelVertex.TangentZ, ModelVertex.TangentX, TangentXW * TangentsDirection);
-#endif
-				FColor Color = FColor::White;
-				if (Index < Primitive.Colors.Num())
-				{
-					Color = FLinearColor(Primitive.Colors[Index]).ToFColor(true);
-				}
-
-				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
-				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(TotalVertexIndex, ModelVertex.TangentX, TangentY, ModelVertex.TangentZ);
-				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(TotalVertexIndex, 0, ModelVertex.TexCoord);
-				if (LOD->bHasVertexColors)
-				{
-					LodRenderData->StaticVertexBuffers.ColorVertexBuffer.VertexColor(TotalVertexIndex) = Color;
-				}
-
-				TMap<int32, FName>& BoneMapInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.OverrideBoneMap : MainBoneMap;
-				TMap<int32, int32>& BonesCacheInUse = Primitive.OverrideBoneMap.Num() > 0 ? Primitive.BonesCache : MainBonesCache;
-
-				if ((!SkeletalMeshContext->SkeletalMeshConfig.bIgnoreSkin && SkeletalMeshContext->SkinIndex > INDEX_NONE) || LOD->Skeleton.Num() > 0)
-				{
-					uint32 TotalWeight = 0;
-					const int32 JointsNum = FMath::Min(Primitive.Joints.Num(), MeshSection.MaxBoneInfluences / 4);
-					for (int32 JointsIndex = 0; JointsIndex < JointsNum; JointsIndex++)
-					{
-						const FglTFRuntimeUInt16Vector4& Joints = Primitive.Joints[JointsIndex][Index];
-						const FVector4& Weights = Primitive.Weights[JointsIndex][Index];
-						for (int32 j = 0; j < 4; j++)
-						{
-							if (BoneMapInUse.Contains(Joints[j]))
-							{
-								int32 BoneIndex = INDEX_NONE;
-								if (BonesCacheInUse.Contains(Joints[j]))
-								{
-									BoneIndex = BonesCacheInUse[Joints[j]];
-								}
-								else
-								{
-									BoneIndex = RefSkeleton.FindBoneIndex(BoneMapInUse[Joints[j]]);
-									BonesCacheInUse.Add(Joints[j], BoneIndex);
-								}
-
-								BONE_INFLUENCE_TYPE QuantizedWeight = FMath::Clamp((BONE_INFLUENCE_TYPE)(Weights[j] * ((double)MAX_BONE_INFLUENCE_WEIGHT)), (BONE_INFLUENCE_TYPE)0x00, (BONE_INFLUENCE_TYPE)MAX_BONE_INFLUENCE_WEIGHT);
-
-								if (QuantizedWeight + TotalWeight > MAX_BONE_INFLUENCE_WEIGHT)
-								{
-									QuantizedWeight = MAX_BONE_INFLUENCE_WEIGHT - TotalWeight;
-								}
-
-								InWeights[TotalVertexIndex].InfluenceWeights[JointsIndex * 4 + j] = QuantizedWeight;
-								InWeights[TotalVertexIndex].InfluenceBones[JointsIndex * 4 + j] = BoneIndex;
-
-								TotalWeight += QuantizedWeight;
-							}
-							else if (!SkeletalMeshContext->SkeletalMeshConfig.bIgnoreMissingBones)
-							{
-								AddError("LoadSkeletalMesh_Internal()", FString::Printf(TEXT("Unable to find map for bone %u"), Joints[j]));
-								return nullptr;
-							}
-						}
-					}
-
-					// fix weight
-					if (TotalWeight < MAX_BONE_INFLUENCE_WEIGHT)
-					{
-						InWeights[TotalVertexIndex].InfluenceWeights[0] += MAX_BONE_INFLUENCE_WEIGHT - TotalWeight;
-					}
-				}
-				else if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.bFallbackToNodesTree)
-				{
-					if (BoneMapInUse.Contains(VertexIndex))
-					{
-						OverrideIndexToCheck = VertexIndex;
-					}
-					if (BoneMapInUse.Contains(OverrideIndexToCheck))
-					{
-						int32 BoneIndex = INDEX_NONE;
-						if (BonesCacheInUse.Contains(OverrideIndexToCheck))
-						{
-							BoneIndex = BonesCacheInUse[OverrideIndexToCheck];
-						}
-						else
-						{
-							BoneIndex = RefSkeleton.FindBoneIndex(BoneMapInUse[OverrideIndexToCheck]);
-							BonesCacheInUse.Add(OverrideIndexToCheck, BoneIndex);
-						}
-						InWeights[TotalVertexIndex].InfluenceWeights[0] = MAX_BONE_INFLUENCE_WEIGHT;
-						InWeights[TotalVertexIndex].InfluenceBones[0] = BoneIndex;
-						InWeights[TotalVertexIndex].InfluenceWeights[1] = 0;
-						InWeights[TotalVertexIndex].InfluenceBones[1] = 0;
-						InWeights[TotalVertexIndex].InfluenceWeights[2] = 0;
-						InWeights[TotalVertexIndex].InfluenceBones[2] = 0;
-						InWeights[TotalVertexIndex].InfluenceWeights[3] = 0;
-						InWeights[TotalVertexIndex].InfluenceBones[3] = 0;
-
-						MeshSection.MaxBoneInfluences = 1;
-					}
-					else if (!SkeletalMeshContext->SkeletalMeshConfig.bIgnoreMissingBones)
-					{
-						AddError("LoadSkeletalMesh_Internal()", "Unable to find map for node based bones");
-						return nullptr;
-					}
-				}
-				else
-				{
-					// reset it to be meaningful
-					MeshSection.MaxBoneInfluences = 1;
-					for (int32 j = 0; j < MeshSection.MaxBoneInfluences; j++)
-					{
-						InWeights[TotalVertexIndex].InfluenceWeights[j] = j == 0 ? MAX_BONE_INFLUENCE_WEIGHT : 0;
-						InWeights[TotalVertexIndex].InfluenceBones[j] = 0;
-					}
-				}
-
-				TotalVertexIndex++;
-			}
-
-			for (int32 BoneIndex = 0; BoneIndex < NumBones; BoneIndex++)
-			{
-				MeshSection.BoneMap.Add(BoneIndex);
-			}
-		}
-
-		if (SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Always)
-		{
-			LOD->bHasNormals = false;
-		}
-		else if (SkeletalMeshContext->SkeletalMeshConfig.NormalsGenerationStrategy == EglTFRuntimeNormalsGenerationStrategy::Never)
-		{
-			LOD->bHasNormals = true;
-		}
-
-		if (SkeletalMeshContext->SkeletalMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Always)
-		{
-			LOD->bHasTangents = false;
-		}
-		else if (SkeletalMeshContext->SkeletalMeshConfig.TangentsGenerationStrategy == EglTFRuntimeTangentsGenerationStrategy::Never)
-		{
-			LOD->bHasTangents = true;
-		}
-
-		if ((!LOD->bHasTangents || !LOD->bHasNormals) && TotalVertexIndex % 3 == 0)
-		{
-
-			//normals with NaNs are incorrectly handled on Android
-			auto FixVectorIfNan = [](FVector& Tangent, int32 Index)
-				{
-					if (Tangent.ContainsNaN() && Index >= 0 && Index < 3)
-					{
-						Tangent.Set(0.0, 0.0, 0.0);
-						Tangent[Index] = 1.0;
-					}
-				};
-
-			ParallelFor(TotalVertexIndex / 3, [&](const int32 VertexTriangleIndex)
-				{
-
-					const int32 VertexIndex = VertexTriangleIndex * 3;
-
-#if ENGINE_MAJOR_VERSION > 4
-					FVector Position0 = FVector(LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex));
-					FVector4 TangentZ0 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex));
-#else
-					FVector Position0 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex);
-					FVector4 TangentZ0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex);
-#endif
-
-
-#if ENGINE_MAJOR_VERSION > 4
-					FVector Position1 = FVector(LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex + 1));
-					FVector4 TangentZ1 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 1));
-#else
-					FVector Position1 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex + 1);
-					FVector4 TangentZ1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 1);
-#endif
-
-
-#if ENGINE_MAJOR_VERSION > 4
-					FVector Position2 = FVector(LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex + 2));
-					FVector4 TangentZ2 = FVector4(LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 2));
-#else
-					FVector Position2 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex + 2);
-					FVector4 TangentZ2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 2);
-#endif
-
-					if (!LOD->bHasNormals)
-					{
-						const FVector SideA = Position1 - Position0;
-						const FVector SideB = Position2 - Position0;
-
-						const FVector NormalFromCross = FVector::CrossProduct(SideB, SideA).GetSafeNormal();
-
-						TangentZ0 = NormalFromCross;
-						TangentZ1 = NormalFromCross;
-						TangentZ2 = NormalFromCross;
-					}
-
-					// if we do not have tangents but we have normals and a UV channel, we can compute them
-					if (!LOD->bHasTangents)
-					{
-						const FVector DeltaPosition0 = Position1 - Position0;
-						const FVector DeltaPosition1 = Position2 - Position0;
-
-						FVector TangentX0;
-						FVector TangentX1;
-						FVector TangentX2;
-
-						if (LOD->bHasUV)
-						{
-#if ENGINE_MAJOR_VERSION > 4
-							const FVector2f& UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
-							const FVector2f& UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
-							const FVector2f& UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
-							const FVector2f DeltaUV0 = UV1 - UV0;
-							const FVector2f DeltaUV1 = UV2 - UV0;
-#else
-							const FVector2D& UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
-							const FVector2D& UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
-							const FVector2D& UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
-							const FVector2D DeltaUV0 = UV1 - UV0;
-							const FVector2D DeltaUV1 = UV2 - UV0;
-#endif
-
-							const float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
-
-							const FVector TriangleTangentX = ((DeltaPosition0 * DeltaUV1.Y) - (DeltaPosition1 * DeltaUV0.Y)) * Factor;
-							const FVector TriangleTangentY = ((DeltaPosition0 * DeltaUV1.X) - (DeltaPosition1 * DeltaUV0.X)) * Factor;
-
-							TangentX0 = TriangleTangentX - (TangentZ0 * FVector::DotProduct(TangentZ0, TriangleTangentX));
-							TangentX0.Normalize();
-
-							TangentX1 = TriangleTangentX - (TangentZ1 * FVector::DotProduct(TangentZ1, TriangleTangentX));
-							TangentX1.Normalize();
-
-							TangentX2 = TriangleTangentX - (TangentZ2 * FVector::DotProduct(TangentZ2, TriangleTangentX));
-							TangentX2.Normalize();
-						}
-						else
-						{
-							TangentX0 = FVector::CrossProduct(TangentZ0, FVector::UpVector);
-							TangentX1 = FVector::CrossProduct(TangentZ1, FVector::UpVector);
-							TangentX2 = FVector::CrossProduct(TangentZ2, FVector::UpVector);
-						}
-
-#if PLATFORM_ANDROID
-						FixVectorIfNan(TangentX0, 0);
-						FixVectorIfNan(TangentX1, 0);
-						FixVectorIfNan(TangentX2, 0);
-#endif
-
-						FVector TangentY0 = ComputeTangentY(TangentZ0, TangentX0) * TangentsDirection;
-						FVector TangentY1 = ComputeTangentY(TangentZ1, TangentX1) * TangentsDirection;
-						FVector TangentY2 = ComputeTangentY(TangentZ2, TangentX2) * TangentsDirection;
-#if PLATFORM_ANDROID
-						FixVectorIfNan(TangentY0, 1);
-						FixVectorIfNan(TangentY1, 1);
-						FixVectorIfNan(TangentY2, 1);
-#endif
-
-
-#if ENGINE_MAJOR_VERSION > 4
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, FVector3f(TangentX0), FVector3f(TangentY0), FVector3f(FVector(TangentZ0)));
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, FVector3f(TangentX1), FVector3f(TangentY1), FVector3f(FVector(TangentZ1)));
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, FVector3f(TangentX2), FVector3f(TangentY2), FVector3f(FVector(TangentZ2)));
-#else
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, TangentX0, TangentY0, TangentZ0);
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, TangentX1, TangentY1, TangentZ1);
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, TangentX2, TangentY2, TangentZ2);
-#endif
-					}
-					else if (!LOD->bHasNormals) // if we are here we need to reapply normals
-					{
-#if ENGINE_MAJOR_VERSION > 4
-						FVector4f TangentX0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex);
-						FVector4f TangentX1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex + 1);
-						FVector4f TangentX2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex + 2);
-						FVector3f TangentY0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex);
-						FVector3f TangentY1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex + 1);
-						FVector3f TangentY2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex + 2);
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, TangentX0, TangentY0, FVector4f(TangentZ0));
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, TangentX1, TangentY1, FVector4f(TangentZ1));
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, TangentX2, TangentY2, FVector4f(TangentZ2));
-#else
-						FVector4 TangentX0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex);
-						FVector4 TangentX1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex + 1);
-						FVector4 TangentX2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex + 2);
-						FVector TangentY0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex);
-						FVector TangentY1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex + 1);
-						FVector TangentY2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex + 2);
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex, TangentX0, TangentY0, TangentZ0);
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 1, TangentX1, TangentY1, TangentZ1);
-						LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(VertexIndex + 2, TangentX2, TangentY2, TangentZ2);
-#endif
-					}
-				});
-		}
-
-		LodRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision || SkeletalMeshContext->SkeletalMeshConfig.bAllowCPUAccess);
-#if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION <= 25 && WITH_EDITOR
-		// very annoying hack for support UE4.25 (unfortunately we cannot set bone influences)
-		TArray<FSoftSkinVertex> SoftSkinVertices;
-		SoftSkinVertices.AddUninitialized(InWeights.Num());
-		for (int32 SoftSkinIndex = 0; SoftSkinIndex < InWeights.Num(); SoftSkinIndex++)
-		{
-			FMemory::Memcpy(&SoftSkinVertices[SoftSkinIndex].InfluenceBones, &InWeights[SoftSkinIndex].InfluenceBones, sizeof(InWeights[SoftSkinIndex].InfluenceBones));
-			FMemory::Memcpy(&SoftSkinVertices[SoftSkinIndex].InfluenceWeights, &InWeights[SoftSkinIndex].InfluenceWeights, sizeof(InWeights[SoftSkinIndex].InfluenceWeights));
-		}
-		LodRenderData->SkinWeightVertexBuffer.Init(SoftSkinVertices);
-#else
-		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences > 0 ? MaxBoneInfluences : 1);
-
-		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneIndex(NumBones > MAX_uint8);
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 1
-		LodRenderData->SkinWeightVertexBuffer.SetUse16BitBoneWeight(bUseHighPrecisionWeights);
-#endif
-
-		LodRenderData->SkinWeightVertexBuffer = InWeights;
-#endif
-		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(NumIndices > MAX_uint16 ? sizeof(uint32) : sizeof(uint16));
-
-		for (int32 Index = 0; Index < NumIndices; Index++)
-		{
-			LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(Index);
-		}
+		return nullptr;
 	}
 
 	FillAssetUserData(SkeletalMeshContext->MeshIndex, SkeletalMeshContext->SkeletalMesh);

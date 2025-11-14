@@ -2362,6 +2362,13 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreCreatedSkeletalMesh, FglTFR
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnFinalizedStaticMesh, TSharedRef<FglTFRuntimeParser>, UStaticMesh*, const FglTFRuntimeStaticMeshConfig&);
 #endif
 
+namespace glTFRuntime
+{
+	GLTFRUNTIME_API bool FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData, const TArray<FglTFRuntimeMeshLOD*>& LODs, const FReferenceSkeleton& RefSkeleton, const int32 SkinIndex, const TMap<int32, FName>& MainBoneMap, FBox& BoundingBox, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, TFunction<void(const FString& ErrorContext, const FString& ErrorMessage)> ErrorCallback);
+	GLTFRUNTIME_API FVector ComputeTangentY(const FVector Normal, const FVector TangetX);
+	GLTFRUNTIME_API FVector ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W);
+}
+
 /**
  *
  */
@@ -2676,6 +2683,7 @@ public:
 	void UpdateSceneBasis(const FMatrix& InSceneBasis);
 	void UpdateSceneScale(const float& InSceneScale);
 	float GetSceneScale() const;
+
 protected:
 	void LoadAndFillBaseMaterials();
 	TSharedRef<FJsonObject> Root;
@@ -3100,9 +3108,6 @@ protected:
 		}
 		return Values[Index];
 	}
-
-	FVector ComputeTangentY(const FVector Normal, const FVector TangetX);
-	FVector ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W);
 
 	TArray64<uint8> ZeroBuffer;
 	TMap<int32, TArray64<uint8>> SparseAccessorsCache;

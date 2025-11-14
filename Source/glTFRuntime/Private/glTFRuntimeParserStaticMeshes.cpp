@@ -269,11 +269,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #if ENGINE_MAJOR_VERSION > 4
 						StaticMeshVertex.TangentX = FVector4f(TangentX);
 						StaticMeshVertex.TangentZ = FVector3f(GetSafeValue(Primitive.Normals, VertexIndex, FVector::ZeroVector, bMissingNormals));
-						StaticMeshVertex.TangentY = FVector3f(ComputeTangentYWithW(FVector(StaticMeshVertex.TangentZ), FVector(StaticMeshVertex.TangentX), TangentX.W * TangentsDirection));
+						StaticMeshVertex.TangentY = FVector3f(glTFRuntime::ComputeTangentYWithW(FVector(StaticMeshVertex.TangentZ), FVector(StaticMeshVertex.TangentX), TangentX.W * TangentsDirection));
 #else
 						StaticMeshVertex.TangentX = TangentX;
 						StaticMeshVertex.TangentZ = GetSafeValue(Primitive.Normals, VertexIndex, FVector::ZeroVector, bMissingNormals);
-						StaticMeshVertex.TangentY = ComputeTangentYWithW(StaticMeshVertex.TangentZ, StaticMeshVertex.TangentX, TangentX.W * TangentsDirection);
+						StaticMeshVertex.TangentY = glTFRuntime::ComputeTangentYWithW(StaticMeshVertex.TangentZ, StaticMeshVertex.TangentX, TangentX.W * TangentsDirection);
 #endif
 
 						for (int32 UVIndex = 0; UVIndex < NumUVs; UVIndex++)
@@ -343,11 +343,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #if ENGINE_MAJOR_VERSION > 4
 						StaticMeshVertex.TangentX = FVector4f(TangentX);
 						StaticMeshVertex.TangentZ = FVector3f(GetSafeValue(Primitive.Normals, VertexIndex, FVector::ZeroVector, bMissingNormals));
-						StaticMeshVertex.TangentY = FVector3f(ComputeTangentYWithW(FVector(StaticMeshVertex.TangentZ), FVector(StaticMeshVertex.TangentX), TangentX.W * TangentsDirection));
+						StaticMeshVertex.TangentY = FVector3f(glTFRuntime::ComputeTangentYWithW(FVector(StaticMeshVertex.TangentZ), FVector(StaticMeshVertex.TangentX), TangentX.W * TangentsDirection));
 #else
 						StaticMeshVertex.TangentX = TangentX;
 						StaticMeshVertex.TangentZ = GetSafeValue(Primitive.Normals, VertexIndex, FVector::ZeroVector, bMissingNormals);
-						StaticMeshVertex.TangentY = ComputeTangentYWithW(StaticMeshVertex.TangentZ, StaticMeshVertex.TangentX, TangentX.W * TangentsDirection);
+						StaticMeshVertex.TangentY = glTFRuntime::ComputeTangentYWithW(StaticMeshVertex.TangentZ, StaticMeshVertex.TangentX, TangentX.W * TangentsDirection);
 #endif
 
 						for (int32 UVIndex = 0; UVIndex < NumUVs; UVIndex++)
@@ -611,10 +611,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 							TangentX0.Normalize();
 #if ENGINE_MAJOR_VERSION > 4
 							StaticMeshVertex0.TangentX = FVector3f(TangentX0);
-							StaticMeshVertex0.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex0.TangentZ), FVector(StaticMeshVertex0.TangentX)) * TangentsDirection);
+							StaticMeshVertex0.TangentY = FVector3f(glTFRuntime::ComputeTangentY(FVector(StaticMeshVertex0.TangentZ), FVector(StaticMeshVertex0.TangentX)) * TangentsDirection);
 #else
 							StaticMeshVertex0.TangentX = TangentX0;
-							StaticMeshVertex0.TangentY = ComputeTangentY(StaticMeshVertex0.TangentZ, StaticMeshVertex0.TangentX) * TangentsDirection;
+							StaticMeshVertex0.TangentY = glTFRuntime::ComputeTangentY(StaticMeshVertex0.TangentZ, StaticMeshVertex0.TangentX) * TangentsDirection;
 #endif
 						}
 
@@ -625,10 +625,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 
 #if ENGINE_MAJOR_VERSION > 4
 							StaticMeshVertex1.TangentX = FVector3f(TangentX1);
-							StaticMeshVertex1.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex1.TangentZ), FVector(StaticMeshVertex1.TangentX)) * TangentsDirection);
+							StaticMeshVertex1.TangentY = FVector3f(glTFRuntime::ComputeTangentY(FVector(StaticMeshVertex1.TangentZ), FVector(StaticMeshVertex1.TangentX)) * TangentsDirection);
 #else
 							StaticMeshVertex1.TangentX = TangentX1;
-							StaticMeshVertex1.TangentY = ComputeTangentY(StaticMeshVertex1.TangentZ, StaticMeshVertex1.TangentX) * TangentsDirection;
+							StaticMeshVertex1.TangentY = glTFRuntime::ComputeTangentY(StaticMeshVertex1.TangentZ, StaticMeshVertex1.TangentX) * TangentsDirection;
 #endif
 						}
 
@@ -638,10 +638,10 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 							TangentX2.Normalize();
 #if ENGINE_MAJOR_VERSION > 4
 							StaticMeshVertex2.TangentX = FVector3f(TangentX2);
-							StaticMeshVertex2.TangentY = FVector3f(ComputeTangentY(FVector(StaticMeshVertex2.TangentZ), FVector(StaticMeshVertex2.TangentX)) * TangentsDirection);
+							StaticMeshVertex2.TangentY = FVector3f(glTFRuntime::ComputeTangentY(FVector(StaticMeshVertex2.TangentZ), FVector(StaticMeshVertex2.TangentX)) * TangentsDirection);
 #else
 							StaticMeshVertex2.TangentX = TangentX2;
-							StaticMeshVertex2.TangentY = ComputeTangentY(StaticMeshVertex2.TangentZ, StaticMeshVertex2.TangentX) * TangentsDirection;
+							StaticMeshVertex2.TangentY = glTFRuntime::ComputeTangentY(StaticMeshVertex2.TangentZ, StaticMeshVertex2.TangentX) * TangentsDirection;
 #endif
 						}
 					});
