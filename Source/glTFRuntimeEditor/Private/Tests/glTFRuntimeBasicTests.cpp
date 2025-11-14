@@ -90,5 +90,42 @@ bool FglTFRuntimeTests_Basic_BlenderEmpty_TwoNodes::RunTest(const FString& Param
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FglTFRuntimeTests_Basic_BadScene, "glTFRuntime.UnitTests.Basic.BadScene", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FglTFRuntimeTests_Basic_BadScene::RunTest(const FString& Parameters)
+{
+	glTFRuntime::Tests::FFixture32 Fixture("bad_scene.gltf");
+
+	FglTFRuntimeConfig LoaderConfig;
+	UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(Fixture.Blob, LoaderConfig);
+	TestTrue("Asset != nullptr", Asset != nullptr);
+
+	FglTFRuntimeScene Scene0;
+	bool bSuccess = Asset->GetParser()->LoadScene(0, Scene0);
+
+	TestEqual("LoadScene(0) == false", bSuccess, false);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FglTFRuntimeTests_Basic_EmptyScene, "glTFRuntime.UnitTests.Basic.EmptyScene", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FglTFRuntimeTests_Basic_EmptyScene::RunTest(const FString& Parameters)
+{
+	glTFRuntime::Tests::FFixture32 Fixture("empty_scene.gltf");
+
+	FglTFRuntimeConfig LoaderConfig;
+	UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(Fixture.Blob, LoaderConfig);
+	TestTrue("Asset != nullptr", Asset != nullptr);
+
+	FglTFRuntimeScene Scene0;
+	bool bSuccess = Asset->GetParser()->LoadScene(0, Scene0);
+
+	TestEqual("LoadScene(0) == true", bSuccess, true);
+	TestEqual("Scene0.Index == 0", Scene0.Index, 0);
+	TestEqual("Scene0.Name == \"\"", Scene0.Name, "0");
+
+	return true;
+}
 
 #endif
