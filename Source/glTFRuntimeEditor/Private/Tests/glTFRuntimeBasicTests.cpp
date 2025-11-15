@@ -94,7 +94,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FglTFRuntimeTests_Basic_BadScene, "glTFRuntime.
 
 bool FglTFRuntimeTests_Basic_BadScene::RunTest(const FString& Parameters)
 {
-	glTFRuntime::Tests::FFixture32 Fixture("bad_scene.gltf");
+	glTFRuntime::Tests::FFixture32 Fixture("BadScene.gltf");
 
 	FglTFRuntimeConfig LoaderConfig;
 	UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(Fixture.Blob, LoaderConfig);
@@ -112,7 +112,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FglTFRuntimeTests_Basic_EmptyScene, "glTFRuntim
 
 bool FglTFRuntimeTests_Basic_EmptyScene::RunTest(const FString& Parameters)
 {
-	glTFRuntime::Tests::FFixture32 Fixture("empty_scene.gltf");
+	glTFRuntime::Tests::FFixture32 Fixture("EmptyScene.gltf");
 
 	FglTFRuntimeConfig LoaderConfig;
 	UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(Fixture.Blob, LoaderConfig);

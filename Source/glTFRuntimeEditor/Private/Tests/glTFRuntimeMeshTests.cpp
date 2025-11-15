@@ -61,5 +61,82 @@ bool FglTFRuntimeTests_Mesh_Blender_PlaneWeightMaps::RunTest(const FString& Para
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FglTFRuntimeTests_Mesh_Triangle, "glTFRuntime.UnitTests.Mesh.Triangle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FglTFRuntimeTests_Mesh_Triangle::RunTest(const FString& Parameters)
+{
+	glTFRuntime::Tests::FFixturePath Fixture("Triangle.gltf");
+
+	FglTFRuntimeConfig LoaderConfig;
+	UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(Fixture.Path, false, LoaderConfig);
+
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
+	FglTFRuntimeMeshLOD LOD;
+	Asset->LoadMeshAsRuntimeLOD(0, LOD, MaterialsConfig);
+
+	TestEqual("LOD.Primitives.Num() == 1", LOD.Primitives.Num(), 1);
+	TestEqual("LOD.Primitives[0].bHasIndices == false", LOD.Primitives[0].bHasIndices, false);
+	TestEqual("LOD.Primitives[0].Indices.Num() == 3", LOD.Primitives[0].Indices.Num(), 3);
+	TestEqual("LOD.Primitives[0].Indices = { 0, 1, 2 }", LOD.Primitives[0].Indices, { 0, 1, 2 });
+	TestEqual("LOD.Primitives[0].Positions.Num() == 3", LOD.Primitives[0].Positions.Num(), 3);
+	TestEqual("LOD.Primitives[0].Normals.Num() == 0", LOD.Primitives[0].Normals.Num(), 0);
+
+	TestEqual("LOD.Primitives[0].Positions = { { -10000, 0, 0 }, { 0, -10000, 0 }, { 0, 10000, 0 } }", LOD.Primitives[0].Positions, { { -10000, 0, 0 }, { 0, -10000, 0 }, { 0, 10000, 0 } });
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FglTFRuntimeTests_Mesh_TriangleSceneScaled, "glTFRuntime.UnitTests.Mesh.TriangleSceneScaled", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FglTFRuntimeTests_Mesh_TriangleSceneScaled::RunTest(const FString& Parameters)
+{
+	glTFRuntime::Tests::FFixturePath Fixture("Triangle.gltf");
+
+	FglTFRuntimeConfig LoaderConfig;
+	LoaderConfig.SceneScale = 1;
+	UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(Fixture.Path, false, LoaderConfig);
+
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
+	FglTFRuntimeMeshLOD LOD;
+	Asset->LoadMeshAsRuntimeLOD(0, LOD, MaterialsConfig);
+
+	TestEqual("LOD.Primitives.Num() == 1", LOD.Primitives.Num(), 1);
+	TestEqual("LOD.Primitives[0].bHasIndices == false", LOD.Primitives[0].bHasIndices, false);
+	TestEqual("LOD.Primitives[0].Indices.Num() == 3", LOD.Primitives[0].Indices.Num(), 3);
+	TestEqual("LOD.Primitives[0].Indices = { 0, 1, 2 }", LOD.Primitives[0].Indices, { 0, 1, 2 });
+	TestEqual("LOD.Primitives[0].Positions.Num() == 3", LOD.Primitives[0].Positions.Num(), 3);
+	TestEqual("LOD.Primitives[0].Normals.Num() == 0", LOD.Primitives[0].Normals.Num(), 0);
+
+	TestEqual("LOD.Primitives[0].Positions = { { -100, 0, 0 }, { 0, -100, 0 }, { 0, 100, 0 } }", LOD.Primitives[0].Positions, { { -100, 0, 0 }, { 0, -100, 0 }, { 0, 100, 0 } });
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FglTFRuntimeTests_Mesh_TriangleIdentity, "glTFRuntime.UnitTests.Mesh.TriangleIdentity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FglTFRuntimeTests_Mesh_TriangleIdentity::RunTest(const FString& Parameters)
+{
+	glTFRuntime::Tests::FFixturePath Fixture("Triangle.gltf");
+
+	FglTFRuntimeConfig LoaderConfig;
+	LoaderConfig.SceneScale = 1;
+	LoaderConfig.TransformBaseType = EglTFRuntimeTransformBaseType::Identity;
+	UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(Fixture.Path, false, LoaderConfig);
+
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
+	FglTFRuntimeMeshLOD LOD;
+	Asset->LoadMeshAsRuntimeLOD(0, LOD, MaterialsConfig);
+
+	TestEqual("LOD.Primitives.Num() == 1", LOD.Primitives.Num(), 1);
+	TestEqual("LOD.Primitives[0].bHasIndices == false", LOD.Primitives[0].bHasIndices, false);
+	TestEqual("LOD.Primitives[0].Indices.Num() == 3", LOD.Primitives[0].Indices.Num(), 3);
+	TestEqual("LOD.Primitives[0].Indices = { 0, 1, 2 }", LOD.Primitives[0].Indices, { 0, 1, 2 });
+	TestEqual("LOD.Primitives[0].Positions.Num() == 3", LOD.Primitives[0].Positions.Num(), 3);
+	TestEqual("LOD.Primitives[0].Normals.Num() == 0", LOD.Primitives[0].Normals.Num(), 0);
+
+	TestEqual("LOD.Primitives[0].Positions = { { 0, 0, 100 }, { -100, 0, 0 }, { 100, 0, 0 } }", LOD.Primitives[0].Positions, { { 0, 0, 100 }, { -100, 0, 0 }, { 100, 0, 0 } });
+
+	return true;
+}
 
 #endif
