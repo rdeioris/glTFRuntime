@@ -568,9 +568,9 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 						bool bSetVertex1 = false;
 						bool bSetVertex2 = false;
 
-						const int32 VertexIndex0 = CurrentIndices[VertexTriangleIndex];
-						const int32 VertexIndex1 = CurrentIndices[VertexTriangleIndex + 1];
-						const int32 VertexIndex2 = CurrentIndices[VertexTriangleIndex + 2];
+						const int32 VertexIndex0 = CurrentIndices[VertexTriangleIndex * 3];
+						const int32 VertexIndex1 = CurrentIndices[VertexTriangleIndex * 3 + 1];
+						const int32 VertexIndex2 = CurrentIndices[VertexTriangleIndex * 3 + 2];
 
 						if (Primitive.bHasIndices)
 						{

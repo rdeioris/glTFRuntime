@@ -139,4 +139,24 @@ bool FglTFRuntimeTests_Mesh_TriangleIdentity::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FglTFRuntimeTests_Mesh_BadMesh, "glTFRuntime.UnitTests.Mesh.BadMesh", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FglTFRuntimeTests_Mesh_BadMesh::RunTest(const FString& Parameters)
+{
+	glTFRuntime::Tests::FFixturePath Fixture("BadMesh.gltf");
+
+	FglTFRuntimeConfig LoaderConfig;
+	UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(Fixture.Path, false, LoaderConfig);
+
+	FglTFRuntimeMaterialsConfig MaterialsConfig;
+	FglTFRuntimeMeshLOD LOD;
+	Asset->LoadMeshAsRuntimeLOD(0, LOD, MaterialsConfig);
+
+	TestEqual("LOD.Primitives.Num() == 0", LOD.Primitives.Num(), 0);
+
+	TestEqual("Asset->GetErrors() == { \"LoadPrimitive(): POSITION attribute is required\" }", Asset->GetErrors(), { "LoadPrimitive(): POSITION attribute is required" });
+
+	return true;
+}
+
 #endif
