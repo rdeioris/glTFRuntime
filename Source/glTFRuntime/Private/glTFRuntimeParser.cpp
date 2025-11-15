@@ -1500,7 +1500,10 @@ void FglTFRuntimeParser::AddError(const FString& ErrorContext, const FString& Er
 {
 	FString FullMessage = ErrorContext + ": " + ErrorMessage;
 	Errors.Add(FullMessage);
-	UE_LOG(LogGLTFRuntime, Error, TEXT("%s"), *FullMessage);
+	if (!GIsAutomationTesting)
+	{
+		UE_LOG(LogGLTFRuntime, Error, TEXT("%s"), *FullMessage);
+	}
 	if (OnError.IsBound())
 	{
 		OnError.Broadcast(ErrorContext, ErrorMessage);
