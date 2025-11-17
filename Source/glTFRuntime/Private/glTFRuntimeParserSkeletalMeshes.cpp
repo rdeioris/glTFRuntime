@@ -47,6 +47,12 @@
 #include "UObject/SavePackage.h"
 #endif
 
+/*
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7
+#include "SkeletalMeshDescription.h"
+#endif
+*/
+
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
 #define BONE_INFLUENCE_TYPE uint16
 #define MAX_BONE_INFLUENCE_WEIGHT 0xffff
@@ -1279,6 +1285,113 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	SkeletalMeshContext->SkeletalMesh->InitResources();
 
 	SkeletalMeshContext->SkeletalMesh->RebuildSocketMap();
+
+#if WITH_EDITOR && ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7
+	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
+	{
+		FMeshDescription* MeshDescription = SkeletalMeshContext->SkeletalMesh->CreateMeshDescription(LODIndex);
+		// it looks like it is not needed to build the whole meshdescription to make the skeletalmesh editor happy...
+#if 0
+		FSkeletalMeshAttributes SkeletalMeshAttributes(*MeshDescription);
+
+		const int32 NumUVs = 1;
+
+		TVertexAttributesRef<FVector3f> MeshDescriptionPositions = MeshDescription->GetVertexPositions();
+		TVertexInstanceAttributesRef<FVector3f> VertexInstanceNormals = SkeletalMeshAttributes.GetVertexInstanceNormals();
+		TVertexInstanceAttributesRef<FVector3f> VertexInstanceTangents = SkeletalMeshAttributes.GetVertexInstanceTangents();
+		TVertexInstanceAttributesRef<FVector2f> VertexInstanceUVs = SkeletalMeshAttributes.GetVertexInstanceUVs();
+		TVertexInstanceAttributesRef<FVector4f> VertexInstanceColors = SkeletalMeshAttributes.GetVertexInstanceColors();
+		VertexInstanceUVs.SetNumChannels(NumUVs);
+
+		FSkinWeightsVertexAttributesRef VertexSkinWeights = SkeletalMeshAttributes.GetVertexSkinWeights();
+
+		const FStaticMeshVertexBuffers& StaticMeshVertexBuffers = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].StaticVertexBuffers;
+		const FMultiSizeIndexContainer& MultiSizeIndexContainer = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].MultiSizeIndexContainer;
+		const FSkinWeightVertexBuffer& SkinWeightVertexBuffer = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].SkinWeightVertexBuffer;
+
+		for (int32 VertexIndex = 0; VertexIndex < static_cast<int32>(StaticMeshVertexBuffers.PositionVertexBuffer.GetNumVertices()); VertexIndex++)
+		{
+			const FVertexID VertexID = FVertexID(VertexIndex);
+			MeshDescription->CreateVertexWithID(VertexID);
+			MeshDescriptionPositions[VertexID] = StaticMeshVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex);
+		}
+
+		TArray<TPair<uint32, FPolygonGroupID>> PolygonGroups;
+		for (const FSkelMeshRenderSection& Section : SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].RenderSections)
+		{
+			const FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
+			PolygonGroups.Add(TPair<uint32, FPolygonGroupID>(Section.BaseIndex, PolygonGroupID));
+		}
+
+		const FRawStaticIndexBuffer16or32Interface* IndexBuffer = MultiSizeIndexContainer.GetIndexBuffer();
+
+		const uint32 NumIndices = IndexBuffer->Num();
+		int32 CurrentPolygonGroupIndex = 0;
+		uint32 CleanedNumOfIndices = (NumIndices / 3) * 3; // avoid crash on non triangles...
+		for (uint32 VertexIndex = 0; VertexIndex < CleanedNumOfIndices; VertexIndex += 3)
+		{
+			const uint32 VertexIndex0 = IndexBuffer->Get(VertexIndex);
+			const uint32 VertexIndex1 = IndexBuffer->Get(VertexIndex + 1);
+			const uint32 VertexIndex2 = IndexBuffer->Get(VertexIndex + 2);
+
+			// skip invalid triangles
+			if (VertexIndex0 == VertexIndex1 || VertexIndex0 == VertexIndex2 || VertexIndex1 == VertexIndex2)
+			{
+				continue;
+			}
+
+			const uint32 NumVertices = StaticMeshVertexBuffers.StaticMeshVertexBuffer.GetNumVertices();
+
+			if (VertexIndex0 >= NumVertices || VertexIndex1 >= NumVertices || VertexIndex2 >= NumVertices)
+			{
+				continue;
+			}
+
+			const FVertexInstanceID VertexInstanceID0 = MeshDescription->CreateVertexInstance(FVertexID(VertexIndex0));
+			const FVertexInstanceID VertexInstanceID1 = MeshDescription->CreateVertexInstance(FVertexID(VertexIndex1));
+			const FVertexInstanceID VertexInstanceID2 = MeshDescription->CreateVertexInstance(FVertexID(VertexIndex2));
+
+			VertexInstanceNormals[VertexInstanceID0] = StaticMeshVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex0);
+			VertexInstanceTangents[VertexInstanceID0] = StaticMeshVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex0);
+			VertexInstanceNormals[VertexInstanceID1] = StaticMeshVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex1);
+			VertexInstanceTangents[VertexInstanceID1] = StaticMeshVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex1);
+			VertexInstanceNormals[VertexInstanceID2] = StaticMeshVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex2);
+			VertexInstanceTangents[VertexInstanceID2] = StaticMeshVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex2);
+
+			for (int32 UVIndex = 0; UVIndex < NumUVs; UVIndex++)
+			{
+				VertexInstanceUVs.Set(VertexInstanceID0, UVIndex, StaticMeshVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex0, UVIndex));
+				VertexInstanceUVs.Set(VertexInstanceID1, UVIndex, StaticMeshVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex1, UVIndex));
+				VertexInstanceUVs.Set(VertexInstanceID2, UVIndex, StaticMeshVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex2, UVIndex));
+			}
+
+			const uint32 NumColorVertices = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].StaticVertexBuffers.ColorVertexBuffer.GetNumVertices();
+
+			if (NumColorVertices > 0)
+			{
+				VertexInstanceColors[VertexInstanceID0] = FLinearColor(SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].StaticVertexBuffers.ColorVertexBuffer.VertexColor(VertexIndex0));
+				VertexInstanceColors[VertexInstanceID1] = FLinearColor(SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].StaticVertexBuffers.ColorVertexBuffer.VertexColor(VertexIndex1));
+				VertexInstanceColors[VertexInstanceID2] = FLinearColor(SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].StaticVertexBuffers.ColorVertexBuffer.VertexColor(VertexIndex2));
+			}
+
+			// safe approach given that the section array is built in order
+			if (CurrentPolygonGroupIndex + 1 < PolygonGroups.Num())
+			{
+				if (VertexIndex >= PolygonGroups[CurrentPolygonGroupIndex + 1].Key)
+				{
+					CurrentPolygonGroupIndex++;
+				}
+			}
+			const FPolygonGroupID PolygonGroupID = PolygonGroups[CurrentPolygonGroupIndex].Value;
+
+			MeshDescription->CreateTriangle(PolygonGroupID, { VertexInstanceID0, VertexInstanceID1, VertexInstanceID2 });
+		}
+
+		SkeletalMeshContext->SkeletalMesh->CommitMeshDescription(LODIndex);
+#endif
+	}
+#endif
+
 
 	OnSkeletalMeshCreated.Broadcast(SkeletalMeshContext->SkeletalMesh);
 
