@@ -1,4 +1,4 @@
-// Copyright 2020-2023, Roberto De Ioris.
+// Copyright 2020-2025, Roberto De Ioris.
 
 #pragma once
 
@@ -20,6 +20,7 @@
 #include "Engine/TextureCube.h"
 #include "Engine/TextureMipDataProviderFactory.h"
 #include "Engine/VolumeTexture.h"
+#include "UObject/GCObject.h"
 #include "Camera/CameraComponent.h"
 #include "Components/AudioComponent.h"
 #include "Components/LightComponent.h"
