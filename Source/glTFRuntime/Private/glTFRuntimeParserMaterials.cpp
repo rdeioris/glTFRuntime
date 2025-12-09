@@ -241,7 +241,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			}
 			GetMaterialTexture(JsonMaterialTransmission->ToSharedRef(), "transmissionTexture", false, RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips, RuntimeMaterial.TransmissionTransform, RuntimeMaterial.TransmissionSampler, false);
 
-			RuntimeMaterial.bKHR_materials_transmission = (RuntimeMaterial.TransmissionFactor > 0.0);
+			RuntimeMaterial.bKHR_materials_transmission = true;
 		}
 
 		// KHR_materials_unlit 
@@ -647,73 +647,97 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	if (!ForceBaseMaterial)
 	{
-		if (MaterialsConfig.MetallicRoughnessOverrideMap.Contains(RuntimeMaterial.MaterialType))
+		if (MaterialsConfig.bUseSubstrateMaterials && !RuntimeMaterial.bKHR_materials_unlit && !RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness)
 		{
-			BaseMaterial = MaterialsConfig.MetallicRoughnessOverrideMap[RuntimeMaterial.MaterialType];
-		}
-		else if (MetallicRoughnessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
-		{
-			BaseMaterial = MetallicRoughnessMaterialsMap[RuntimeMaterial.MaterialType];
-		}
+			EglTFRuntimeSubstrateMaterialType SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::OpaqueTwoSided : EglTFRuntimeSubstrateMaterialType::Opaque;
+			if (RuntimeMaterial.bKHR_materials_transmission)
+			{
+				SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::TransmittanceTwoSided : EglTFRuntimeSubstrateMaterialType::Transmittance;
+			}
+			else if (RuntimeMaterial.bTranslucent)
+			{
+				SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::AlphaCompositeTwoSided : EglTFRuntimeSubstrateMaterialType::AlphaComposite;
+			}
+			else if (RuntimeMaterial.bMasked)
+			{
+				SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::MaskedTwoSided : EglTFRuntimeSubstrateMaterialType::Masked;
+			}
 
-		if (RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness)
-		{
-			if (MaterialsConfig.SpecularGlossinessOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			if (MaterialsConfig.SubstrateMaterials.Contains(SubstrateMaterialType))
 			{
-				BaseMaterial = MaterialsConfig.SpecularGlossinessOverrideMap[RuntimeMaterial.MaterialType];
-			}
-			else if (SpecularGlossinessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
-			{
-				BaseMaterial = SpecularGlossinessMaterialsMap[RuntimeMaterial.MaterialType];
+				BaseMaterial = MaterialsConfig.SubstrateMaterials[SubstrateMaterialType];
 			}
 		}
-
-		if (RuntimeMaterial.bKHR_materials_unlit)
+		else
 		{
-			if (MaterialsConfig.UnlitOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			if (MaterialsConfig.MetallicRoughnessOverrideMap.Contains(RuntimeMaterial.MaterialType))
 			{
-				BaseMaterial = MaterialsConfig.UnlitOverrideMap[RuntimeMaterial.MaterialType];
+				BaseMaterial = MaterialsConfig.MetallicRoughnessOverrideMap[RuntimeMaterial.MaterialType];
 			}
-			else if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+			else if (MetallicRoughnessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 			{
-				BaseMaterial = UnlitMaterialsMap[RuntimeMaterial.MaterialType];
+				BaseMaterial = MetallicRoughnessMaterialsMap[RuntimeMaterial.MaterialType];
 			}
-		}
 
-		if (RuntimeMaterial.bKHR_materials_clearcoat)
-		{
-			if (MaterialsConfig.ClearCoatOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			if (RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness)
 			{
-				BaseMaterial = MaterialsConfig.ClearCoatOverrideMap[RuntimeMaterial.MaterialType];
+				if (MaterialsConfig.SpecularGlossinessOverrideMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = MaterialsConfig.SpecularGlossinessOverrideMap[RuntimeMaterial.MaterialType];
+				}
+				else if (SpecularGlossinessMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = SpecularGlossinessMaterialsMap[RuntimeMaterial.MaterialType];
+				}
 			}
-			else if (ClearCoatMaterialsMap.Contains(RuntimeMaterial.MaterialType))
-			{
-				BaseMaterial = ClearCoatMaterialsMap[RuntimeMaterial.MaterialType];
-			}
-		}
 
-		if (RuntimeMaterial.bKHR_materials_sheen)
-		{
-			if (MaterialsConfig.SheenOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			if (RuntimeMaterial.bKHR_materials_unlit)
 			{
-				BaseMaterial = MaterialsConfig.SheenOverrideMap[RuntimeMaterial.MaterialType];
+				if (MaterialsConfig.UnlitOverrideMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = MaterialsConfig.UnlitOverrideMap[RuntimeMaterial.MaterialType];
+				}
+				else if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = UnlitMaterialsMap[RuntimeMaterial.MaterialType];
+				}
 			}
-			else if (SheenMaterialsMap.Contains(RuntimeMaterial.MaterialType))
-			{
-				BaseMaterial = SheenMaterialsMap[RuntimeMaterial.MaterialType];
-			}
-		}
 
-		// NOTE: ensure to have transmission as the last check given its incompatibility with other materials like clearcoat
-		if (RuntimeMaterial.bKHR_materials_transmission)
-		{
-			if (MaterialsConfig.TransmissionOverrideMap.Contains(RuntimeMaterial.MaterialType))
+			if (RuntimeMaterial.bKHR_materials_clearcoat)
 			{
-				BaseMaterial = MaterialsConfig.TransmissionOverrideMap[RuntimeMaterial.MaterialType];
+				if (MaterialsConfig.ClearCoatOverrideMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = MaterialsConfig.ClearCoatOverrideMap[RuntimeMaterial.MaterialType];
+				}
+				else if (ClearCoatMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = ClearCoatMaterialsMap[RuntimeMaterial.MaterialType];
+				}
 			}
-			else if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+
+			if (RuntimeMaterial.bKHR_materials_sheen)
 			{
-				BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
+				if (MaterialsConfig.SheenOverrideMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = MaterialsConfig.SheenOverrideMap[RuntimeMaterial.MaterialType];
+				}
+				else if (SheenMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = SheenMaterialsMap[RuntimeMaterial.MaterialType];
+				}
+			}
+
+			// NOTE: ensure to have transmission as the last check given its incompatibility with other materials like clearcoat
+			if (RuntimeMaterial.bKHR_materials_transmission)
+			{
+				if (MaterialsConfig.TransmissionOverrideMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = MaterialsConfig.TransmissionOverrideMap[RuntimeMaterial.MaterialType];
+				}
+				else if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+				{
+					BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
+				}
 			}
 		}
 	}

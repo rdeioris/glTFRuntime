@@ -403,6 +403,19 @@ enum class EglTFRuntimeMaterialType : uint8
 };
 
 UENUM()
+enum class EglTFRuntimeSubstrateMaterialType : uint8
+{
+	Opaque,
+	OpaqueTwoSided,
+	Transmittance,
+	TransmittanceTwoSided,
+	AlphaComposite,
+	AlphaCompositeTwoSided,
+	Masked,
+	MaskedTwoSided
+};
+
+UENUM()
 enum class EglTFRuntimeCacheMode : uint8
 {
 	ReadWrite,
@@ -742,6 +755,12 @@ struct FglTFRuntimeMaterialsConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FString> CollectWeightMaps;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bUseSubstrateMaterials;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TMap<EglTFRuntimeSubstrateMaterialType, UMaterialInterface*> SubstrateMaterials;
+
 	FglTFRuntimeMaterialsConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -764,6 +783,7 @@ struct FglTFRuntimeMaterialsConfig
 		LinesScaleFactor = 1;
 		bAddEpicInterchangeParams = false;
 		bForceEmptyMaterialNameToMaterialIndex = false;
+		bUseSubstrateMaterials = false;
 	}
 };
 
