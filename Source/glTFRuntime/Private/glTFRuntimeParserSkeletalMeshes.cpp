@@ -1027,10 +1027,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
 					MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
 
-					for (int32 Index = 0; Index < Primitive.Indices.Num(); Index++)
+					for (int32 VertexIndex = 0; VertexIndex < Primitive.Positions.Num(); VertexIndex++)
 					{
 						FMorphTargetDelta Delta;
-						int32 VertexIndex = Primitive.Indices[Index];
 						if (VertexIndex < MorphTargetData.Positions.Num())
 						{
 #if ENGINE_MAJOR_VERSION > 4
@@ -1053,7 +1052,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 							bSkip = false;
 						}
 
-						Delta.SourceIdx = BaseIndex + Index;
+						Delta.SourceIdx = BaseIndex + VertexIndex;
 #if ENGINE_MAJOR_VERSION > 4
 						Delta.TangentZDelta = FVector3f::ZeroVector;
 #else
