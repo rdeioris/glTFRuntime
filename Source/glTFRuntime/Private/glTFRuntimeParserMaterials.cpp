@@ -329,6 +329,37 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			GetMaterialTexture(JsonMaterialSheen->ToSharedRef(), "sheenRoughnessTexture", false, RuntimeMaterial.SheenRoughnessTextureCache, RuntimeMaterial.SheenRoughnessTextureMips, RuntimeMaterial.SheenRoughnessTextureTransform, RuntimeMaterial.SheenRoughnessTextureSampler, false);
 			RuntimeMaterial.bKHR_materials_sheen = true;
 		}
+
+		// KHR_materials_iridescence
+		const TSharedPtr<FJsonObject>* JsonMaterialIridescence;
+		if ((*JsonExtensions)->TryGetObjectField(TEXT("KHR_materials_iridescence"), JsonMaterialIridescence))
+		{
+			if (!(*JsonMaterialIridescence)->TryGetNumberField(TEXT("iridescenceFactor"), RuntimeMaterial.IridescenceFactor))
+			{
+				RuntimeMaterial.IridescenceFactor = 0;
+			}
+
+			if (!(*JsonMaterialIridescence)->TryGetNumberField(TEXT("iridescenceIor"), RuntimeMaterial.IridescenceIor))
+			{
+				RuntimeMaterial.IridescenceIor = 1.3;
+			}
+
+			if (!(*JsonMaterialIridescence)->TryGetNumberField(TEXT("iridescenceThicknessMinimum"), RuntimeMaterial.IridescenceThicknessMinimum))
+			{
+				RuntimeMaterial.IridescenceThicknessMinimum = 200;
+			}
+
+			if (!(*JsonMaterialIridescence)->TryGetNumberField(TEXT("iridescenceThicknessMaximum"), RuntimeMaterial.IridescenceThicknessMaximum))
+			{
+				RuntimeMaterial.IridescenceThicknessMaximum = 400;
+			}
+
+			GetMaterialTexture(JsonMaterialIridescence->ToSharedRef(), "iridescenceTexture", false, RuntimeMaterial.IridescenceTextureCache, RuntimeMaterial.IridescenceTextureMips, RuntimeMaterial.IridescenceTextureTransform, RuntimeMaterial.IridescenceTextureSampler, false);
+			GetMaterialTexture(JsonMaterialIridescence->ToSharedRef(), "iridescenceThicknessTexture", false, RuntimeMaterial.IridescenceThicknessTextureCache, RuntimeMaterial.IridescenceThicknessTextureMips, RuntimeMaterial.IridescenceThicknessTextureTransform, RuntimeMaterial.IridescenceThicknessTextureSampler, false);
+
+			RuntimeMaterial.bKHR_materials_iridescence = true;
+		}
+
 	}
 
 	if (IsInGameThread())
@@ -954,6 +985,23 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			RuntimeMaterial.SheenRoughnessTextureSampler,
 			"sheenRoughness", RuntimeMaterial.SheenRoughnessTextureTransform,
 			TextureCompressionSettings::TC_Default, false);
+	}
+
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_iridescence, "iridescenceFactor", RuntimeMaterial.IridescenceFactor);
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_iridescence, "iridescenceIor", RuntimeMaterial.IridescenceIor);
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_iridescence, "iridescenceThicknessMaximum", RuntimeMaterial.IridescenceThicknessMaximum);
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_iridescence, "iridescenceThicknessMinimum", RuntimeMaterial.IridescenceThicknessMinimum);
+	if (RuntimeMaterial.bKHR_materials_iridescence)
+	{
+		ApplyMaterialTexture("iridescenceTexture", RuntimeMaterial.IridescenceTextureCache, RuntimeMaterial.IridescenceTextureMips,
+			RuntimeMaterial.IridescenceTextureSampler,
+			"iridescence", RuntimeMaterial.IridescenceTextureTransform,
+			TextureCompressionSettings::TC_Default, true);
+
+		ApplyMaterialTexture("iridescenceThicknessTexture", RuntimeMaterial.IridescenceThicknessTextureCache, RuntimeMaterial.IridescenceThicknessTextureMips,
+			RuntimeMaterial.IridescenceThicknessTextureSampler,
+			"iridescenceThickness", RuntimeMaterial.IridescenceThicknessTextureTransform,
+			TextureCompressionSettings::TC_Default, true);
 	}
 
 	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_emissive_strength, "emissiveStrength", RuntimeMaterial.EmissiveStrength);
