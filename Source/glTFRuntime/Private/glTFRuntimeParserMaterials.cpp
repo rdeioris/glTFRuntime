@@ -346,7 +346,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 			if (!(*JsonMaterialIridescence)->TryGetNumberField(TEXT("iridescenceThicknessMinimum"), RuntimeMaterial.IridescenceThicknessMinimum))
 			{
-				RuntimeMaterial.IridescenceThicknessMinimum = 200;
+				RuntimeMaterial.IridescenceThicknessMinimum = 100;
 			}
 
 			if (!(*JsonMaterialIridescence)->TryGetNumberField(TEXT("iridescenceThicknessMaximum"), RuntimeMaterial.IridescenceThicknessMaximum))
