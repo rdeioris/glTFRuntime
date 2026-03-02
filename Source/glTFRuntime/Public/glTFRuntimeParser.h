@@ -437,6 +437,10 @@ enum class EglTFRuntimeMaterialType : uint8
 UENUM()
 enum class EglTFRuntimeSubstrateMaterialType : uint8
 {
+	SimpleOpaque,
+	SimpleOpaqueTwoSided,
+	SimpleMasked,
+	SimpleMaskedTwoSided,
 	Opaque,
 	OpaqueTwoSided,
 	Transmittance,
