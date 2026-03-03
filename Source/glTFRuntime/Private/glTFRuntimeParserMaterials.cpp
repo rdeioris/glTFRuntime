@@ -681,7 +681,8 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		if (MaterialsConfig.bUseSubstrateMaterials && !RuntimeMaterial.bKHR_materials_unlit && !RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness)
 		{
 			bool bIsSimpleSlab = true;
-			if (RuntimeMaterial.bKHR_materials_transmission || RuntimeMaterial.bKHR_materials_clearcoat || RuntimeMaterial.bKHR_materials_iridescence || RuntimeMaterial.bKHR_materials_sheen || RuntimeMaterial.bKHR_materials_volume) {
+			if (RuntimeMaterial.bKHR_materials_clearcoat ||	RuntimeMaterial.bKHR_materials_iridescence || RuntimeMaterial.bKHR_materials_sheen || RuntimeMaterial.bKHR_materials_volume)
+			{
 				bIsSimpleSlab = false;
 			}
 
@@ -691,7 +692,9 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 			if (RuntimeMaterial.bKHR_materials_transmission)
 			{
-				SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::TransmittanceTwoSided : EglTFRuntimeSubstrateMaterialType::Transmittance;
+				SubstrateMaterialType = RuntimeMaterial.bTwoSided ?
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleTransmittanceTwoSided : EglTFRuntimeSubstrateMaterialType::TransmittanceTwoSided) :
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleTransmittance : EglTFRuntimeSubstrateMaterialType::Transmittance);
 			}
 			else if (RuntimeMaterial.bTranslucent)
 			{
