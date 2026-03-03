@@ -695,7 +695,9 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 			}
 			else if (RuntimeMaterial.bTranslucent)
 			{
-				SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::AlphaCompositeTwoSided : EglTFRuntimeSubstrateMaterialType::AlphaComposite;
+				SubstrateMaterialType = RuntimeMaterial.bTwoSided ?
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleAlphaCompositeTwoSided : EglTFRuntimeSubstrateMaterialType::AlphaCompositeTwoSided) :
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleAlphaComposite : EglTFRuntimeSubstrateMaterialType::AlphaComposite);
 			}
 			else if (RuntimeMaterial.bMasked)
 			{
