@@ -33,8 +33,25 @@ int32 UglTFRuntimeSoundWave::GeneratePCMData(uint8* PCMData, const int32 Samples
 
 	int64 BytesToCopy = FMath::Min(RuntimeAudioData.Num() - RuntimeAudioOffset, BytesNeeded);
 	FMemory::Memcpy(PCMData, RuntimeAudioData.GetData() + RuntimeAudioOffset, BytesToCopy);
+
+	if (OnPCMData.IsBound())
+	{
+		TArray<uint8> NewPCMData;
+		NewPCMData.Append(RuntimeAudioData.GetData() + RuntimeAudioOffset, BytesToCopy);
+		FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([OnPCMData = this->OnPCMData, NewPCMData]()
+			{
+				OnPCMData.Execute(NewPCMData);
+			}, TStatId(), nullptr, ENamedThreads::GameThread);
+	}
+
 	RuntimeAudioOffset += BytesToCopy;
+
 	return BytesToCopy;
+}
+
+void UglTFRuntimeSoundWave::SetOnPCMData(const FglTFRuntimeSoundWavePCMData& InOnPCMData)
+{
+	OnPCMData = InOnPCMData;
 }
 
 void UglTFRuntimeSoundWave::ResetAudioOffset()
