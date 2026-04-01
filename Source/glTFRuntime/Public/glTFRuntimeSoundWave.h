@@ -7,6 +7,7 @@
 #include "glTFRuntimeSoundWave.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSoundWavePCMData, const TArray<uint8>&, PCMData);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSoundWavePCMDataFloat, const TArray<float>&, PCMData);
 
 /**
  * 
@@ -38,10 +39,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	void SetOnPCMData(const FglTFRuntimeSoundWavePCMData& InOnPCMData);
 
+	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+	void SetOnPCMDataFloat(const FglTFRuntimeSoundWavePCMDataFloat& InOnPCMDataFloat);
+
 protected:
 	TArray64<uint8> RuntimeAudioData;
 	int64 RuntimeAudioOffset;
 
 	FglTFRuntimeSoundWavePCMData OnPCMData;
+	FglTFRuntimeSoundWavePCMDataFloat OnPCMDataFloat;
 	
 };
