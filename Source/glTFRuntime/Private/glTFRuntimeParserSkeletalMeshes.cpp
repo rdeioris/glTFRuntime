@@ -1299,14 +1299,14 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 				SkeletalMeshAttributes.RegisterMorphTargetAttribute(*MorphTarget->GetName(), false);
 			}
 		}
-		}
+	}
 #endif
 
 
 	OnSkeletalMeshCreated.Broadcast(SkeletalMeshContext->SkeletalMesh);
 
 	return SkeletalMeshContext->SkeletalMesh;
-	}
+}
 
 void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshContextRef SkeletalMeshContext)
 {
@@ -1593,6 +1593,8 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 
 			NewBodySetup->AggGeom.SphylElems.Add(Capsule);
 		}
+
+		NewBodySetup->CollisionReponse = PhysicsBody.Value.CollisionResponse;
 
 		const int32 NewBodyIndex = PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
 		if (PhysicsBody.Value.bDisableCollision)
@@ -4584,4 +4586,194 @@ bool FglTFRuntimeParser::SanitizeBoneTrack(const FReferenceSkeleton& RefSkeleton
 	}
 
 	return true;
+}
+
+bool FglTFRuntimeParser::SkinHasJoint(const int32 SkinIndex, const FString& JointName)
+{
+	TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+	if (!JsonSkinObject)
+	{
+		AddError("SkinHasJoint()", "Unable to find skin.");
+		return false;
+	}
+
+	// get and check the list of valid joints	
+	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+	if (JsonSkinObject->TryGetArrayField(TEXT("joints"), JsonJoints))
+	{
+		for (TSharedPtr<FJsonValue> JsonJoint : *JsonJoints)
+		{
+			int64 NodeIndex;
+			if (!JsonJoint->TryGetNumber(NodeIndex))
+			{
+				return false;
+			}
+
+			FglTFRuntimeNode JointNode;
+			if (!LoadNode(NodeIndex, JointNode))
+			{
+				return false;
+			}
+
+			if (JointNode.Name == JointName)
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+int32 FglTFRuntimeParser::GetSkinJointIndexFromName(const int32 SkinIndex, const FString& JointName)
+{
+	TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+	if (!JsonSkinObject)
+	{
+		AddError("GetSkinJointIndexFromName()", "Unable to find skin.");
+		return false;
+	}
+
+	// get and check the list of valid joints	
+	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+	if (JsonSkinObject->TryGetArrayField(TEXT("joints"), JsonJoints))
+	{
+		for (int32 JointIndex = 0; JointIndex < JsonJoints->Num(); JointIndex++)
+		{
+			TSharedPtr<FJsonValue> JsonJoint = (*JsonJoints)[JointIndex];
+
+			int64 NodeIndex;
+			if (!JsonJoint->TryGetNumber(NodeIndex))
+			{
+				return INDEX_NONE;
+			}
+
+			FglTFRuntimeNode JointNode;
+			if (!LoadNode(NodeIndex, JointNode))
+			{
+				return INDEX_NONE;
+			}
+
+			if (JointNode.Name == JointName)
+			{
+				return JointIndex;
+			}
+		}
+	}
+
+	return INDEX_NONE;
+}
+
+FString FglTFRuntimeParser::GetSkinJointNameFromJointIndex(const int32 SkinIndex, const int32 JointIndex)
+{
+	TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+	if (!JsonSkinObject)
+	{
+		AddError("GetSkinJointNameFromJointIndex()", "Unable to find skin.");
+		return "";
+	}
+
+	// get and check the list of valid joints	
+	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+	if (JsonSkinObject->TryGetArrayField(TEXT("joints"), JsonJoints))
+	{
+		if (JsonJoints->IsValidIndex(JointIndex))
+		{
+			TSharedPtr<FJsonValue> JsonJoint = (*JsonJoints)[JointIndex];
+
+			int64 NodeIndex;
+			if (!JsonJoint->TryGetNumber(NodeIndex))
+			{
+				return "";
+			}
+
+			FglTFRuntimeNode JointNode;
+			if (!LoadNode(NodeIndex, JointNode))
+			{
+				return "";
+			}
+
+			return JointNode.Name;
+		}
+	}
+
+	return "";
+}
+
+int32 FglTFRuntimeParser::GetSkinNodeIndexFromName(const int32 SkinIndex, const FString& JointName)
+{
+	TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+	if (!JsonSkinObject)
+	{
+		AddError("GetSkinNodeIndexFromName()", "Unable to find skin.");
+		return false;
+	}
+
+	// get and check the list of valid joints	
+	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+	if (JsonSkinObject->TryGetArrayField(TEXT("joints"), JsonJoints))
+	{
+		for (int32 JointIndex = 0; JointIndex < JsonJoints->Num(); JointIndex++)
+		{
+			TSharedPtr<FJsonValue> JsonJoint = (*JsonJoints)[JointIndex];
+
+			int64 NodeIndex;
+			if (!JsonJoint->TryGetNumber(NodeIndex))
+			{
+				return INDEX_NONE;
+			}
+
+			FglTFRuntimeNode JointNode;
+			if (!LoadNode(NodeIndex, JointNode))
+			{
+				return INDEX_NONE;
+			}
+
+			if (JointNode.Name == JointName)
+			{
+				return NodeIndex;
+			}
+		}
+	}
+
+	return INDEX_NONE;
+}
+
+FString FglTFRuntimeParser::GetSkinJointNameFromNodeIndex(const int32 SkinIndex, const int32 NodeIndex)
+{
+	TSharedPtr<FJsonObject>	JsonSkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+	if (!JsonSkinObject)
+	{
+		AddError("GetSkinJointNameFromNodeIndex()", "Unable to find skin.");
+		return "";
+	}
+
+	// get and check the list of valid joints	
+	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+	if (JsonSkinObject->TryGetArrayField(TEXT("joints"), JsonJoints))
+	{
+		for (int32 JointIndex = 0; JointIndex < JsonJoints->Num(); JointIndex++)
+		{
+			TSharedPtr<FJsonValue> JsonJoint = (*JsonJoints)[JointIndex];
+
+			int64 CurrentNodeIndex;
+			if (!JsonJoint->TryGetNumber(CurrentNodeIndex))
+			{
+				return "";
+			}
+
+			FglTFRuntimeNode JointNode;
+			if (!LoadNode(NodeIndex, JointNode))
+			{
+				return "";
+			}
+
+			if (CurrentNodeIndex == NodeIndex)
+			{
+				return JointNode.Name;
+			}
+		}
+	}
+
+	return "";
 }

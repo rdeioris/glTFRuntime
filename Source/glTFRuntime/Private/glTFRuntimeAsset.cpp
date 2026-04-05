@@ -1781,3 +1781,39 @@ UTexture2D* UglTFRuntimeAsset::LoadTexture(const int32 TextureIndex, const FglTF
 
 	return nullptr;
 }
+
+bool UglTFRuntimeAsset::SkinHasJoint(const int32 SkinIndex, const FString& JointName)
+{
+	GLTF_CHECK_PARSER(false);
+
+	return Parser->SkinHasJoint(SkinIndex, JointName);
+
+}
+
+int32 UglTFRuntimeAsset::GetSkinJointIndexFromName(const int32 SkinIndex, const FString& JointName)
+{
+	GLTF_CHECK_PARSER(-1);
+
+	return Parser->GetSkinJointIndexFromName(SkinIndex, JointName);
+}
+
+FString UglTFRuntimeAsset::GetSkinJointNameFromJointIndex(const int32 SkinIndex, const int32 JointIndex)
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->GetSkinJointNameFromJointIndex(SkinIndex, JointIndex);
+}
+
+int32 UglTFRuntimeAsset::GetSkinNodeIndexFromName(const int32 SkinIndex, const FString& JointName)
+{
+	GLTF_CHECK_PARSER(-1);
+
+	return Parser->GetSkinNodeIndexFromName(SkinIndex, JointName);
+}
+
+FString UglTFRuntimeAsset::GetSkinJointNameFromNodeIndex(const int32 SkinIndex, const int32 NodeIndex)
+{
+	GLTF_CHECK_PARSER("");
+
+	return Parser->GetSkinJointNameFromNodeIndex(SkinIndex, NodeIndex);
+}

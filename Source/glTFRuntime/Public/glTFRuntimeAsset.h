@@ -393,6 +393,21 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	FString GetBaseFilename() const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	bool SkinHasJoint(const int32 SkinIndex, const FString& JointName);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	int32 GetSkinJointIndexFromName(const int32 SkinIndex, const FString& JointName);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	FString GetSkinJointNameFromJointIndex(const int32 SkinIndex, const int32 JointIndex);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	int32 GetSkinNodeIndexFromName(const int32 SkinIndex, const FString& JointName);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	FString GetSkinJointNameFromNodeIndex(const int32 SkinIndex, const int32 NodeIndex);
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
 
