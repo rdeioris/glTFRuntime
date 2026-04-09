@@ -112,6 +112,9 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 
 	USceneComponent* NewComponent = nullptr;
+	bool bMorphNodeUsesNodeTreeFallback = false;
+	bool bMorphNodeForcedNodeTreeFallback = false;
+	bool bMorphNodeLoadedByRecursiveFallback = false;
 	if (bAllowCameras && Node.CameraIndex != INDEX_NONE)
 	{
 		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, GetSafeNodeName<UCameraComponent>(Node));
@@ -147,7 +150,8 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 	else
 	{
-		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal && !(bStaticMeshesAsSkeletalOnMorphTargets && Asset->MeshHasMorphTargets(Node.MeshIndex)))
+		const bool bLoadStaticMeshAsSkeletalOnMorphTargets = (Node.SkinIndex < 0 && bStaticMeshesAsSkeletalOnMorphTargets && Asset->MeshHasMorphTargets(Node.MeshIndex));
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal && !bLoadStaticMeshAsSkeletalOnMorphTargets)
 		{
 			UStaticMeshComponent* StaticMeshComponent = nullptr;
 			TArray<FTransform> GPUInstancingTransforms;
@@ -256,15 +260,133 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(SkeletalMeshComponent);
-			if (SkeletalMeshConfig.Outer == nullptr)
+			FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfigForNode = SkeletalMeshConfig;
+			if (SkeletalMeshConfigForNode.Outer == nullptr)
 			{
-				SkeletalMeshConfig.Outer = SkeletalMeshComponent;
+				SkeletalMeshConfigForNode.Outer = SkeletalMeshComponent;
 			}
-			USkeletalMesh* SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfig);
+			bMorphNodeUsesNodeTreeFallback =
+				(Node.SkinIndex < 0 &&
+					bLoadStaticMeshAsSkeletalOnMorphTargets &&
+					SkeletalMeshConfigForNode.SkeletonConfig.bFallbackToNodesTree);
+			if (bMorphNodeUsesNodeTreeFallback)
+			{
+				// Node tree fallback can carry scale both in pre-transformed vertices and in ref pose.
+				// Normalize skeleton scale to avoid double scaling artifacts.
+				SkeletalMeshConfigForNode.SkeletonConfig.bNormalizeSkeletonScale = true;
+			}
+			// For morph-target meshes without skin, force a node-tree skeleton so node
+			// animation tracks (for example "Cube") can bind to real bones.
+			if (Node.SkinIndex < 0 &&
+				bLoadStaticMeshAsSkeletalOnMorphTargets &&
+				!SkeletalMeshConfigForNode.SkeletonConfig.bFallbackToNodesTree &&
+				SkeletalMeshConfigForNode.CustomSkeleton.Num() == 0 &&
+				SkeletalMeshConfigForNode.SkeletonConfig.RootNodeIndex <= INDEX_NONE &&
+				SkeletalMeshConfigForNode.SkeletonConfig.ForceRootNode.IsEmpty())
+			{
+				SkeletalMeshConfigForNode.SkeletonConfig.bFallbackToNodesTree = true;
+				SkeletalMeshConfigForNode.SkeletonConfig.bNormalizeSkeletonScale = true;
+				SkeletalMeshConfigForNode.SkeletonConfig.RootNodeIndex = Node.Index;
+				bMorphNodeUsesNodeTreeFallback = true;
+				bMorphNodeForcedNodeTreeFallback = true;
+			}
+			if (bMorphNodeUsesNodeTreeFallback && !Node.Name.IsEmpty())
+			{
+				FString ResolvedRootBoneName = Node.Name;
+				if (SkeletalMeshConfigForNode.SkeletonConfig.BoneRemapper.Remapper.IsBound())
+				{
+					ResolvedRootBoneName = SkeletalMeshConfigForNode.SkeletonConfig.BoneRemapper.Remapper.Execute(
+						Node.Index,
+						ResolvedRootBoneName,
+						SkeletalMeshConfigForNode.SkeletonConfig.BoneRemapper.Context);
+				}
+				if (SkeletalMeshConfigForNode.SkeletonConfig.BonesNameMap.Contains(ResolvedRootBoneName))
+				{
+					FString RemappedBoneName = SkeletalMeshConfigForNode.SkeletonConfig.BonesNameMap[ResolvedRootBoneName];
+					if (RemappedBoneName.Contains(TEXT(",")))
+					{
+						TArray<FString> Parts;
+						if (RemappedBoneName.ParseIntoArray(Parts, TEXT(",")) > 0)
+						{
+							RemappedBoneName = Parts[0];
+						}
+					}
+					if (!RemappedBoneName.IsEmpty())
+					{
+						ResolvedRootBoneName = RemappedBoneName;
+					}
+				}
+
+				// Skeleton scale is normalized before BonesDeltaTransformMap is applied.
+				// Rebase root pose without scale to avoid injecting a reciprocal scale.
+				FTransform RootSkeletonTransformNoScale = Node.Transform;
+				RootSkeletonTransformNoScale.SetScale3D(FVector::OneVector);
+				const FTransform RootRebaseTransformForSkeleton = RootSkeletonTransformNoScale.Inverse();
+				SkeletalMeshConfigForNode.SkeletonConfig.BonesDeltaTransformMap.Add(Node.Name, RootRebaseTransformForSkeleton);
+				if (!ResolvedRootBoneName.IsEmpty() && ResolvedRootBoneName != Node.Name)
+				{
+					SkeletalMeshConfigForNode.SkeletonConfig.BonesDeltaTransformMap.Add(ResolvedRootBoneName, RootRebaseTransformForSkeleton);
+				}
+				UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d RootRebaseForSkeleton=%s RootKey='%s' RemappedRootKey='%s'"),
+					*Node.Name,
+					Node.Index,
+					*RootRebaseTransformForSkeleton.ToString(),
+					*Node.Name,
+					*ResolvedRootBoneName);
+			}
+			USkeletalMesh* SkeletalMesh = nullptr;
+			if (bMorphNodeUsesNodeTreeFallback && !Node.Name.IsEmpty())
+			{
+				TArray<FString> ExcludeNodes;
+				SkeletalMesh = Asset->LoadSkeletalMeshRecursive(Node.Name, ExcludeNodes, SkeletalMeshConfigForNode, EglTFRuntimeRecursiveMode::Ignore);
+				if (SkeletalMesh)
+				{
+					bMorphNodeLoadedByRecursiveFallback = true;
+				}
+			}
+			if (!SkeletalMesh)
+			{
+				SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfigForNode);
+			}
 			SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
+			if (SkeletalMesh && bMorphNodeUsesNodeTreeFallback)
+			{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
+				const FReferenceSkeleton& RefSkeleton = SkeletalMeshComponent->GetSkeletalMeshAsset()->GetRefSkeleton();
+#else
+				const FReferenceSkeleton& RefSkeleton = SkeletalMeshComponent->SkeletalMesh->RefSkeleton;
+#endif
+				if (RefSkeleton.GetNum() > 0)
+				{
+					const FTransform RootRefPose = RefSkeleton.GetRefBonePose()[0];
+					const FString RootBoneName = RefSkeleton.GetBoneName(0).ToString();
+					const bool bHasRootDeltaByNodeName = SkeletalMeshConfigForNode.SkeletonConfig.BonesDeltaTransformMap.Contains(Node.Name);
+					const bool bHasRootDeltaByRootBoneName = SkeletalMeshConfigForNode.SkeletonConfig.BonesDeltaTransformMap.Contains(RootBoneName);
+					UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d RootBone='%s' RootRefPose=%s DeltaByNodeName=%s DeltaByRootBoneName=%s"),
+						*Node.Name,
+						Node.Index,
+						*RootBoneName,
+						*RootRefPose.ToString(),
+						bHasRootDeltaByNodeName ? TEXT("true") : TEXT("false"),
+						bHasRootDeltaByRootBoneName ? TEXT("true") : TEXT("false"));
+				}
+			}
 			DiscoveredSkeletalMeshComponents.Add(SkeletalMeshComponent);
 			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
 			NewComponent = SkeletalMeshComponent;
+
+			if (bMorphNodeUsesNodeTreeFallback)
+			{
+				UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d Mesh=%d Skin=%d Forced=%s RootNodeIndex=%d RecursiveMeshLoad=%s NodeTransform=%s"),
+					*Node.Name,
+					Node.Index,
+					Node.MeshIndex,
+					Node.SkinIndex,
+					bMorphNodeForcedNodeTreeFallback ? TEXT("true") : TEXT("false"),
+					SkeletalMeshConfigForNode.SkeletonConfig.RootNodeIndex,
+					bMorphNodeLoadedByRecursiveFallback ? TEXT("true") : TEXT("false"),
+					*Node.Transform.ToString());
+			}
 		}
 	}
 
@@ -345,16 +467,74 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(NewComponent);
 		if (bAllowSkeletalAnimations)
 		{
+			const bool bMorphNodeFallbackAnimationFix = bMorphNodeUsesNodeTreeFallback;
+			const bool bNodeHasTransformTracks = bMorphNodeFallbackAnimationFix && (Asset->LoadAllNodeAnimationCurves(Node.Index).Num() > 0);
+
+			FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfigForNode = SkeletalAnimationConfig;
+			// Node-tree fallback already carries node transforms in the reference skeleton.
+			// Avoid forcing RootNodeIndex here, otherwise root transforms can be applied twice.
+			if (bMorphNodeFallbackAnimationFix)
+			{
+				SkeletalAnimationConfigForNode.RootNodeIndex = INDEX_NONE;
+				const FTransform RootRebaseTransformForAnimation = Node.Transform.Inverse();
+				FString RootBoneNameForAnimation;
+				if (SkeletalMeshComponent->GetNumBones() > 0)
+				{
+					RootBoneNameForAnimation = SkeletalMeshComponent->GetBoneName(0).ToString();
+				}
+				if (!Node.Name.IsEmpty())
+				{
+					SkeletalAnimationConfigForNode.TransformPose.Add(Node.Name, RootRebaseTransformForAnimation);
+				}
+				if (!RootBoneNameForAnimation.IsEmpty())
+				{
+					SkeletalAnimationConfigForNode.TransformPose.Add(RootBoneNameForAnimation, RootRebaseTransformForAnimation);
+				}
+				UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d RootRebaseForAnimation=%s TransformPoseNodeKey='%s' TransformPoseRootBoneKey='%s' TransformPoseCount=%d"),
+					*Node.Name,
+					Node.Index,
+					*RootRebaseTransformForAnimation.ToString(),
+					*Node.Name,
+					*RootBoneNameForAnimation,
+					SkeletalAnimationConfigForNode.TransformPose.Num());
+			}
+
+			if (bMorphNodeFallbackAnimationFix)
+			{
+				UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d AnimConfigRootNodeIndex=%d NodeHasTRSTracks=%s"),
+					*Node.Name,
+					Node.Index,
+					SkeletalAnimationConfigForNode.RootNodeIndex,
+					bNodeHasTransformTracks ? TEXT("true") : TEXT("false"));
+				if (UglTFRuntimeAnimationCurve* NodeAnimationCurve = Asset->LoadNodeAnimationCurve(Node.Index))
+				{
+					float CurveMinTime = 0.f;
+					float CurveMaxTime = 0.f;
+					NodeAnimationCurve->GetTimeRange(CurveMinTime, CurveMaxTime);
+					const FTransform CurveTransformAtZero = NodeAnimationCurve->GetTransformValue(0.f);
+					UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d CurveName='%s' CurveTimeRange=[%f,%f] CurveT0=%s"),
+						*Node.Name,
+						Node.Index,
+						*NodeAnimationCurve->glTFCurveAnimationName,
+						CurveMinTime,
+						CurveMaxTime,
+						*CurveTransformAtZero.ToString());
+				}
+			}
+
 			UAnimSequence* SkeletalAnimation = nullptr;
+			bool bLoadedNodeSkeletalAnimation = false;
+			bool bUsedPoseFallbackAnimation = false;
 			if (bLoadAllSkeletalAnimations)
 			{
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
-				TMap<FString, UAnimSequence*> SkeletalAnimationsMap = Asset->LoadNodeSkeletalAnimationsMap(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
+				TMap<FString, UAnimSequence*> SkeletalAnimationsMap = Asset->LoadNodeSkeletalAnimationsMap(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfigForNode);
 #else
-				TMap<FString, UAnimSequence*> SkeletalAnimationsMap = Asset->LoadNodeSkeletalAnimationsMap(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+				TMap<FString, UAnimSequence*> SkeletalAnimationsMap = Asset->LoadNodeSkeletalAnimationsMap(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfigForNode);
 #endif
 				if (SkeletalAnimationsMap.Num() > 0)
 				{
+					bLoadedNodeSkeletalAnimation = true;
 					DiscoveredSkeletalAnimations.Add(SkeletalMeshComponent, SkeletalAnimationsMap);
 
 					for (const TPair<FString, UAnimSequence*>& Pair : SkeletalAnimationsMap)
@@ -371,27 +551,78 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			else
 			{
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
-				SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
+				SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfigForNode);
 #else
-				SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+				SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfigForNode);
 #endif
+				bLoadedNodeSkeletalAnimation = (SkeletalAnimation != nullptr);
 			}
 
 			if (!SkeletalAnimation && bAllowPoseAnimations)
 			{
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
-				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfig, Node.SkinIndex);
+				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfigForNode, Node.SkinIndex);
 #else
-				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->SkeletalMesh, SkeletalAnimationConfig, Node.SkinIndex);
+				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->SkeletalMesh, SkeletalAnimationConfigForNode, Node.SkinIndex);
 #endif
+				bUsedPoseFallbackAnimation = (SkeletalAnimation != nullptr);
 			}
 
 			if (SkeletalAnimation)
 			{
+				const FTransform RelativeBeforeFix = SkeletalMeshComponent->GetRelativeTransform();
+				if (bMorphNodeFallbackAnimationFix && bMorphNodeLoadedByRecursiveFallback)
+				{
+					UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d AppliedIdentity=false Mode=RecursiveFallback Relative=%s"),
+						*Node.Name,
+						Node.Index,
+						*RelativeBeforeFix.ToString());
+				}
+				else if (bMorphNodeFallbackAnimationFix && bNodeHasTransformTracks && bLoadedNodeSkeletalAnimation)
+				{
+					// Root node transform is already baked in root-bone keys for this path.
+					SkeletalMeshComponent->SetRelativeTransform(FTransform::Identity);
+					UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d AppliedIdentity=true RelativeBefore=%s RelativeAfter=%s"),
+						*Node.Name,
+						Node.Index,
+						*RelativeBeforeFix.ToString(),
+						*SkeletalMeshComponent->GetRelativeTransform().ToString());
+				}
+				else if (bMorphNodeFallbackAnimationFix)
+				{
+					UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d AppliedIdentity=false RecursiveMeshLoad=%s NodeHasTRSTracks=%s LoadedNodeAnimation=%s UsedPoseFallback=%s Relative=%s"),
+						*Node.Name,
+						Node.Index,
+						bMorphNodeLoadedByRecursiveFallback ? TEXT("true") : TEXT("false"),
+						bNodeHasTransformTracks ? TEXT("true") : TEXT("false"),
+						bLoadedNodeSkeletalAnimation ? TEXT("true") : TEXT("false"),
+						bUsedPoseFallbackAnimation ? TEXT("true") : TEXT("false"),
+						*RelativeBeforeFix.ToString());
+				}
 				SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;
 				SkeletalMeshComponent->AnimationData.bSavedLooping = true;
 				SkeletalMeshComponent->AnimationData.bSavedPlaying = bAutoPlayAnimations;
 				SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+				if (bMorphNodeFallbackAnimationFix)
+				{
+					SkeletalMeshComponent->RefreshBoneTransforms();
+					const FTransform ComponentRelative = SkeletalMeshComponent->GetRelativeTransform();
+					const FTransform ComponentWorld = SkeletalMeshComponent->GetComponentTransform();
+					if (SkeletalMeshComponent->GetNumBones() > 0)
+					{
+						const FName RootBoneName = SkeletalMeshComponent->GetBoneName(0);
+						const FVector RootBoneLocationCS = SkeletalMeshComponent->GetBoneLocation(RootBoneName, EBoneSpaces::ComponentSpace);
+						const FVector RootBoneLocationWS = SkeletalMeshComponent->GetBoneLocation(RootBoneName, EBoneSpaces::WorldSpace);
+						UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Node='%s' Index=%d ComponentRelative=%s ComponentWorld=%s RootBone='%s' RootBoneCS=%s RootBoneWS=%s"),
+							*Node.Name,
+							Node.Index,
+							*ComponentRelative.ToString(),
+							*ComponentWorld.ToString(),
+							*RootBoneName.ToString(),
+							*RootBoneLocationCS.ToString(),
+							*RootBoneLocationWS.ToString());
+					}
+				}
 			}
 		}
 	}
