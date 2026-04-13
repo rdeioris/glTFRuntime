@@ -12,7 +12,7 @@
 /**
  *
  */
-UCLASS(BlueprintType)
+UCLASS(BlueprintType, meta = (DisplayName = "glTFRuntime Asset"))
 class GLTFRUNTIME_API UglTFRuntimeAsset : public UObject
 {
 	GENERATED_BODY()

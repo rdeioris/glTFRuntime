@@ -61,7 +61,7 @@ struct FglTFRuntimeBlob
 	}
 };
 
-UENUM()
+UENUM(BlueprintType, meta = (DisplayName = "glTFRuntime TransformBaseType"))
 enum class EglTFRuntimeTransformBaseType : uint8
 {
 	Default,
@@ -819,7 +819,7 @@ struct FglTFRuntimeMaterialsConfig
 	}
 };
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, meta = (DisplayName = "glTFRuntime StaticMeshConfig"))
 struct FglTFRuntimeStaticMeshConfig
 {
 	GENERATED_BODY()

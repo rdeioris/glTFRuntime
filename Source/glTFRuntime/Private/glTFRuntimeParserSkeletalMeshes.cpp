@@ -1547,6 +1547,7 @@ void FglTFRuntimeParser::GeneratePhysicsAsset_Internal(FglTFRuntimeSkeletalMeshC
 			BoxElem.X = BoxExtent.X * 2.0f * PhysicsBody.Value.CollisionScale;
 			BoxElem.Y = BoxExtent.Y * 2.0f * PhysicsBody.Value.CollisionScale;
 			BoxElem.Z = BoxExtent.Z * 2.0f * PhysicsBody.Value.CollisionScale;
+
 			NewBodySetup->AggGeom.BoxElems.Add(BoxElem);
 		}
 
