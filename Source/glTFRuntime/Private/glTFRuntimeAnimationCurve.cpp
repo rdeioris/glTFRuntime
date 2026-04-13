@@ -104,6 +104,21 @@ FTransform UglTFRuntimeAnimationCurve::GetTransformValue(float InTime) const
 		}
 
 	}
+	else
+	{
+		// No animated rotation track for this node: preserve the node default rotation.
+		const FQuat RawDefaultQuat = FQuat(
+			QuatCurves[0].Eval(InTime),
+			QuatCurves[1].Eval(InTime),
+			QuatCurves[2].Eval(InTime),
+			QuatCurves[3].Eval(InTime));
+
+		if (RawDefaultQuat.SizeSquared() > KINDA_SMALL_NUMBER)
+		{
+			const FMatrix DefaultRotationMatrix = BasisMatrix.Inverse() * FQuatRotationMatrix(RawDefaultQuat.GetNormalized()) * BasisMatrix;
+			Transform.SetRotation(DefaultRotationMatrix.ToQuat().GetNormalized());
+		}
+	}
 
 	return Transform;
 }
