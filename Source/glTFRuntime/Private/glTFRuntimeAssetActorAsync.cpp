@@ -48,7 +48,7 @@ AglTFRuntimeAssetActorAsync::AglTFRuntimeAssetActorAsync()
 	bAllowPoseAnimations = true;
 	bAutoPlayAnimations = true;
 	bAllowLights = true;
-	MaxConcurrentMeshLoads = 1;
+	MaxConcurrentMeshLoads = 8;
 	bLoadAllSkeletalAnimations = false;
 
 	bStopLoadingRequested = false;
