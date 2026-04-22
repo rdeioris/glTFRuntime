@@ -1787,9 +1787,46 @@ void FglTFRuntimeDDS::LoadMips(const int32 TextureIndex, TArray<FglTFRuntimeMipM
 	}
 	else
 	{
-		if (!(Ptr32[20] & DDPF_ALPHAPIXELS))
+		// slow path for 24 bit textures
+		if (Ptr32[22] == 24)
 		{
-			UE_LOG(LogGLTFRuntime, Warning, TEXT("DDS Uncompressed PixelFormat without Alpha is not supported"));
+			int32 MipWidth = Width;
+			int32 MipHeight = Height;
+
+			for (int32 MipIndex = 0; MipIndex < NumberOfMips; MipIndex++)
+			{
+				const int64 BlockX = GPixelFormats[PixelFormat].BlockSizeX;
+				const int64 BlockY = GPixelFormats[PixelFormat].BlockSizeY;
+				const int64 MipWidthAligned = FMath::Max(((MipWidth / BlockX) + ((MipWidth % BlockX) != 0 ? 1 : 0)) * BlockX, BlockX);
+				const int64 MipHeightAligned = FMath::Max(((MipHeight / BlockY) + ((MipHeight % BlockY) != 0 ? 1 : 0)) * BlockY, BlockY);
+				const int64 MipSize = ((MipWidthAligned * GPixelFormats[PixelFormat].BlockBytes * MipHeightAligned) / (BlockX * BlockY)) * NumberOfSlices;
+
+				const int64 DDSMipSize = (MipWidthAligned * 3 * MipHeightAligned) * NumberOfSlices;
+				if (PixelsOffset + DDSMipSize > Data.Num())
+				{
+					return;
+				}
+				FglTFRuntimeMipMap MipMap(TextureIndex, PixelFormat, MipWidth, MipHeight);
+				MipMap.Pixels.AddUninitialized(MipSize);
+
+				for (int64 PixelIndex = 0; PixelIndex < MipWidthAligned * MipHeightAligned; PixelIndex++)
+				{
+					MipMap.Pixels[PixelIndex * 4] = Data[PixelsOffset + (PixelIndex * 3)];
+					MipMap.Pixels[PixelIndex * 4 + 1] = Data[PixelsOffset + (PixelIndex * 3 + 1)];
+					MipMap.Pixels[PixelIndex * 4 + 2] = Data[PixelsOffset + (PixelIndex * 3 + 2)];
+					MipMap.Pixels[PixelIndex * 4 + 3] = 0xff;
+				}
+
+				Mips.Add(MoveTemp(MipMap));
+				PixelsOffset += DDSMipSize;
+				MipWidth = FMath::Max(MipWidth / 2, 1);
+				MipHeight = FMath::Max(MipHeight / 2, 1);
+			}
+			return;
+		}
+		else if (Ptr32[22] != 32)
+		{
+			UE_LOG(LogGLTFRuntime, Warning, TEXT("DDS Uncompressed Pixel Size must be 24 or 32 bits (found %u)"), Ptr32[22]);
 			return;
 		}
 	}
