@@ -2679,7 +2679,19 @@ bool FglTFRuntimeParser::FillReferenceSkeletonFromNode(const FglTFRuntimeNode& R
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
 
 	// now traverse from the root and check if the node is in the "joints" list
-	return TraverseJoints(Modifier, RootNode.Index, INDEX_NONE, RootNode, {}, BoneMap, {}, SkeletonConfig);
+	if (!TraverseJoints(Modifier, RootNode.Index, INDEX_NONE, RootNode, {}, BoneMap, {}, SkeletonConfig))
+	{
+		return false;
+	}
+
+	// Node-tree fallback has no "joints" array, so BoneMap may be empty.
+	// Ensure at least one mapping for the fallback skinning path.
+	if (BoneMap.Num() == 0 && RefSkeleton.GetNum() > 0)
+	{
+		BoneMap.Add(0, RefSkeleton.GetBoneName(0));
+	}
+
+	return true;
 }
 
 bool FglTFRuntimeParser::RemapRuntimeLODBoneNames(FglTFRuntimeMeshLOD& RuntimeLOD, const FglTFRuntimeSkeletonConfig& SkeletonConfig)

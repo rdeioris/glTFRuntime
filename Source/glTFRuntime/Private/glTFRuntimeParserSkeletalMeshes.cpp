@@ -155,11 +155,22 @@ void FglTFRuntimeParser::AddSkeletonDeltaTranforms(FReferenceSkeleton& RefSkelet
 		const int32 BoneIndex = RefSkeleton.FindBoneIndex(*Pair.Key);
 		if (BoneIndex <= INDEX_NONE)
 		{
+			/*UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] SkeletonDelta Bone='%s' BoneIndex=%d Applied=false Delta=%s"),
+				*Pair.Key,
+				BoneIndex,
+				*Pair.Value.ToString());*/
 			continue;
 		}
-		FTransform Transform = BonesTransforms[BoneIndex];
-		Transform.Accumulate(Pair.Value);
-		Modifier.UpdateRefPoseTransform(BoneIndex, Transform);
+		const FTransform TransformBefore = BonesTransforms[BoneIndex];
+		FTransform TransformAfter = TransformBefore;
+		TransformAfter.Accumulate(Pair.Value);
+		Modifier.UpdateRefPoseTransform(BoneIndex, TransformAfter);
+		/*UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] SkeletonDelta Bone='%s' BoneIndex=%d Applied=true Before=%s Delta=%s After=%s"),
+			*Pair.Key,
+			BoneIndex,
+			*TransformBefore.ToString(),
+			*Pair.Value.ToString(),
+			*TransformAfter.ToString());*/
 	}
 }
 
@@ -308,8 +319,8 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 			TMap<int32, TArray<int32>> OverlappingVertices;
 			MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
 
-			// this is used for non-skinned asset loaded as skinned ones
-			int32 OverrideVertexToCheck = 0;
+			// this is used for non-skinned assets loaded as skinned ones
+			int32 OverrideVertexToCheck = INDEX_NONE;
 
 			for (int32 VertexIndex = 0; VertexIndex < Primitive.Positions.Num(); VertexIndex++)
 			{
@@ -452,9 +463,20 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 					{
 						OverrideVertexToCheck = VertexIndex;
 					}
+					else if (OverrideVertexToCheck == INDEX_NONE && BoneMapInUse.Num() > 0)
+					{
+						// BoneMap keys are not guaranteed to start from zero in all paths.
+						// Keep using the first discovered mapping for vertices without explicit map.
+						for (const TPair<int32, FName>& BoneMapPair : BoneMapInUse)
+						{
+							OverrideVertexToCheck = BoneMapPair.Key;
+							break;
+						}
+					}
+
+					int32 BoneIndex = INDEX_NONE;
 					if (BoneMapInUse.Contains(OverrideVertexToCheck))
 					{
-						int32 BoneIndex = INDEX_NONE;
 						if (BonesCacheInUse.Contains(OverrideVertexToCheck))
 						{
 							BoneIndex = BonesCacheInUse[OverrideVertexToCheck];
@@ -464,6 +486,16 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 							BoneIndex = RefSkeleton.FindBoneIndex(BoneMapInUse[OverrideVertexToCheck]);
 							BonesCacheInUse.Add(OverrideVertexToCheck, BoneIndex);
 						}
+					}
+
+					// Graceful fallback: if node map is missing/invalid, bind to root bone instead of aborting.
+					if (BoneIndex <= INDEX_NONE && RefSkeleton.GetNum() > 0)
+					{
+						BoneIndex = 0;
+					}
+
+					if (BoneIndex > INDEX_NONE)
+					{
 						InWeights[BaseVertexIndex].InfluenceWeights[0] = MAX_BONE_INFLUENCE_WEIGHT;
 						InWeights[BaseVertexIndex].InfluenceBones[0] = BoneIndex;
 						InWeights[BaseVertexIndex].InfluenceWeights[1] = 0;
@@ -1805,6 +1837,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 				return;
 			}
 
+			FScopeLock ScopeLock(&SkeletalMeshAsyncCacheLock);
 			FglTFRuntimeMeshLOD* LOD = nullptr;
 			if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig))
 			{
@@ -1876,6 +1909,7 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString& NodeName,
 
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, ExcludeNodes, NodeName, SkinIndex, AsyncCallback, TransformApplyRecursiveMode]()
 		{
+			FScopeLock ScopeLock(&SkeletalMeshRecursiveAsyncCacheLock);
 			FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
 			// ensure to cache it as the finalizer requires LOD access
 			FglTFRuntimeMeshLOD& CombinedLOD = SkeletalMeshContext->CachedRuntimeMeshLODs.AddDefaulted_GetRef();
@@ -2072,20 +2106,21 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 		bool bAnimationFound = false;
 		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
 			{
-				if (!bAnimationFound)
+				const bool bTrackMatchesNodeOrJoint = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
+				if (!bAnimationFound && bTrackMatchesNodeOrJoint)
 				{
-					bAnimationFound = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
+					bAnimationFound = true;
 				}
-				return true;
+				return bTrackMatchesNodeOrJoint;
 			}))
 		{
 			return nullptr;
 		}
 		if (bAnimationFound || MorphTargetCurves.Num() > 0)
 		{
-			// this is very inefficient as we parse the tracks twice
-			// TODO: refactor it
-			return LoadSkeletalAnimation(SkeletalMesh, JsonAnimationIndex, SkeletalAnimationConfig);
+			UAnimSequence* AnimSequence = LoadSkeletalAnimationFromTracksAndMorphTargets(SkeletalMesh, Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig);
+			FillAssetUserData(JsonAnimationIndex, AnimSequence);
+			return AnimSequence;
 		}
 	}
 
@@ -2163,11 +2198,12 @@ TMap<FString, UAnimSequence*> FglTFRuntimeParser::LoadNodeSkeletalAnimationsMap(
 		bool bAnimationFound = false;
 		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
 			{
-				if (!bAnimationFound)
+				const bool bTrackMatchesNodeOrJoint = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
+				if (!bAnimationFound && bTrackMatchesNodeOrJoint)
 				{
-					bAnimationFound = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
+					bAnimationFound = true;
 				}
-				return true;
+				return bTrackMatchesNodeOrJoint;
 			}))
 		{
 			continue;
@@ -2175,9 +2211,8 @@ TMap<FString, UAnimSequence*> FglTFRuntimeParser::LoadNodeSkeletalAnimationsMap(
 
 		if (bAnimationFound || MorphTargetCurves.Num() > 0)
 		{
-			// this is very inefficient as we parse the tracks twice
-			// TODO: refactor it
-			UAnimSequence* NewAnimation = LoadSkeletalAnimation(SkeletalMesh, JsonAnimationIndex, SkeletalAnimationConfig);
+			UAnimSequence* NewAnimation = LoadSkeletalAnimationFromTracksAndMorphTargets(SkeletalMesh, Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig);
+			FillAssetUserData(JsonAnimationIndex, NewAnimation);
 			if (NewAnimation)
 			{
 				UAnimSequence*& AnimationSlot = SkeletalAnimationsMap.FindOrAdd(AnimationName);
@@ -3417,6 +3452,16 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 	FReferenceSkeleton AnimRefSkeleton;
 	FReferenceSkeleton RetargetRefSkeleton;
 
+	if (SkeletalAnimationConfig.TransformPose.Num() > 0)
+	{
+		for (const TPair<FString, FTransform>& Pair : SkeletalAnimationConfig.TransformPose)
+		{
+			/*UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] TransformPoseMap Track='%s' Transform=%s"),
+				*Pair.Key,
+				*Pair.Value.ToString());*/
+		}
+	}
+
 	// build retargeting structures
 	if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
 	{
@@ -3605,6 +3650,16 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
 
 			float FrameDelta = 1.f / SkeletalAnimationConfig.FramesPerSecond;
+			const bool bTrackHasTransformPose = SkeletalAnimationConfig.TransformPose.Contains(TrackName);
+			const FTransform TrackTransformPose = bTrackHasTransformPose ? SkeletalAnimationConfig.TransformPose[TrackName] : FTransform::Identity;
+			if (SkeletalAnimationConfig.TransformPose.Num() > 0 && (Path == "rotation" || Path == "translation" || Path == "scale"))
+			{
+				/*UE_LOG(LogGLTFRuntime, Log, TEXT("[MorphFallback] Track='%s' Path='%s' HasTransformPose=%s Transform=%s"),
+					*TrackName,
+					*Path,
+					bTrackHasTransformPose ? TEXT("true") : TEXT("false"),
+					bTrackHasTransformPose ? *TrackTransformPose.ToString() : TEXT("Identity"));*/
+			}
 
 			if (Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
 			{
@@ -3697,9 +3752,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 							}
 						}
 
-						if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
+						if (bTrackHasTransformPose)
 						{
-							AnimQuat = SkeletalAnimationConfig.TransformPose[TrackName].TransformRotation(AnimQuat);
+							AnimQuat = TrackTransformPose.TransformRotation(AnimQuat);
 						}
 
 #if ENGINE_MAJOR_VERSION > 4
@@ -3803,9 +3858,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 							}
 						}
 
-						if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
+						if (bTrackHasTransformPose)
 						{
-							AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
+							AnimLocation = TrackTransformPose.TransformPosition(AnimLocation);
 						}
 
 #if ENGINE_MAJOR_VERSION > 4
@@ -3843,6 +3898,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
 				const int32 ScaleKeysFirstIndex = Track.ScaleKeys.Num();
+				const FVector TransformPoseScale = bTrackHasTransformPose ? TrackTransformPose.GetScale3D() : FVector::OneVector;
 
 				Track.ScaleKeys.AddUninitialized(NumFrames);
 
@@ -3854,10 +3910,20 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 						const float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
 						FVector4 First = Curve.Values[FirstIndex];
 						FVector4 Second = Curve.Values[SecondIndex];
+						FVector AnimScale;
 #if ENGINE_MAJOR_VERSION > 4
-						Track.ScaleKeys[ScaleKeysFirstIndex + FrameIndex] = FVector3f((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling());
+						AnimScale = (SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling();
 #else
-						Track.ScaleKeys[ScaleKeysFirstIndex + FrameIndex] = (SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling();
+						AnimScale = (SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling();
+#endif
+						if (bTrackHasTransformPose)
+						{
+							AnimScale *= TransformPoseScale;
+						}
+#if ENGINE_MAJOR_VERSION > 4
+						Track.ScaleKeys[ScaleKeysFirstIndex + FrameIndex] = FVector3f(AnimScale);
+#else
+						Track.ScaleKeys[ScaleKeysFirstIndex + FrameIndex] = AnimScale;
 #endif
 					});
 			}
@@ -4078,15 +4144,33 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 						{
 							Tangent = AdditionalTransform.TransformFVector4NoScale(Tangent);
 						}
+						// Morph target positions are deltas, so use vector transform (no translation).
+						for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
+						{
+							for (FVector& MorphDelta : MorphTarget.Positions)
+							{
+								MorphDelta = AdditionalTransform.TransformVector(MorphDelta);
+							}
+							for (FVector& MorphNormal : MorphTarget.Normals)
+							{
+								MorphNormal = AdditionalTransform.TransformVectorNoScale(MorphNormal);
+							}
+						}
 					}
 				}
 			}
 			else if (SkeletonConfig.bFallbackToNodesTree)
 			{
+				const bool bIgnoreRootNodeTransform = (TransformApplyRecursiveMode == EglTFRuntimeRecursiveMode::Ignore && SkeletonConfig.CachedNodeIndex > INDEX_NONE);
 				FglTFRuntimeNode CurrentNode = ChildNode;
 				FTransform AdditionalTransform = CurrentNode.Transform;
+				if (bIgnoreRootNodeTransform && ChildNode.Index == SkeletonConfig.CachedNodeIndex)
+				{
+					AdditionalTransform = FTransform::Identity;
+				}
 
-				if (SkeletonConfig.NodeBonesDeltaTransformMap.Contains(ChildNode.Name))
+				if (!(bIgnoreRootNodeTransform && ChildNode.Index == SkeletonConfig.CachedNodeIndex) &&
+					SkeletonConfig.NodeBonesDeltaTransformMap.Contains(ChildNode.Name))
 				{
 					AdditionalTransform.Accumulate(SkeletonConfig.NodeBonesDeltaTransformMap[ChildNode.Name]);
 				}
@@ -4096,6 +4180,11 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 					if (!LoadNode(CurrentNode.ParentIndex, CurrentNode))
 					{
 						return false;
+					}
+
+					if (bIgnoreRootNodeTransform && CurrentNode.Index == SkeletonConfig.CachedNodeIndex)
+					{
+						break;
 					}
 
 					AdditionalTransform *= CurrentNode.Transform;
@@ -4121,6 +4210,18 @@ bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString& Nod
 					for (FVector4& Tangent : Primitive.Tangents)
 					{
 						Tangent = AdditionalTransform.TransformFVector4NoScale(Tangent);
+					}
+					// Morph target positions are deltas, so use vector transform (no translation).
+					for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
+					{
+						for (FVector& MorphDelta : MorphTarget.Positions)
+						{
+							MorphDelta = AdditionalTransform.TransformVector(MorphDelta);
+						}
+						for (FVector& MorphNormal : MorphTarget.Normals)
+						{
+							MorphNormal = AdditionalTransform.TransformVectorNoScale(MorphNormal);
+						}
 					}
 				}
 
