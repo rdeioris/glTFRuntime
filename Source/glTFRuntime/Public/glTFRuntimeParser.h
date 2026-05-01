@@ -2206,6 +2206,19 @@ struct FglTFRuntimeMaterial
 	FglTFRuntimeTextureTransform SheenRoughnessTextureTransform;
 	FglTFRuntimeTextureSampler SheenRoughnessTextureSampler;
 
+	bool bKHR_materials_iridescence;
+	double IridescenceFactor;
+	double IridescenceIor;
+	double IridescenceThicknessMaximum;
+	double IridescenceThicknessMinimum;
+	UTexture2D* IridescenceTextureCache;
+	TArray<FglTFRuntimeMipMap> IridescenceTextureMips;
+	FglTFRuntimeTextureSampler IridescenceTextureSampler;
+	FglTFRuntimeTextureTransform IridescenceTextureTransform;
+	UTexture2D* IridescenceThicknessTextureCache;
+	TArray<FglTFRuntimeMipMap> IridescenceThicknessTextureMips;
+	FglTFRuntimeTextureSampler IridescenceThicknessTextureSampler;
+	FglTFRuntimeTextureTransform IridescenceThicknessTextureTransform;
 
 	FglTFRuntimeMaterial()
 	{
@@ -2257,6 +2270,13 @@ struct FglTFRuntimeMaterial
 		SheenRoughnessFactor = 0;
 		SheenColorTextureCache = nullptr;
 		SheenRoughnessTextureCache = nullptr;
+		bKHR_materials_iridescence = false;
+		IridescenceFactor = 0;
+		IridescenceIor = 1.3;
+		IridescenceThicknessMaximum = 400;
+		IridescenceThicknessMinimum = 100;
+		IridescenceTextureCache = nullptr;
+		IridescenceThicknessTextureCache = nullptr;
 	}
 };
 
