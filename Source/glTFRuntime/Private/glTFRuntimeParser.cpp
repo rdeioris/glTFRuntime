@@ -129,7 +129,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromRawDataAndArchive(const u
 
 		if (!LoaderConfig.bAsBlob && Filename.IsEmpty())
 		{
-			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to find entry point from Archive."), *Filename);
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to find entry point from Archive."));
 			return nullptr;
 		}
 
@@ -6951,7 +6951,11 @@ void FglTFRuntimeParser::FillAssetUserData(const int32 Index, IInterface_AssetUs
 	{
 		if (AssetUserDataClass)
 		{
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 8
+			UglTFRuntimeAssetUserData* AssetUserData = NewObject<UglTFRuntimeAssetUserData>(Cast<UObject>(InObject), AssetUserDataClass, NAME_None, RF_Public);
+#else
 			UglTFRuntimeAssetUserData* AssetUserData = NewObject<UglTFRuntimeAssetUserData>(InObject->_getUObject(), AssetUserDataClass, NAME_None, RF_Public);
+#endif
 			AssetUserData->SetParser(AsShared());
 			AssetUserData->ReceiveFillAssetUserData(Index);
 			InObject->AddAssetUserData(AssetUserData);

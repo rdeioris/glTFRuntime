@@ -3011,10 +3011,18 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 
 		for (const FName& KeyName : MorphTargetKeys)
 		{
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 8
+			if (JsonFrameObject->Values.Contains(UE::FSharedString(KeyName.ToString())))
+#else
 			if (JsonFrameObject->Values.Contains(KeyName.ToString()))
+#endif
 			{
 				double Value = 0;
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 8
+				if (!JsonFrameObject->Values[UE::FSharedString(KeyName.ToString())]->TryGetNumber(Value))
+#else
 				if (!JsonFrameObject->Values[KeyName.ToString()]->TryGetNumber(Value))
+#endif
 				{
 					Value = 0;
 				}

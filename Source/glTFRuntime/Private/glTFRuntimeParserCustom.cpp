@@ -192,6 +192,10 @@ TArray<FString> FglTFRuntimeParser::GetJSONObjectKeysFromPath(const TArray<FglTF
 	bFound = false;
 	TArray<FString> Keys;
 
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 8
+	TArray<UE::FSharedString> SharedKeys;
+#endif
+
 	TSharedPtr<FJsonValue> CurrentObject = GetJSONObjectFromPath(Path);
 	if (CurrentObject)
 	{
@@ -199,7 +203,15 @@ TArray<FString> FglTFRuntimeParser::GetJSONObjectKeysFromPath(const TArray<FglTF
 		if (CurrentObject->TryGetObject(JsonObject))
 		{
 			bFound = true;
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 8
+			(*JsonObject)->Values.GetKeys(SharedKeys);
+			for (const UE::FSharedString& SharedString : SharedKeys)
+			{
+				Keys.Add(*SharedString);
+			}
+#else
 			(*JsonObject)->Values.GetKeys(Keys);
+#endif
 		}
 	}
 
