@@ -14,6 +14,7 @@
   "IsBetaVersion": false,
   "IsExperimentalVersion": false,
   "Installed": true,
+  "EnabledByDefault": true,
   "Modules": [
     {
       "Name": "glTFRuntime",
