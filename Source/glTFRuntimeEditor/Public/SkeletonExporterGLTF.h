@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Exporters/Exporter.h"
 #include "Dom/JsonObject.h"
+#include "Animation/Skeleton.h"
 #include "SkeletonExporterGLTF.generated.h"
 
 class FglTFExportContext

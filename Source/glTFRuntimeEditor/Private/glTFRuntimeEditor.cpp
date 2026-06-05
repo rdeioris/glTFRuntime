@@ -12,6 +12,8 @@
 #include "Interfaces/IPluginManager.h"
 #include "Misc/Paths.h"
 #include "Misc/FileHelper.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/Input/SEditableTextBox.h"
 
 #define LOCTEXT_NAMESPACE "FglTFRuntimeEditorModule"
 
