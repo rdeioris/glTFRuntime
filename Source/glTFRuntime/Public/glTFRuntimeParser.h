@@ -2407,6 +2407,11 @@ DECLARE_TS_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreCreatedStaticMesh, FglTF
 DECLARE_TS_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPostCreatedStaticMesh, FglTFRuntimeStaticMeshContextRef);
 DECLARE_TS_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreCreatedSkeletalMesh, FglTFRuntimeSkeletalMeshContextRef);
 DECLARE_TS_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnFinalizedStaticMesh, TSharedRef<FglTFRuntimeParser>, UStaticMesh*, const FglTFRuntimeStaticMeshConfig&);
+// Fired during FinalizeStaticMesh, after RenderData is built but BEFORE InitResources.
+// A listener can do any last-moment work on RenderData while LOD0's CPU-side
+// vertex/index data is still resident - e.g. building LODResources[0].DistanceFieldData
+// (the glTFRuntimeDistanceField plugin), Lumen mesh cards, custom buffers, etc.
+DECLARE_TS_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreInitStaticMeshResources, FglTFRuntimeStaticMeshContextRef);
 #else
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnPreLoadedPrimitive, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, FglTFRuntimePrimitive&);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnLoadedPrimitive, TSharedRef<FglTFRuntimeParser>, TSharedRef<FJsonObject>, FglTFRuntimePrimitive&);
@@ -2421,6 +2426,7 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreCreatedStaticMesh, FglTFRun
 DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPostCreatedStaticMesh, FglTFRuntimeStaticMeshContextRef);
 DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreCreatedSkeletalMesh, FglTFRuntimeSkeletalMeshContextRef);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FglTFRuntimeOnFinalizedStaticMesh, TSharedRef<FglTFRuntimeParser>, UStaticMesh*, const FglTFRuntimeStaticMeshConfig&);
+DECLARE_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnPreInitStaticMeshResources, FglTFRuntimeStaticMeshContextRef);
 #endif
 
 namespace glTFRuntime
@@ -2663,6 +2669,7 @@ public:
 	static FglTFRuntimeOnFinalizedStaticMesh OnFinalizedStaticMesh;
 	static FglTFRuntimeOnPreCreatedStaticMesh OnPreCreatedStaticMesh;
 	static FglTFRuntimeOnPostCreatedStaticMesh OnPostCreatedStaticMesh;
+	static FglTFRuntimeOnPreInitStaticMeshResources OnPreInitStaticMeshResources;
 	static FglTFRuntimeOnPreCreatedSkeletalMesh OnPreCreatedSkeletalMesh;
 
 	const FglTFRuntimeBlob* GetAdditionalBufferView(const int64 Index, const FString& Name) const;

@@ -42,6 +42,7 @@ FglTFRuntimeOnLoadedTexturePixels FglTFRuntimeParser::OnLoadedTexturePixels;
 FglTFRuntimeOnFinalizedStaticMesh FglTFRuntimeParser::OnFinalizedStaticMesh;
 FglTFRuntimeOnPreCreatedStaticMesh FglTFRuntimeParser::OnPreCreatedStaticMesh;
 FglTFRuntimeOnPostCreatedStaticMesh FglTFRuntimeParser::OnPostCreatedStaticMesh;
+FglTFRuntimeOnPreInitStaticMeshResources FglTFRuntimeParser::OnPreInitStaticMeshResources;
 FglTFRuntimeOnPreCreatedSkeletalMesh FglTFRuntimeParser::OnPreCreatedSkeletalMesh;
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)

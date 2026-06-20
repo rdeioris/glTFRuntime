@@ -954,6 +954,12 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	}
 #endif
 
+	// Last chance to touch RenderData BEFORE InitResources, while LOD0's CPU-side
+	// vertex/index data is still resident and any added GPU data gets uploaded
+	// together with the mesh. Used e.g. by the glTFRuntimeDistanceField plugin to
+	// build LODResources[0].DistanceFieldData. No-op if nothing is bound.
+	OnPreInitStaticMeshResources.Broadcast(StaticMeshContext);
+
 	StaticMesh->InitResources();
 
 	// set default LODs screen sizes
