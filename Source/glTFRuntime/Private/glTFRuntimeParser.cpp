@@ -6314,8 +6314,23 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 
 		uint32 Next = 0;
 		uint32 Last = 0;
-		TArray<TPair<uint32, uint32>> EdgeFifo;
-		TArray<uint32> VertexFifo;
+
+		// Fixed-size ring buffers matching the meshoptimizer spec (16 entries each).
+		// The previous TArray + Insert(0) approach was O(n^2): the arrays grew unboundedly
+		// because no entries were ever removed, making each prepend shift an ever-growing list.
+		// With 370k+ triangles this caused multi-second stalls.
+		TPair<uint32, uint32> EdgeFifoRing[16] = {};
+		uint32 EdgeFifoPos = 0;
+		uint32 VertexFifoRing[16] = {};
+		uint32 VertexFifoPos = 0;
+
+		auto EdgeFifoPush = [&](uint32 A, uint32 B) { EdgeFifoRing[(EdgeFifoPos++) & 15] = { A, B }; };
+		auto EdgeFifoGet  = [&](uint32 I) -> const TPair<uint32, uint32>& { return EdgeFifoRing[(EdgeFifoPos - 1 - I) & 15]; };
+		auto EdgeFifoSize = [&]() -> uint32 { return FMath::Min(EdgeFifoPos, 16u); };
+
+		auto VertexFifoPush = [&](uint32 V) { VertexFifoRing[(VertexFifoPos++) & 15] = V; };
+		auto VertexFifoGet  = [&](uint32 I) -> uint32 { return VertexFifoRing[(VertexFifoPos - 1 - I) & 15]; };
+		auto VertexFifoSize = [&]() -> uint32 { return FMath::Min(VertexFifoPos, 16u); };
 
 		int64 Offset = 1;
 		const uint32 TrianglesNum = Elements / 3;
@@ -6392,79 +6407,79 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 
 			if (NibbleLeft < 0xf && NibbleRight == 0) // 0xX0
 			{
-				if (NibbleLeft >= EdgeFifo.Num())
+				if (NibbleLeft >= EdgeFifoSize())
 				{
 					return false;
 				}
-				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+				const TPair<uint32, uint32> AB = EdgeFifoGet(NibbleLeft);
 				const uint32 C = Next++;
 
-				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
-				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
-				VertexFifo.Insert(C, 0);
+				EdgeFifoPush(C, AB.Value); // push CB
+				EdgeFifoPush(AB.Key, C);   // push AC
+				VertexFifoPush(C);
 
 				EmitTriangle(AB.Key, AB.Value, C);
 			}
 			else if (NibbleLeft < 0xf && NibbleRight > 0 && NibbleRight < 0x0d) // 0xXY
 			{
-				if (NibbleLeft >= EdgeFifo.Num())
+				if (NibbleLeft >= EdgeFifoSize())
 				{
 					return false;
 				}
-				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+				const TPair<uint32, uint32> AB = EdgeFifoGet(NibbleLeft);
 
-				if (NibbleRight >= VertexFifo.Num())
+				if (NibbleRight >= VertexFifoSize())
 				{
 					return false;
 				}
 
-				const uint32 C = VertexFifo[NibbleRight];
-				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
-				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
+				const uint32 C = VertexFifoGet(NibbleRight);
+				EdgeFifoPush(C, AB.Value); // push CB
+				EdgeFifoPush(AB.Key, C);   // push AC
 
 				EmitTriangle(AB.Key, AB.Value, C);
 			}
 			else if (NibbleLeft < 0xf && NibbleRight == 0x0d) // 0xXd
 			{
-				if (NibbleLeft >= EdgeFifo.Num())
+				if (NibbleLeft >= EdgeFifoSize())
 				{
 					return false;
 				}
-				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+				const TPair<uint32, uint32> AB = EdgeFifoGet(NibbleLeft);
 
 				const uint32 C = Last - 1;
 				Last = C;
 
-				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
-				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
-				VertexFifo.Insert(C, 0);
+				EdgeFifoPush(C, AB.Value); // push CB
+				EdgeFifoPush(AB.Key, C);   // push AC
+				VertexFifoPush(C);
 
 				EmitTriangle(AB.Key, AB.Value, C);
 			}
 			else if (NibbleLeft < 0xf && NibbleRight == 0x0e) // 0xXe
 			{
-				if (NibbleLeft >= EdgeFifo.Num())
+				if (NibbleLeft >= EdgeFifoSize())
 				{
 					return false;
 				}
-				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+				const TPair<uint32, uint32> AB = EdgeFifoGet(NibbleLeft);
 
 				const uint32 C = Last + 1;
 				Last = C;
 
-				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
-				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
-				VertexFifo.Insert(C, 0);
+				EdgeFifoPush(C, AB.Value); // push CB
+				EdgeFifoPush(AB.Key, C);   // push AC
+				VertexFifoPush(C);
 
 				EmitTriangle(AB.Key, AB.Value, C);
 			}
 			else if (NibbleLeft < 0xf && NibbleRight == 0x0f) // 0xXf
 			{
-				if (NibbleLeft >= EdgeFifo.Num())
+				if (NibbleLeft >= EdgeFifoSize())
 				{
 					return false;
 				}
-				const TPair<uint32, uint32> AB = EdgeFifo[NibbleLeft];
+				const TPair<uint32, uint32> AB = EdgeFifoGet(NibbleLeft);
 
 				if (!DecodeIndex())
 				{
@@ -6473,9 +6488,9 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 
 				const uint32 C = Last;
 
-				EdgeFifo.Insert(TPair<uint32, uint32>(C, AB.Value), 0); // push CB
-				EdgeFifo.Insert(TPair<uint32, uint32>(AB.Key, C), 0); // push AC
-				VertexFifo.Insert(C, 0);
+				EdgeFifoPush(C, AB.Value); // push CB
+				EdgeFifoPush(AB.Key, C);   // push AC
+				VertexFifoPush(C);
 
 				EmitTriangle(AB.Key, AB.Value, C);
 			}
@@ -6495,11 +6510,11 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 				}
 				else
 				{
-					if (Z - 1 >= VertexFifo.Num())
+					if (static_cast<uint32>(Z - 1) >= VertexFifoSize())
 					{
 						return false;
 					}
-					B = VertexFifo[Z - 1];
+					B = VertexFifoGet(Z - 1);
 				}
 
 				if (W == 0)
@@ -6508,24 +6523,24 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 				}
 				else
 				{
-					if (W - 1 >= VertexFifo.Num())
+					if (static_cast<uint32>(W - 1) >= VertexFifoSize())
 					{
 						return false;
 					}
-					C = VertexFifo[W - 1];
+					C = VertexFifoGet(W - 1);
 				}
 
-				EdgeFifo.Insert(TPair<uint32, uint32>(B, A), 0); // push BA
-				EdgeFifo.Insert(TPair<uint32, uint32>(C, B), 0); // push CB
-				EdgeFifo.Insert(TPair<uint32, uint32>(A, C), 0); // push AC
-				VertexFifo.Insert(A, 0);
+				EdgeFifoPush(B, A); // push BA
+				EdgeFifoPush(C, B); // push CB
+				EdgeFifoPush(A, C); // push AC
+				VertexFifoPush(A);
 				if (Z == 0)
 				{
-					VertexFifo.Insert(B, 0);
+					VertexFifoPush(B);
 				}
 				if (W == 0)
 				{
-					VertexFifo.Insert(C, 0);
+					VertexFifoPush(C);
 				}
 
 				EmitTriangle(A, B, C);
@@ -6566,11 +6581,11 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 				}
 				else if (Z < 0xf)
 				{
-					if (Z - 1 >= VertexFifo.Num())
+					if (static_cast<uint32>(Z - 1) >= VertexFifoSize())
 					{
 						return false;
 					}
-					B = VertexFifo[Z - 1];
+					B = VertexFifoGet(Z - 1);
 				}
 				else
 				{
@@ -6588,11 +6603,11 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 				}
 				else if (W < 0xf)
 				{
-					if (W - 1 >= VertexFifo.Num())
+					if (static_cast<uint32>(W - 1) >= VertexFifoSize())
 					{
 						return false;
 					}
-					C = VertexFifo[W - 1];
+					C = VertexFifoGet(W - 1);
 				}
 				else
 				{
@@ -6603,17 +6618,17 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 					C = Last;
 				}
 
-				EdgeFifo.Insert(TPair<uint32, uint32>(B, A), 0); // push BA
-				EdgeFifo.Insert(TPair<uint32, uint32>(C, B), 0); // push CB
-				EdgeFifo.Insert(TPair<uint32, uint32>(A, C), 0); // push AC
-				VertexFifo.Insert(A, 0);
+				EdgeFifoPush(B, A); // push BA
+				EdgeFifoPush(C, B); // push CB
+				EdgeFifoPush(A, C); // push AC
+				VertexFifoPush(A);
 				if (Z == 0 || Z == 0xf)
 				{
-					VertexFifo.Insert(B, 0);
+					VertexFifoPush(B);
 				}
 				if (W == 0 || W == 0xf)
 				{
-					VertexFifo.Insert(C, 0);
+					VertexFifoPush(C);
 				}
 
 				EmitTriangle(A, B, C);
