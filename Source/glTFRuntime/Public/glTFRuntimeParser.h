@@ -1211,7 +1211,7 @@ struct FglTFRuntimePhysicsBody
 		bSphereAutoCollision = false;
 		bBoxAutoCollision = false;
 		bCapsuleAutoCollision = false;
-		CollisionScale = 1.01;
+		CollisionScale = 1.01f;
 		bDisableCollision = false;
 		CollisionResponse = EBodyCollisionResponse::Type::BodyCollision_Enabled;
 	}
@@ -1249,13 +1249,13 @@ struct FglTFRuntimePhysicsAssetAutoBodyConfig
 	FglTFRuntimePhysicsAssetAutoBodyConfig()
 	{
 		CollisionType = EglTFRuntimePhysicsAssetAutoBodyCollisionType::Capsule;
-		MinBoneSize = 20;
+		MinBoneSize = 20.0f;
 		bDisableOverlappingCollisions = true;
 		bDisableAllCollisions = false;
 		CollisionTraceFlag = ECollisionTraceFlag::CTF_UseDefault;
 		PhysicsType = EPhysicsType::PhysType_Default;
 		bConsiderForBounds = true;
-		CollisionScale = 1.01;
+		CollisionScale = 1.01f;
 	}
 };
 
