@@ -2701,11 +2701,11 @@ public:
 	template<typename Callback, typename... Args>
 	void ForEachJsonField(TSharedRef<FJsonObject> JsonObject, Callback InCallback, Args... InArgs)
 	{
-		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : JsonObject->Values)
+		for (const auto& Pair : JsonObject->Values)
 		{
 			if (Pair.Value.IsValid())
 			{
-				InCallback(Pair.Key, Pair.Value.ToSharedRef(), InArgs...);
+				InCallback(FString(Pair.Key), Pair.Value.ToSharedRef(), InArgs...);
 			}
 		}
 	}
