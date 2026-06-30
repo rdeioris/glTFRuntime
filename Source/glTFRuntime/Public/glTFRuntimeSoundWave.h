@@ -4,6 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Sound/SoundWave.h"
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7)
+#include "Sound/SoundGenerator.h"   // ISoundGenerator, ISoundGeneratorPtr, FSoundGeneratorInitParams
+#endif
 #include "glTFRuntimeSoundWave.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSoundWavePCMData, const TArray<uint8>&, PCMData);
@@ -23,6 +26,11 @@ public:
 	virtual int32 GeneratePCMData(uint8* PCMData, const int32 SamplesNeeded) override;
 	virtual bool HasCompressedData(FName Format, ITargetPlatform* TargetPlatform) const override { return false; }
 
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7)
+	// 5.7+ "Direct Procedural Rendering" renders procedural sources through an ISoundGenerator.
+	virtual ISoundGeneratorPtr CreateSoundGenerator(const FSoundGeneratorInitParams& InParams) override;
+#endif
+
 	virtual void SetRuntimeAudioData(const uint8* AudioData, const int64 AudioDataSize)
 	{
 		RuntimeAudioData.Empty();
@@ -41,6 +49,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	void SetOnPCMDataFloat(const FglTFRuntimeSoundWavePCMDataFloat& InOnPCMDataFloat);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	TArray<uint8> GetPCMData() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	int32 GetNumChannels() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
+	int32 GetSampleRate() const;
 
 protected:
 	TArray64<uint8> RuntimeAudioData;
