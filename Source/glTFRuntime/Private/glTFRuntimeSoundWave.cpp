@@ -95,9 +95,6 @@ public:
 	{
 	}
 
-	// Required to be usable with a generator source (the direct procedural path).
-	virtual int32 GetNumChannels() override { return NumChannels; }
-
 	// Ends the source (and fires OnAudioFinished) once the buffer is exhausted (non-looping).
 	virtual bool IsFinished() const override { return bFinished; }
 
@@ -153,8 +150,14 @@ ISoundGeneratorPtr UglTFRuntimeSoundWave::CreateSoundGenerator(const FSoundGener
 {
 	// Snapshot current data + offset so the generator is self-contained on the render thread
 	// and independent of later SetRuntimeAudioData()/ResetAudioOffset() calls.
+	// Copy the scalar members into locals first: bLooping is a bitfield, which MakeShared's
+	// perfect forwarding cannot bind a reference to.
+	const int32 SnapshotNumChannels = NumChannels;
+	const bool bSnapshotLooping = bLooping;
+	const int64 SnapshotOffset = RuntimeAudioOffset;
+
 	return MakeShared<FglTFRuntimeSoundGenerator, ESPMode::ThreadSafe>(
-		RuntimeAudioData, NumChannels, bLooping, RuntimeAudioOffset, OnPCMData, OnPCMDataFloat);
+		RuntimeAudioData, SnapshotNumChannels, bSnapshotLooping, SnapshotOffset, OnPCMData, OnPCMDataFloat);
 }
 #endif
 
