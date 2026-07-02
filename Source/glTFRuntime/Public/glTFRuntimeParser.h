@@ -2780,6 +2780,11 @@ protected:
 	TMap<UMaterialInterface*, FString> MaterialsNameCache;
 #endif
 
+	FCriticalSection StaticMeshAsyncCacheLock;
+	FCriticalSection SkeletalMeshAsyncCacheLock;
+	//FCriticalSection StaticMeshAsyncCacheLock;
+	FCriticalSection SkeletalMeshRecursiveAsyncCacheLock;
+	
 	TArray<FglTFRuntimeNode> AllNodesCache;
 	bool bAllNodesCached;
 
