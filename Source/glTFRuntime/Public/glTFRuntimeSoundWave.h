@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Sound/SoundWave.h"
+#include "Runtime/Launch/Resources/Version.h"   // ENGINE_MAJOR_VERSION / ENGINE_MINOR_VERSION (else C4668 under -WarningsAsErrors)
 #if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7)
 #include "Sound/SoundGenerator.h"   // ISoundGenerator, ISoundGeneratorPtr, FSoundGeneratorInitParams
 #endif
