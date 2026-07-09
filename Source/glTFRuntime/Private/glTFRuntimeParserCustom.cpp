@@ -263,22 +263,22 @@ TMap<FString, FString> FglTFRuntimeParser::GetJSONStringMapFromPath(const TArray
 		if (CurrentObject->TryGetObject(JsonObject))
 		{
 			bFound = true;
-			for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*JsonObject)->Values)
+			for (const auto& Pair : (*JsonObject)->Values)
 			{
 				if (!Pair.Value.IsValid())
 				{
-					StringMap.Add(Pair.Key, "");
+					StringMap.Add(FString(Pair.Key), "");
 					continue;
 				}
 
 				FString Value;
 				if (!Pair.Value->TryGetString(Value))
 				{
-					StringMap.Add(Pair.Key, "");
+					StringMap.Add(FString(Pair.Key), "");
 					continue;
 				}
 
-				StringMap.Add(Pair.Key, Value);
+				StringMap.Add(FString(Pair.Key), Value);
 			}
 		}
 	}
