@@ -48,3 +48,11 @@ This is an incomplete list of available plugins:
 ## 2026-07-21 Fix incorrect static-mesh transforms in `AglTFRuntimeAssetActorAsync`
 
 修复模型加载错误的变换
+
+修复前：
+
+![修复前](image/7.21fix-b1.png)
+
+修复后：
+
+![修复后](image/7.21fix-a1.png)
