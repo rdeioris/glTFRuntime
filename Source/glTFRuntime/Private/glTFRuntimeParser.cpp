@@ -304,6 +304,18 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 			StartOfBuffer += 2;
 		}
 
+		// Decompression-bomb guard (untrusted input): gzip wraps DEFLATE (RFC 1952 / RFC 1951),
+		// whose maximum expansion is 1032:1, so a declared size larger than the compressed payload
+		// could produce is malformed/malicious. (ISIZE is only size mod 2^32, so this is a floor of
+		// protection, but it still stops the classic bomb.)
+		const int64 GzipCompressedSize = DataNum - StartOfBuffer - 8;
+		constexpr uint64 MaxDeflateExpansion = 1032;
+		if (GzipCompressedSize < 0 || static_cast<uint64>(*GzipOriginalSize) > static_cast<uint64>(GzipCompressedSize) * MaxDeflateExpansion)
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Refusing Gzip data: declared uncompressed size %u is implausible for %lld compressed bytes (possible decompression bomb)."), *GzipOriginalSize, static_cast<long long>(GzipCompressedSize));
+			return nullptr;
+		}
+
 		UncompressedData.AddUninitialized(*GzipOriginalSize);
 		if (!FCompression::UncompressMemory(NAME_Zlib, UncompressedData.GetData(), *GzipOriginalSize, &DataPtr[StartOfBuffer], DataNum - StartOfBuffer - 8, COMPRESS_NoFlags, -15))
 		{
@@ -376,11 +388,20 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 
 		}
 
+		// Decompression-bomb guard (untrusted input): in the LZ4 block format one length byte of
+		// 0xFF encodes 255 output bytes, so the maximum expansion is 255:1. Bound the pre-reservation
+		// and (below, in the decoder and after each block) the running output to that ratio.
+		constexpr int64 MaxLZ4Expansion = 255;
+		const int64 LZ4MaxPlausibleOutput = DataNum * MaxLZ4Expansion;
 		if (bLZ4BlockHasContentSize)
 		{
 			const uint64* LZ4ContentSize = reinterpret_cast<const uint64*>(DataPtr + 4 + 2);
-			// 64GB seems a pretty reasonable limit...
-			UncompressedData.Reserve(FMath::Min<int64>(*LZ4ContentSize, 64LLU * 1024 * 1024 * 1024));
+			if (static_cast<int64>(*LZ4ContentSize) < 0 || static_cast<int64>(*LZ4ContentSize) > LZ4MaxPlausibleOutput)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Refusing LZ4 data: declared content size %llu is implausible for %lld compressed bytes (possible decompression bomb)."), static_cast<unsigned long long>(*LZ4ContentSize), static_cast<long long>(DataNum));
+				return nullptr;
+			}
+			UncompressedData.Reserve(FMath::Min<int64>(static_cast<int64>(*LZ4ContentSize), LZ4MaxPlausibleOutput));
 		}
 		else
 		{
@@ -388,7 +409,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 			UncompressedData.Reserve(ReserveBlockSize * LZ4Blocks.Num() * 2);
 		}
 
-		auto LZ4Decompress = [](const uint8* BlockData, const int64 BlockSize, TArray64<uint8>& Output) -> bool
+		auto LZ4Decompress = [LZ4MaxPlausibleOutput](const uint8* BlockData, const int64 BlockSize, TArray64<uint8>& Output) -> bool
 			{
 				const uint32 TrueBlockSize = BlockSize & 0x7FFFFFFF;
 				// uncompressed block?
@@ -469,6 +490,12 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 
 					while (MatchLength > 0)
 					{
+						// running decompression-bomb cap: matches copy from already-decoded output, so
+						// this is the amplification point; stop if it exceeds the 255:1 plausibility bound.
+						if (Output.Num() > LZ4MaxPlausibleOutput)
+						{
+							return false;
+						}
 						if (!Output.IsValidIndex(MatchOffset))
 						{
 							return false;
@@ -505,6 +532,11 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 				}
 
 				UncompressedData.Append(BlockState.Key);
+				if (UncompressedData.Num() > LZ4MaxPlausibleOutput)
+				{
+					UE_LOG(LogGLTFRuntime, Error, TEXT("Refusing LZ4 data: decompressed output exceeded the %lld-byte plausibility bound (possible decompression bomb)."), static_cast<long long>(LZ4MaxPlausibleOutput));
+					return nullptr;
+				}
 			}
 		}
 		else
@@ -5719,6 +5751,16 @@ bool FglTFRuntimeArchiveZip::GetFileContent(const FString& Filename, TArray64<ui
 
 	if (Compression == 8)
 	{
+		// Decompression-bomb guard (untrusted archives): DEFLATE's maximum expansion is 1032:1
+		// (RFC 1951; a 258-byte max-length match encoded as 2 bits => 258*8/2 = 1032). Anything
+		// larger than that from the actual compressed bytes is malformed/malicious.
+		constexpr uint64 MaxDeflateExpansion = 1032;
+		if (static_cast<uint64>(UncompressedSize) > static_cast<uint64>(CompressedSize) * MaxDeflateExpansion)
+		{
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Refusing ZIP entry '%s': declared uncompressed size %u is implausible for %u compressed bytes (possible decompression bomb)."), *Filename, UncompressedSize, CompressedSize);
+			return false;
+		}
+
 		OutData.AddUninitialized(UncompressedSize);
 		if (!FCompression::UncompressMemory(NAME_Zlib, OutData.GetData(), UncompressedSize, CompressedData, CompressedSize, COMPRESS_NoFlags, -15))
 		{

@@ -242,7 +242,7 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 		int32 NumLODPositions = 0;
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
 		{
-			NumLODIndices += LOD->Primitives[PrimitiveIndex].bHasIndices ? LOD->Primitives[PrimitiveIndex].Indices.Num() : LOD->Primitives[PrimitiveIndex].Positions.Num();
+			NumLODIndices += LOD->Primitives[PrimitiveIndex].Indices.Num();
 			NumLODPositions += LOD->Primitives[PrimitiveIndex].Positions.Num();
 
 			if (LOD->Primitives[PrimitiveIndex].bHighPrecisionUVs)
@@ -292,7 +292,7 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 
 			MeshSection.MaterialIndex = PrimitiveIndex;
 			MeshSection.BaseIndex = BaseIndex;
-			MeshSection.NumTriangles = (Primitive.bHasIndices ? Primitive.Indices.Num() : Primitive.Positions.Num()) / 3;
+			MeshSection.NumTriangles = Primitive.Indices.Num() / 3;
 			MeshSection.BaseVertexIndex = BaseVertexIndex;
 			MeshSection.MaxBoneInfluences = FMath::Min(Primitive.Joints.Num() * 4, MAX_TOTAL_INFLUENCES);
 
@@ -303,7 +303,7 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 
 			MeshSection.NumVertices = Primitive.Positions.Num();
 
-			BaseIndex += Primitive.bHasIndices ? Primitive.Indices.Num() : Primitive.Positions.Num();
+			BaseIndex += Primitive.Indices.Num();
 
 			TMap<int32, TArray<int32>> OverlappingVertices;
 			MeshSection.DuplicatedVerticesBuffer.Init(MeshSection.NumVertices, OverlappingVertices);
@@ -525,28 +525,16 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
 		{
 			FglTFRuntimePrimitive& Primitive = LOD->Primitives[PrimitiveIndex];
-			const int32 NumVertexInstancesPerSection = Primitive.bHasIndices ? Primitive.Indices.Num() : Primitive.Positions.Num();
+			const int32 NumVertexInstancesPerSection = Primitive.Indices.Num();
 
 			TArray<uint32> CurrentIndices;
 			CurrentIndices.Reserve(NumVertexInstancesPerSection);
 
-			if (Primitive.bHasIndices)
+			for (const uint32 Index : Primitive.Indices)
 			{
-				for (const uint32 Index : Primitive.Indices)
-				{
-					LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
-					CurrentIndices.Add(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
-				}
+				LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
+				CurrentIndices.Add(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
 			}
-			else
-			{
-				for (int32 Index = 0; Index < Primitive.Positions.Num(); Index++)
-				{
-					LodRenderData->MultiSizeIndexContainer.GetIndexBuffer()->AddItem(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
-					CurrentIndices.Add(LodRenderData->RenderSections[PrimitiveIndex].BaseVertexIndex + Index);
-				}
-			}
-
 
 			if ((!LOD->bHasTangents || !LOD->bHasNormals) && ((NumVertexInstancesPerSection % 3) == 0))
 			{
