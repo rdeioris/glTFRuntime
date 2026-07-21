@@ -1010,7 +1010,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 				{
 					bool bSkip = true;
 					FMorphTargetLODModel MorphTargetLODModel;
-					MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
+					// SourceIdx indexes the render vertex buffer, whose per-section base
+					// advances by Positions.Num() (see MeshSection.BaseVertexIndex above)
+					MorphTargetLODModel.NumBaseMeshVerts = Primitive.Positions.Num();
 					MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
 
 					for (int32 VertexIndex = 0; VertexIndex < Primitive.Positions.Num(); VertexIndex++)
@@ -1132,7 +1134,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 					MorphTargetIndex++;
 				}
-				BaseIndex += Primitive.Indices.Num();
+				BaseIndex += Primitive.Positions.Num();
 			}
 		}
 
