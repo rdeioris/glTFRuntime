@@ -40,3 +40,11 @@ This is an incomplete list of available plugins:
 * https://github.com/rdeioris/glTFRuntimeGeometryCache (Geometry Cache support)
 * https://github.com/rdeioris/glTFRuntimeAlembic (Alembic files support, includes grooming/hair and geometry cache)
 * https://github.com/rdeioris/glTFRuntimeAvif (Avif textures support)
+
+
+
+# 修复记录 
+
+## 2026-07-21 Fix incorrect static-mesh transforms in `AglTFRuntimeAssetActorAsync`
+
+修复模型加载错误的变换

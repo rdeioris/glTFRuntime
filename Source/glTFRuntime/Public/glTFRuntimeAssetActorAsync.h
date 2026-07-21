@@ -49,6 +49,8 @@ class GLTFRUNTIME_API AglTFRuntimeAssetActorAsync : public AActor
 		bool bUseCustomSkeletalMeshConfig = false;
 		bool bUseRecursiveSkeletalMeshLoad = false;
 		bool bMorphNodeUsesNodeTreeFallback = false;
+		bool bApplyStaticMeshBakeTransform = false;
+		FMatrix StaticMeshBakeTransform = FMatrix::Identity;
 	};
 	
 public:	
@@ -80,6 +82,7 @@ protected:
 	TMap<USkeletalMeshComponent*, TMap<FString, UAnimSequence*>> DiscoveredSkeletalAnimations;
 	TSet<FString> DiscoveredAnimationNames;
 	TMap<FString, float> DiscoveredAnimationDurationsByName;
+	TMap<USceneComponent*, FMatrix> DesiredComponentWorldMatrices;
 
 	void ScenesLoaded();
 	void PumpMeshLoadQueue();
@@ -93,6 +96,8 @@ protected:
 	void RegisterNodeAnimationCurves(USceneComponent* SceneComponent, const FglTFRuntimeNode& Node);
 	void RememberAnimationDuration(const FString& AnimationName, const float DurationSeconds);
 	void UpdateNodeAnimations(const float DeltaTime, const bool bAdvanceTime);
+	void ConfigureStaticMeshTransformCorrections();
+	bool ComputeStaticMeshTransformCorrectionAtTime(USceneComponent* SceneComponent, const float Time, FMatrix& OutCorrection, float& OutAnimationDuration) const;
 
 public:	
 
@@ -137,6 +142,13 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	bool bAllowNodeAnimations;
+
+	// Bake the matrix correction required by rotated/non-uniformly-scaled node
+	// hierarchies into static-mesh vertices. Time-invariant corrections are now
+	// applied automatically, including when node animations are enabled; this
+	// flag is retained for serialized Blueprint compatibility.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	bool bPreserveStaticMeshTransformMatrices;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	bool bAllowPoseAnimations;

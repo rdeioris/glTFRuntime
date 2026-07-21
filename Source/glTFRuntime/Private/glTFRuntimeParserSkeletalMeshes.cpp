@@ -1030,9 +1030,14 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 #if WITH_EDITOR
 		ImportedResource->LODModels.Add(new FSkeletalMeshLODModel());
-		for (int32 PrimitiveIndex = 0; PrimitiveIndex < SkeletalMeshContext->LODs[LODIndex]->Primitives.Num(); PrimitiveIndex++)
+		int32 NumSourceSections = SkeletalMeshContext->LODs[LODIndex]->Primitives.Num();
+		if (SkeletalMeshContext->SkeletalMesh->GetResourceForRendering() && SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData.IsValidIndex(LODIndex))
 		{
-			ImportedResource->LODModels[LODIndex].Sections.AddDefaulted();
+			NumSourceSections = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData[LODIndex].RenderSections.Num();
+		}
+		ImportedResource->LODModels[LODIndex].Sections.SetNum(NumSourceSections);
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < NumSourceSections; PrimitiveIndex++)
+		{
 			ImportedResource->LODModels[LODIndex].Sections[PrimitiveIndex].OriginalDataSectionIndex = PrimitiveIndex;
 			ImportedResource->LODModels[LODIndex].UserSectionsData.Add(PrimitiveIndex);
 		}
@@ -1310,6 +1315,30 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 
 	GeneratePhysicsAsset_Internal(SkeletalMeshContext);
+
+#if WITH_EDITOR
+	// Keep source and render section counts aligned to avoid editor-side InitResources assertions.
+	if (SkeletalMeshContext->SkeletalMesh->GetResourceForRendering())
+	{
+		const FSkeletalMeshRenderData* RenderData = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering();
+		const int32 NumSyncLODs = FMath::Min(ImportedResource->LODModels.Num(), RenderData->LODRenderData.Num());
+		for (int32 LODIndex = 0; LODIndex < NumSyncLODs; LODIndex++)
+		{
+			const int32 NumRenderSections = RenderData->LODRenderData[LODIndex].RenderSections.Num();
+			FSkeletalMeshLODModel& ImportLODModel = ImportedResource->LODModels[LODIndex];
+			if (ImportLODModel.Sections.Num() != NumRenderSections)
+			{
+				ImportLODModel.Sections.SetNum(NumRenderSections);
+				ImportLODModel.UserSectionsData.Empty();
+				for (int32 SectionIndex = 0; SectionIndex < NumRenderSections; SectionIndex++)
+				{
+					ImportLODModel.Sections[SectionIndex].OriginalDataSectionIndex = SectionIndex;
+					ImportLODModel.UserSectionsData.Add(SectionIndex);
+				}
+			}
+		}
+	}
+#endif
 
 	SkeletalMeshContext->SkeletalMesh->InitResources();
 
@@ -1843,7 +1872,11 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 				return;
 			}
 
-			SkeletalMeshContext->LODs.Add(LOD);
+			// Keep an owned copy in the context: pointers to LODsCache entries can become invalid
+			// if the cache map rehashes while finalization runs on the game thread.
+			FglTFRuntimeMeshLOD& CachedLOD = SkeletalMeshContext->CachedRuntimeMeshLODs.AddDefaulted_GetRef();
+			CachedLOD = *LOD;
+			SkeletalMeshContext->LODs.Add(&CachedLOD);
 
 			SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
 		});

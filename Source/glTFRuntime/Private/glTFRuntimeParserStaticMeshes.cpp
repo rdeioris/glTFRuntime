@@ -179,6 +179,41 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		int32 VertexBaseIndex = 0;
 
 		const bool bApplyAdditionalTransforms = LOD->Primitives.Num() == LOD->AdditionalTransforms.Num();
+		const bool bApplyMeshBakeTransform = StaticMeshConfig.bApplyMeshBakeTransform;
+		const FMatrix MeshBakeNormalTransform = bApplyMeshBakeTransform
+			? StaticMeshConfig.MeshBakeTransform.Inverse().GetTransposed()
+			: FMatrix::Identity;
+		const bool bMeshBakeTransformReversesWinding = bApplyMeshBakeTransform && StaticMeshConfig.MeshBakeTransform.Determinant() < 0;
+
+		const auto ApplyMeshBakeTransform = [&](FStaticMeshBuildVertex& StaticMeshVertex, const float TangentYSign)
+			{
+				if (!bApplyMeshBakeTransform)
+				{
+					return;
+				}
+
+				const FVector TransformedPosition = StaticMeshConfig.MeshBakeTransform.TransformPosition(FVector(StaticMeshVertex.Position));
+				FVector TransformedTangentX = StaticMeshConfig.MeshBakeTransform.TransformVector(FVector(StaticMeshVertex.TangentX)).GetSafeNormal();
+				const FVector TransformedTangentZ = MeshBakeNormalTransform.TransformVector(FVector(StaticMeshVertex.TangentZ)).GetSafeNormal();
+
+				// A full affine matrix can contain shear. Re-orthogonalize the tangent
+				// against the inverse-transpose transformed normal before rebuilding Y.
+				TransformedTangentX = (TransformedTangentX - TransformedTangentZ * FVector::DotProduct(TransformedTangentX, TransformedTangentZ)).GetSafeNormal();
+				const float TransformedTangentYSign = bMeshBakeTransformReversesWinding ? -TangentYSign : TangentYSign;
+				const FVector TransformedTangentY = glTFRuntime::ComputeTangentYWithW(TransformedTangentZ, TransformedTangentX, TransformedTangentYSign);
+
+#if ENGINE_MAJOR_VERSION > 4
+				StaticMeshVertex.Position = FVector3f(TransformedPosition);
+				StaticMeshVertex.TangentX = FVector3f(TransformedTangentX);
+				StaticMeshVertex.TangentY = FVector3f(TransformedTangentY);
+				StaticMeshVertex.TangentZ = FVector3f(TransformedTangentZ);
+#else
+				StaticMeshVertex.Position = TransformedPosition;
+				StaticMeshVertex.TangentX = TransformedTangentX;
+				StaticMeshVertex.TangentY = TransformedTangentY;
+				StaticMeshVertex.TangentZ = TransformedTangentZ;
+#endif
+			};
 
 		int32 AdditionalTransformsPrimitiveIndex = 0; // used only when applying additional transforms
 
@@ -313,6 +348,8 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 							StaticMeshVertex.TangentZ = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentZ);
 #endif
 						}
+
+						ApplyMeshBakeTransform(StaticMeshVertex, TangentX.W * TangentsDirection);
 					});
 
 				ParallelFor(NumVertexInstancesPerSection, [&](const int32 VertexInstanceSectionIndex)
@@ -387,13 +424,15 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 							StaticMeshVertex.TangentZ = LOD->AdditionalTransforms[AdditionalTransformsPrimitiveIndex].TransformVectorNoScale(StaticMeshVertex.TangentZ);
 #endif
 						}
+
+						ApplyMeshBakeTransform(StaticMeshVertex, TangentX.W * TangentsDirection);
 					});
 			}
 			// End of Geometry generation
 
 			AdditionalTransformsPrimitiveIndex++;
 
-			if (StaticMeshConfig.bReverseWinding && (NumVertexInstancesPerSection % 3) == 0)
+			if ((StaticMeshConfig.bReverseWinding != bMeshBakeTransformReversesWinding) && (NumVertexInstancesPerSection % 3) == 0)
 			{
 				const int32 NumVerticesInThisSection = VertexInstanceBaseIndex + NumVertexInstancesPerSection;
 				for (int32 VertexInstanceSectionIndex = VertexInstanceBaseIndex; VertexInstanceSectionIndex < NumVerticesInThisSection; VertexInstanceSectionIndex += 3)
@@ -712,6 +751,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 		if (CurrentLODIndex == 0)
 		{
 			BoundingBox.GetCenterAndExtents(StaticMeshContext->BoundingBoxAndSphere.Origin, StaticMeshContext->BoundingBoxAndSphere.BoxExtent);
+			if (StaticMeshConfig.bApplyMeshBakeTransform)
+			{
+				UE_LOG(LogGLTFRuntime, Log, TEXT("[MatrixPreservation] Baked static-mesh local bounds Min=%s Max=%s Vertices=%d"),
+					*BoundingBox.Min.ToString(), *BoundingBox.Max.ToString(), StaticMeshBuildVertices.Num());
+			}
 			StaticMeshContext->BoundingBoxAndSphere.SphereRadius = 0.0f;
 			for (const FStaticMeshBuildVertex& StaticMeshVertex : StaticMeshBuildVertices)
 			{

@@ -45,6 +45,7 @@ AglTFRuntimeAssetActorAsync::AglTFRuntimeAssetActorAsync()
 	bStaticMeshesAsSkeletalOnMorphTargets = true;
 	bAllowSkeletalAnimations = true;
 	bAllowNodeAnimations = false;
+	bPreserveStaticMeshTransformMatrices = true;
 	bAllowPoseAnimations = true;
 	bAutoPlayAnimations = true;
 	bAllowLights = true;
@@ -73,6 +74,11 @@ void AglTFRuntimeAssetActorAsync::BeginPlay()
 	LoadingStartTime = FPlatformTime::Seconds();
 	bNodeAnimationsPlaying = bAutoPlayAnimations;
 	bAnimationsPaused = !bAutoPlayAnimations;
+	UE_LOG(LogGLTFRuntime, Log, TEXT("[MatrixPreservation] BeginPlay Animations=%d AllowNodeAnimations=%s PreserveStaticMeshMatrices=%s StaticMeshesAsSkeletal=%s"),
+		Asset->GetNumAnimations(),
+		bAllowNodeAnimations ? TEXT("true") : TEXT("false"),
+		bPreserveStaticMeshTransformMatrices ? TEXT("true") : TEXT("false"),
+		bStaticMeshesAsSkeletal ? TEXT("true") : TEXT("false"));
 
 	TArray<FglTFRuntimeScene> Scenes = Asset->GetScenes();
 	for (FglTFRuntimeScene& Scene : Scenes)
@@ -87,6 +93,7 @@ void AglTFRuntimeAssetActorAsync::BeginPlay()
 		SceneComponent->RegisterComponent();
 		AddInstanceComponent(SceneComponent);
 		TrackCreatedComponent(SceneComponent);
+		DesiredComponentWorldMatrices.Add(SceneComponent, SceneComponent->GetComponentTransform().ToMatrixWithScale());
 
 		for (int32 NodeIndex : Scene.RootNodesIndices)
 		{
@@ -99,6 +106,7 @@ void AglTFRuntimeAssetActorAsync::BeginPlay()
 		}
 	}
 
+	ConfigureStaticMeshTransformCorrections();
 	PumpMeshLoadQueue();
 	TryFinalizeLoadingFlow();
 }
@@ -153,6 +161,12 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 		return;
 	}
 
+	const FMatrix* DesiredParentWorldMatrix = DesiredComponentWorldMatrices.Find(NodeParentComponent);
+	const FMatrix ParentWorldMatrix = DesiredParentWorldMatrix
+		? *DesiredParentWorldMatrix
+		: (NodeParentComponent ? NodeParentComponent->GetComponentTransform().ToMatrixWithScale() : FMatrix::Identity);
+	const FMatrix DesiredNodeWorldMatrix = Node.Transform.ToMatrixWithScale() * ParentWorldMatrix;
+
 	USceneComponent* NewComponent = nullptr;
 	if (Node.MeshIndex < 0)
 	{
@@ -186,6 +200,12 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 		}
 		else
 		{
+			if (Node.SkinIndex < 0 && bStaticMeshesAsSkeletal)
+			{
+				UE_LOG(LogGLTFRuntime, Warning, TEXT("[MatrixPreservation] Node '%s' (%d) is an unskinned static mesh forced through the skeletal path; static full-matrix correction is not applied."),
+					*Node.Name, Node.Index);
+			}
+
 			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, *GetSafeNodeName<USkeletalMeshComponent>(Node));
 			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
 			SkeletalMeshComponent->RegisterComponent();
@@ -266,6 +286,8 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 	{
 		return;
 	}
+
+	DesiredComponentWorldMatrices.Add(NewComponent, DesiredNodeWorldMatrix);
 
 	NewComponent->ComponentTags.Add(*FString::Printf(TEXT("glTFRuntime:NodeName:%s"), *Node.Name));
 	NewComponent->ComponentTags.Add(*FString::Printf(TEXT("glTFRuntime:NodeIndex:%d"), Node.Index));
@@ -399,6 +421,113 @@ void AglTFRuntimeAssetActorAsync::UpdateNodeAnimations(const float DeltaTime, co
 	}
 }
 
+bool AglTFRuntimeAssetActorAsync::ComputeStaticMeshTransformCorrectionAtTime(USceneComponent* SceneComponent, const float Time, FMatrix& OutCorrection, float& OutAnimationDuration) const
+{
+	OutCorrection = FMatrix::Identity;
+	OutAnimationDuration = 0.0f;
+	if (!SceneComponent)
+	{
+		return false;
+	}
+
+	TArray<USceneComponent*> ComponentChain;
+	USceneComponent* CurrentComponent = SceneComponent;
+	while (CurrentComponent && DesiredComponentWorldMatrices.Contains(CurrentComponent))
+	{
+		ComponentChain.Add(CurrentComponent);
+		CurrentComponent = CurrentComponent->GetAttachParent();
+	}
+
+	const FTransform BaseWorldTransform = CurrentComponent ? CurrentComponent->GetComponentTransform() : FTransform::Identity;
+	FTransform ActualWorldTransform = BaseWorldTransform;
+	FMatrix DesiredWorldMatrix = BaseWorldTransform.ToMatrixWithScale();
+
+	for (int32 ChainIndex = ComponentChain.Num() - 1; ChainIndex >= 0; ChainIndex--)
+	{
+		USceneComponent* ChainComponent = ComponentChain[ChainIndex];
+		FTransform LocalTransform = ChainComponent->GetRelativeTransform();
+
+		if (bAllowNodeAnimations)
+		{
+			if (UglTFRuntimeAnimationCurve* const* CurvePtr = CurveBasedAnimations.Find(ChainComponent))
+			{
+				if (IsValid(*CurvePtr))
+				{
+					LocalTransform = (*CurvePtr)->GetTransformValue(Time);
+					OutAnimationDuration = FMath::Max(OutAnimationDuration, (*CurvePtr)->glTFCurveAnimationDuration);
+				}
+			}
+		}
+
+		DesiredWorldMatrix = LocalTransform.ToMatrixWithScale() * DesiredWorldMatrix;
+		ActualWorldTransform = LocalTransform * ActualWorldTransform;
+	}
+
+	const FMatrix ActualWorldMatrix = ActualWorldTransform.ToMatrixWithScale();
+	if (FMath::IsNearlyZero(ActualWorldMatrix.Determinant()))
+	{
+		return false;
+	}
+
+	OutCorrection = DesiredWorldMatrix * ActualWorldMatrix.Inverse();
+	return true;
+}
+
+void AglTFRuntimeAssetActorAsync::ConfigureStaticMeshTransformCorrections()
+{
+	for (TPair<UPrimitiveComponent*, FglTFRuntimeMeshLoadContext>& Pair : PendingMeshesToLoad)
+	{
+		UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(Pair.Key);
+		if (!IsValid(StaticMeshComponent))
+		{
+			continue;
+		}
+
+		FMatrix ReferenceCorrection;
+		float AnimationDuration = 0.0f;
+		if (!ComputeStaticMeshTransformCorrectionAtTime(StaticMeshComponent, 0.0f, ReferenceCorrection, AnimationDuration))
+		{
+			continue;
+		}
+
+		bool bCorrectionIsAnimationInvariant = true;
+		if (AnimationDuration > KINDA_SMALL_NUMBER)
+		{
+			constexpr int32 NumAnimationSamples = 8;
+			for (int32 SampleIndex = 1; SampleIndex <= NumAnimationSamples; SampleIndex++)
+			{
+				const float SampleTime = AnimationDuration * static_cast<float>(SampleIndex) / static_cast<float>(NumAnimationSamples + 1);
+				FMatrix SampleCorrection;
+				float IgnoredDuration = 0.0f;
+				if (!ComputeStaticMeshTransformCorrectionAtTime(StaticMeshComponent, SampleTime, SampleCorrection, IgnoredDuration) ||
+					!SampleCorrection.Equals(ReferenceCorrection, 0.001f))
+				{
+					bCorrectionIsAnimationInvariant = false;
+					break;
+				}
+			}
+		}
+
+		if (!bCorrectionIsAnimationInvariant)
+		{
+			UE_LOG(LogGLTFRuntime, Warning, TEXT("[MatrixPreservation] Static node '%s' (%d) requires a time-varying matrix correction; keeping the animated component hierarchy unchanged."),
+				*Pair.Value.Node.Name, Pair.Value.Node.Index);
+			continue;
+		}
+
+		if (!ReferenceCorrection.Equals(FMatrix::Identity, KINDA_SMALL_NUMBER))
+		{
+			Pair.Value.bApplyStaticMeshBakeTransform = true;
+			Pair.Value.StaticMeshBakeTransform = ReferenceCorrection;
+			UE_LOG(LogGLTFRuntime, Log, TEXT("[MatrixPreservation] Correcting static node '%s' (%d), animated=%s, determinant=%g"),
+				*Pair.Value.Node.Name,
+				Pair.Value.Node.Index,
+				AnimationDuration > KINDA_SMALL_NUMBER ? TEXT("true") : TEXT("false"),
+				ReferenceCorrection.Determinant());
+		}
+	}
+}
+
 void AglTFRuntimeAssetActorAsync::PumpMeshLoadQueue()
 {
 	if (!Asset || bStopLoadingRequested || bDestroyInitiated)
@@ -436,6 +565,14 @@ bool AglTFRuntimeAssetActorAsync::DispatchMeshLoad(UPrimitiveComponent* Primitiv
 	if (UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(PrimitiveComponent))
 	{
 		FglTFRuntimeStaticMeshConfig StaticMeshConfigForNode = OverrideStaticMeshConfig(MeshLoadContext.Node.Index, StaticMeshComponent);
+		if (MeshLoadContext.bApplyStaticMeshBakeTransform)
+		{
+			StaticMeshConfigForNode.bApplyMeshBakeTransform = true;
+			StaticMeshConfigForNode.MeshBakeTransform = MeshLoadContext.StaticMeshBakeTransform;
+			// The cache is keyed only by mesh index, while the correction is specific
+			// to this node occurrence.
+			StaticMeshConfigForNode.CacheMode = EglTFRuntimeCacheMode::None;
+		}
 		if (StaticMeshConfigForNode.Outer == nullptr)
 		{
 			StaticMeshConfigForNode.Outer = StaticMeshComponent;
@@ -703,6 +840,7 @@ void AglTFRuntimeAssetActorAsync::CleanupTrackedComponents()
 	}
 
 	TrackedCreatedComponents.Empty();
+	DesiredComponentWorldMatrices.Empty();
 }
 
 void AglTFRuntimeAssetActorAsync::StopLoadingAndDestroy()

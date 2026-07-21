@@ -1294,8 +1294,13 @@ bool FglTFRuntimeParser::LoadBlobToMips(const int32 TextureIndex, TSharedRef<FJs
 			// limit image size (currently only PF_B8G8R8A8 is supported)
 			if (PixelFormat == EPixelFormat::PF_B8G8R8A8 && (MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0) && GPixelFormats[PixelFormat].BlockSizeX == 1 && GPixelFormats[PixelFormat].BlockSizeY == 1)
 			{
-				const int32 NewWidth = MaterialsConfig.ImagesConfig.MaxWidth > 0 ? MaterialsConfig.ImagesConfig.MaxWidth : Width;
-				const int32 NewHeight = MaterialsConfig.ImagesConfig.MaxHeight > 0 ? MaterialsConfig.ImagesConfig.MaxHeight : Height;
+				const int32 NewWidth = (MaterialsConfig.ImagesConfig.MaxWidth > 0 && Width > MaterialsConfig.ImagesConfig.MaxWidth)
+						   ? MaterialsConfig.ImagesConfig.MaxWidth
+						   : Width;
+
+				const int32 NewHeight = (MaterialsConfig.ImagesConfig.MaxHeight > 0 && Height > MaterialsConfig.ImagesConfig.MaxHeight)
+											? MaterialsConfig.ImagesConfig.MaxHeight
+											: Height;
 				TArray64<FColor> ResizedPixels;
 				ResizedPixels.AddUninitialized(NewWidth * NewHeight);
 #if ENGINE_MAJOR_VERSION >= 5

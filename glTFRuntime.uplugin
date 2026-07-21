@@ -1,37 +1,46 @@
 {
-  "FileVersion": 3,
-  "Version": 1,
-  "VersionName": "20260113",
-  "FriendlyName": "glTFRuntime",
-  "Description": "Manage glTF files at runtime",
-  "Category": "Runtime",
-  "CreatedBy": "Roberto De Ioris",
-  "CreatedByURL": "https://github.com/rdeioris/",
-  "DocsURL": "https://github.com/rdeioris/glTFRuntime/blob/master/README.md",
-  "MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/d2ed3709933d4608a3a8dd746cbc045d",
-  "SupportURL": "https://discord.gg/DzS7MHy",
-  "CanContainContent": true,
-  "IsBetaVersion": false,
-  "IsExperimentalVersion": false,
-  "Installed": true,
-  "Modules": [
-    {
-      "Name": "glTFRuntime",
-      "Type": "Runtime",
-      "LoadingPhase": "Default",
-      "WhitelistPlatforms": [ "Win64", "Mac", "Linux", "Android", "IOS" ]
-    },
-    {
-      "Name": "glTFRuntimeEditor",
-      "Type": "Editor",
-      "LoadingPhase": "Default",
-      "WhitelistPlatforms": [ "Win64", "Mac", "Linux" ]
-    }
-  ],
-  "Plugins": [
-    {
-      "Name": "ProceduralMeshComponent",
-      "Enabled": true
-    }
-  ]
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "20260113",
+	"FriendlyName": "glTFRuntime",
+	"Description": "Manage glTF files at runtime",
+	"Category": "Runtime",
+	"CreatedBy": "Roberto De Ioris",
+	"CreatedByURL": "https://github.com/rdeioris/",
+	"DocsURL": "https://github.com/rdeioris/glTFRuntime/blob/master/README.md",
+	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/d2ed3709933d4608a3a8dd746cbc045d",
+	"SupportURL": "https://discord.gg/DzS7MHy",
+	"EngineVersion": "5.4.0",
+	"CanContainContent": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "glTFRuntime",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac",
+				"Linux",
+				"Android",
+				"IOS"
+			]
+		},
+		{
+			"Name": "glTFRuntimeEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ProceduralMeshComponent",
+			"Enabled": true
+		}
+	]
 }

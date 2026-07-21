@@ -915,6 +915,13 @@ struct FglTFRuntimeStaticMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bUseHighPrecisionTangentBasis;
 
+	// Optional full-matrix correction baked into the generated vertices. This is
+	// intentionally not exposed to Blueprints: asset actors use it internally to
+	// preserve glTF node hierarchies that Unreal's FTransform cannot compose
+	// exactly (for example, a rotated child below a non-uniformly scaled parent).
+	bool bApplyMeshBakeTransform;
+	FMatrix MeshBakeTransform;
+
 	FglTFRuntimeStaticMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -934,6 +941,8 @@ struct FglTFRuntimeStaticMeshConfig
 		LODScreenSizeMultiplier = 2;
 		bBuildLumenCards = false;
 		bUseHighPrecisionTangentBasis = false;
+		bApplyMeshBakeTransform = false;
+		MeshBakeTransform = FMatrix::Identity;
 	}
 };
 
@@ -2775,7 +2784,6 @@ protected:
 
 	FCriticalSection StaticMeshAsyncCacheLock;
 	FCriticalSection SkeletalMeshAsyncCacheLock;
-	//FCriticalSection StaticMeshAsyncCacheLock;
 	FCriticalSection SkeletalMeshRecursiveAsyncCacheLock;
 	
 	TArray<FglTFRuntimeNode> AllNodesCache;
