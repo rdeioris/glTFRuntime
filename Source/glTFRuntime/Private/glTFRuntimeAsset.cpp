@@ -1655,22 +1655,22 @@ TMap<FString, FString> UglTFRuntimeAsset::GetAssetMeta() const
 
 	if (JsonObject)
 	{
-		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : JsonObject->Values)
+		for (const auto& Pair : JsonObject->Values)
 		{
 			if (!Pair.Value.IsValid())
 			{
-				Meta.Add(Pair.Key, "");
+				Meta.Add(FString(Pair.Key), "");
 				continue;
 			}
 
 			FString Value;
 			if (!Pair.Value->TryGetString(Value))
 			{
-				Meta.Add(Pair.Key, "");
+				Meta.Add(FString(Pair.Key), "");
 				continue;
 			}
 
-			Meta.Add(Pair.Key, Value);
+			Meta.Add(FString(Pair.Key), Value);
 		}
 	}
 

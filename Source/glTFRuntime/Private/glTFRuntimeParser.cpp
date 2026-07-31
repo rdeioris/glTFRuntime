@@ -6142,7 +6142,7 @@ bool FglTFRuntimeParser::GetStringMapFromExtras(const FString& Key, TMap<FString
 		return false;
 	}
 
-	for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*JsonExtraObject)->Values)
+	for (const auto& Pair : (*JsonExtraObject)->Values)
 	{
 		if (!Pair.Value.IsValid())
 		{
@@ -6155,7 +6155,7 @@ bool FglTFRuntimeParser::GetStringMapFromExtras(const FString& Key, TMap<FString
 			continue;
 		}
 
-		StringMap.Add(Pair.Key, Value);
+		StringMap.Add(FString(Pair.Key), Value);
 	}
 
 	return true;
