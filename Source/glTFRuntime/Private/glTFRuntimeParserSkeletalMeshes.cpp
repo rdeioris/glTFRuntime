@@ -999,7 +999,11 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			TMap<FString, UMorphTarget*> MorphTargetNamesHistory;
 			TMap<FString, int32> MorphTargetNamesDuplicateCounter;
 
-			int32 BaseIndex = 0;
+			// FMorphTargetDelta::SourceIdx addresses the LOD's vertex buffer, so this base must
+			// track FSkelMeshRenderSection::BaseVertexIndex in FillSkeletalMeshRenderData, which
+			// accumulates Positions.Num(). Advancing it by Indices.Num() instead placed every
+			// primitive after the first past the end of the vertex buffer.
+			int32 BaseVertexIndex = 0;
 
 			for (int32 PrimitiveIndex = 0; PrimitiveIndex < SkeletalMeshContext->LODs[LODIndex]->Primitives.Num(); PrimitiveIndex++)
 			{
@@ -1010,7 +1014,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 				{
 					bool bSkip = true;
 					FMorphTargetLODModel MorphTargetLODModel;
-					MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
+					MorphTargetLODModel.NumBaseMeshVerts = Primitive.Positions.Num();
 					MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
 
 					for (int32 VertexIndex = 0; VertexIndex < Primitive.Positions.Num(); VertexIndex++)
@@ -1038,7 +1042,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 							bSkip = false;
 						}
 
-						Delta.SourceIdx = BaseIndex + VertexIndex;
+						Delta.SourceIdx = BaseVertexIndex + VertexIndex;
 #if ENGINE_MAJOR_VERSION > 4
 						Delta.TangentZDelta = FVector3f::ZeroVector;
 #else
@@ -1132,7 +1136,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 					MorphTargetIndex++;
 				}
-				BaseIndex += Primitive.Indices.Num();
+				BaseVertexIndex += Primitive.Positions.Num();
 			}
 		}
 
