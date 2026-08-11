@@ -2963,7 +2963,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 		const TSharedPtr<FJsonObject>* JsonFrameObject = nullptr;
 		if (JsonFrame->TryGetObject(JsonFrameObject))
 		{
-			for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*JsonFrameObject)->Values)
+			for (const auto& Pair : (*JsonFrameObject)->Values)
 			{
 				if (!MorphTargetCurves.Contains(*Pair.Key))
 				{
