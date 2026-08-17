@@ -2965,9 +2965,9 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 		{
 			for (const auto& Pair : (*JsonFrameObject)->Values)
 			{
-				if (!MorphTargetCurves.Contains(*Pair.Key))
+				if (!MorphTargetCurves.Contains(*FString(Pair.Key)))
 				{
-					MorphTargetCurves.Add(*Pair.Key);
+					MorphTargetCurves.Add(*FString(Pair.Key));
 				}
 			}
 		}
