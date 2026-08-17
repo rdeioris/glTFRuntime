@@ -680,18 +680,33 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	{
 		if (MaterialsConfig.bUseSubstrateMaterials && !RuntimeMaterial.bKHR_materials_unlit && !RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness)
 		{
-			EglTFRuntimeSubstrateMaterialType SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::OpaqueTwoSided : EglTFRuntimeSubstrateMaterialType::Opaque;
+			bool bIsSimpleSlab = true;
+			if (RuntimeMaterial.bKHR_materials_clearcoat ||	RuntimeMaterial.bKHR_materials_iridescence || RuntimeMaterial.bKHR_materials_sheen || RuntimeMaterial.bKHR_materials_volume)
+			{
+				bIsSimpleSlab = false;
+			}
+
+			EglTFRuntimeSubstrateMaterialType SubstrateMaterialType = RuntimeMaterial.bTwoSided ?
+				(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleOpaqueTwoSided : EglTFRuntimeSubstrateMaterialType::OpaqueTwoSided) :
+				(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleOpaque : EglTFRuntimeSubstrateMaterialType::Opaque);
+
 			if (RuntimeMaterial.bKHR_materials_transmission)
 			{
-				SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::TransmittanceTwoSided : EglTFRuntimeSubstrateMaterialType::Transmittance;
+				SubstrateMaterialType = RuntimeMaterial.bTwoSided ?
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleTransmittanceTwoSided : EglTFRuntimeSubstrateMaterialType::TransmittanceTwoSided) :
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleTransmittance : EglTFRuntimeSubstrateMaterialType::Transmittance);
 			}
 			else if (RuntimeMaterial.bTranslucent)
 			{
-				SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::AlphaCompositeTwoSided : EglTFRuntimeSubstrateMaterialType::AlphaComposite;
+				SubstrateMaterialType = RuntimeMaterial.bTwoSided ?
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleAlphaCompositeTwoSided : EglTFRuntimeSubstrateMaterialType::AlphaCompositeTwoSided) :
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleAlphaComposite : EglTFRuntimeSubstrateMaterialType::AlphaComposite);
 			}
 			else if (RuntimeMaterial.bMasked)
 			{
-				SubstrateMaterialType = RuntimeMaterial.bTwoSided ? EglTFRuntimeSubstrateMaterialType::MaskedTwoSided : EglTFRuntimeSubstrateMaterialType::Masked;
+				SubstrateMaterialType = RuntimeMaterial.bTwoSided ?
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleMaskedTwoSided : EglTFRuntimeSubstrateMaterialType::MaskedTwoSided) :
+					(bIsSimpleSlab ? EglTFRuntimeSubstrateMaterialType::SimpleMasked : EglTFRuntimeSubstrateMaterialType::Masked);
 			}
 
 			if (MaterialsConfig.SubstrateMaterials.Contains(SubstrateMaterialType))
