@@ -544,7 +544,8 @@ TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArr
 			{
 				if (SquareBracketEnd > SquareBracketStart)
 				{
-					const FString KeyIndex = Key.Mid(SquareBracketStart + 1, SquareBracketEnd - SquareBracketStart);
+					// the index is what sits between the brackets, ']' excluded
+					const FString KeyIndex = Key.Mid(SquareBracketStart + 1, SquareBracketEnd - SquareBracketStart - 1);
 					PathIndex = FCString::Atoi(*KeyIndex);
 					PathKey = Key.Left(SquareBracketStart);
 				}
@@ -569,8 +570,10 @@ bool UglTFRuntimeFunctionLibrary::GetIndicesAsBytesFromglTFRuntimeLODPrimitive(c
 
 	const FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
 
-	Bytes.AddUninitialized(Primitive.Indices.Num() * sizeof(uint32));
-	FMemory::Memcpy(Bytes.GetData(), Primitive.Indices.GetData(), Primitive.Indices.Num() * sizeof(uint32));
+	// append (like the sibling getters do): writing at GetData() would overwrite whatever the
+	// caller already had in the array and leave the newly added bytes uninitialized.
+	const int32 BytesBaseIndex = Bytes.AddUninitialized(Primitive.Indices.Num() * sizeof(uint32));
+	FMemory::Memcpy(Bytes.GetData() + BytesBaseIndex, Primitive.Indices.GetData(), Primitive.Indices.Num() * sizeof(uint32));
 	return true;
 }
 

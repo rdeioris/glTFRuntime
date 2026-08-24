@@ -49,6 +49,16 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnSkeletalMeshCreated, U
 * definitely go to Benjamin MICHEL (SBRK)
 *
 */
+/**
+ * Non owning view over a range of bytes (the glTF equivalent of a span).
+ *
+ * A blob returned by GetBuffer()/GetBufferView()/GetAccessor() points *inside* memory owned by the
+ * parser (the embedded GLB chunk, or one of its internal buffer caches), so:
+ *  - it stays valid as long as the parser is alive and ClearCache() has not been called;
+ *  - it must never be freed or written through by the caller;
+ *  - Num is the number of bytes that can legitimately be read from Data (the loader validates it
+ *    against the underlying buffer, this is what keeps malformed files from reading out of bounds).
+ */
 struct FglTFRuntimeBlob
 {
 	uint8* Data;
@@ -2280,6 +2290,11 @@ struct FglTFRuntimeMaterial
 	}
 };
 
+/**
+ * Base class of the containers a glTF asset can be loaded from (zip/archives, or a plain
+ * filename -> bytes map). Implementations expose a flat, case sensitive virtual filesystem: the
+ * loader looks up the entry point in it and then resolves every relative uri against it.
+ */
 class GLTFRUNTIME_API FglTFRuntimeArchive
 {
 public:
@@ -2305,6 +2320,19 @@ protected:
 	TMap<FString, TPair<uint32, uint32>> GlobalSizeMap;
 };
 
+/**
+ * Minimal, self contained ZIP reader (no engine/OS dependency, works the same on every platform).
+ *
+ * Supported: stored (0) and deflate (8) entries, streamed archives whose local headers carry zeroed
+ * sizes, ZipCrypto and - through FglTFRuntimeAESDecrypterHook - AES entries.
+ * Not supported: ZIP64 (sizes and offsets are 32bit, archives are capped at 2GB), multi disk
+ * archives, other compression methods.
+ *
+ * The whole archive is kept in memory and entries are decompressed on demand by GetFileContent().
+ * As the input is untrusted, every offset read from the file is validated against the archive size
+ * and deflate entries are rejected when their declared uncompressed size is not plausible for the
+ * amount of compressed bytes available (decompression bomb guard).
+ */
 class GLTFRUNTIME_API FglTFRuntimeArchiveZip : public FglTFRuntimeArchive
 {
 public:
@@ -2457,7 +2485,27 @@ namespace glTFRuntime
 }
 
 /**
+ * The glTF/GLB document itself: json tree, binary buffers and every Load*() entry point built on
+ * top of them.
  *
+ * Lifetime: always held through a TSharedPtr (it derives from TSharedFromThis and registers itself
+ * as an FGCObject to keep the UObjects it produced - meshes, materials, textures - alive as long as
+ * the parser is).
+ *
+ * Caching: decoded buffers, sparse accessors, meshes, materials, skeletons and textures are cached
+ * per index. UObject caches are opt-in per call through FglTFRuntimeConfig/*Config CacheMode, the
+ * byte level ones (buffers, bufferViews, sparse accessors) are always on since they back the
+ * FglTFRuntimeBlob views handed out to callers. ClearCache() drops all of them and invalidates
+ * every blob previously returned.
+ *
+ * Threading: a single parser is *not* internally synchronized. The async loaders (Load*Async) run
+ * one background job at a time per parser and marshal every UObject creation step back to the game
+ * thread; loading from two threads through the same parser concurrently is not supported. Hooks and
+ * delegates are always invoked on the game thread.
+ *
+ * Untrusted input: every offset, size and index read from the document is validated before being
+ * used to address memory - glTF assets are frequently downloaded at runtime, so a malformed or
+ * hostile file must fail the load, never read out of bounds.
  */
 class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject, public TSharedFromThis<FglTFRuntimeParser>
 {
@@ -2501,7 +2549,7 @@ public:
 	bool LoadNodes();
 	bool LoadNode(const int32 NodeIndex, FglTFRuntimeNode& Node);
 	bool LoadNodeByName(const FString& NodeName, FglTFRuntimeNode& Node);
-	bool LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes);
+	bool LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes, TSet<int32>* VisitedNodes = nullptr);
 	bool LoadJointByName(const int64 RootBoneIndex, const FString& Name, FglTFRuntimeNode& Node);
 	int32 AddFakeRootNode(const FString& BaseName);
 
@@ -2555,8 +2603,31 @@ public:
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
 
+	/**
+	 * Resolves "buffers[BufferIndex]" to its bytes: the GLB binary chunk, a base64 data uri, an
+	 * entry of the archive the asset was loaded from, or a sibling file when external files are
+	 * allowed by the config. The result is cached, so the returned blob outlives the call.
+	 */
 	bool GetBuffer(const int32 BufferIndex, FglTFRuntimeBlob& Blob);
+
+	/**
+	 * Resolves "bufferViews[BufferViewIndex]" to the slice of its buffer, transparently decoding
+	 * EXT_meshopt_compression views (decompressed views are cached).
+	 * Stride is the view byteStride, 0 when the data is tightly packed.
+	 */
 	bool GetBufferView(const int32 BufferViewIndex, FglTFRuntimeBlob& Blob, int64& Stride);
+
+	/**
+	 * Resolves "accessors[AccessorIndex]" to the bytes of its elements plus everything needed to
+	 * walk them: element i lives at Blob.Data[i * Stride] and is made of Elements components of
+	 * ElementSize bytes each (Count elements in total, Blob.Num bytes are safe to read).
+	 *
+	 * Handles the three flavours of accessor: bufferView backed, implicit (no bufferView, reads as
+	 * zeroes) and sparse (a copy of the base data patched with the sparse values, then cached).
+	 *
+	 * AdditionalBufferView optionally overrides the source bytes (used by extensions that provide
+	 * their own decoded buffer, e.g. draco) and may be null.
+	 */
 	bool GetAccessor(const int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, FglTFRuntimeBlob& Blob, const FglTFRuntimeBlob* AdditionalBufferView);
 
 	bool GetAllNodes(TArray<FglTFRuntimeNode>& Nodes);
@@ -2829,6 +2900,9 @@ protected:
 
 	void FixNodeParent(FglTFRuntimeNode& Node);
 
+	// recursion body of LoadNodesRecursive(), carries the visited set by reference
+	bool LoadNodesRecursive_Internal(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes, TSet<int32>& VisitedNodes);
+
 	int32 FindCommonRoot(const TArray<int32>& NodeIndices);
 	int32 FindTopRoot(int32 NodeIndex);
 	bool HasRoot(int32 NodeIndex, int32 RootIndex);
@@ -2938,6 +3012,18 @@ public:
 		return FTransform(SceneBasis.Inverse() * M * SceneBasis);
 	}
 
+	/**
+	 * Reads the accessor referenced by JsonObject[Name] into Data, converting every element to T and
+	 * passing it through Filter (used to rebase positions/vectors into Unreal space).
+	 *
+	 * SupportedElements / SupportedTypes whitelist the accessor "type" (component count) and
+	 * "componentType" the caller can deal with; anything else fails the call instead of being
+	 * silently reinterpreted. bDefaultNormalized is the assumed normalization when the accessor does
+	 * not state one, and ComponentTypePtr optionally reports back the component type that was found
+	 * (callers use it to decide between high and low precision buffers).
+	 *
+	 * Elements are decoded in parallel; Data is appended to, not reset.
+	 */
 	template<typename T, typename Callback>
 	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
@@ -3016,7 +3102,11 @@ public:
 				}
 			};
 
-		TFunction<void(const int64 Elements, const int64 Index, const FglTFRuntimeBlob& Blob, T& Value, const bool bNormalized)> ComponentFunction = nullptr;
+		// The readers above capture nothing, so they decay to plain function pointers. Going through
+		// a TFunction here would add an indirection to every single element of every accessor,
+		// and this is the hottest loop of the whole plugin (once per vertex, per attribute).
+		using FComponentReader = void(*)(const int64 Elements, const int64 Index, const FglTFRuntimeBlob& Blob, T& Value, const bool bNormalized);
+		FComponentReader ComponentFunction = nullptr;
 
 		switch (ComponentType)
 		{
@@ -3040,13 +3130,20 @@ public:
 			return false;
 		}
 
-		Data.AddUninitialized(Count);
+		// TArray is 32bit indexed, and Data may already hold something: append and write relative
+		// to the first appended element instead of assuming an empty array starting at 0.
+		if (Count > TNumericLimits<int32>::Max())
+		{
+			return false;
+		}
+
+		const int32 BaseIndex = Data.AddUninitialized(static_cast<int32>(Count));
 		ParallelFor(Count, [&](const int64 ElementIndex)
 			{
 				int64 Index = ElementIndex * Stride;
 				T Value;
 				ComponentFunction(Elements, Index, Blob, Value, bNormalized);
-				Data[ElementIndex] = Filter(Value);
+				Data[BaseIndex + ElementIndex] = Filter(Value);
 			});
 
 		return true;
@@ -3115,7 +3212,10 @@ public:
 				Value = bNormalized ? ((float)(*Ptr)) / 65535.f : *Ptr;
 			};
 
-		TFunction<void(const int64 Index, const FglTFRuntimeBlob& Blob, T& Value, const bool bNormalized)> ComponentFunction = nullptr;
+		// see the note in the sibling overload: captureless lambdas decay to function pointers,
+		// which keeps the per-element call in the loop below free of TFunction indirection.
+		using FComponentReader = void(*)(const int64 Index, const FglTFRuntimeBlob& Blob, T& Value, const bool bNormalized);
+		FComponentReader ComponentFunction = nullptr;
 
 		switch (ComponentType)
 		{
@@ -3139,13 +3239,18 @@ public:
 			return false;
 		}
 
-		Data.AddUninitialized(Count);
+		if (Count > TNumericLimits<int32>::Max())
+		{
+			return false;
+		}
+
+		const int32 BaseIndex = Data.AddUninitialized(static_cast<int32>(Count));
 		ParallelFor(Count, [&](const int64 ElementIndex)
 			{
 				int64 Index = ElementIndex * Stride;
 				T Value;
 				ComponentFunction(Index, Blob, Value, bNormalized);
-				Data[ElementIndex] = Filter(Value);
+				Data[BaseIndex + ElementIndex] = Filter(Value);
 			});
 
 		return true;

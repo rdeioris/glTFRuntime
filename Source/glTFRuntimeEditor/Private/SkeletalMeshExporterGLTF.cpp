@@ -52,7 +52,7 @@ void FglTFExportContextSkeletalMesh::GenerateSkeletalMesh(USkeletalMesh* Skeleta
 	for (int32 LodIndex = 0; LodIndex < NumLods; LodIndex++)
 	{
 		TSharedRef<FJsonObject> JsonMesh = MakeShared<FJsonObject>();
-		JsonMesh->SetStringField("name", FString::Printf(TEXT("Mesh_LOD_%d"), LodIndex));
+		JsonMesh->SetStringField(TEXT("name"), FString::Printf(TEXT("Mesh_LOD_%d"), LodIndex));
 
 		TArray<FSkelMeshRenderSection>& RenderSections = RenderData->LODRenderData[LodIndex].RenderSections;
 		int32 NumSections = RenderSections.Num();
@@ -106,33 +106,33 @@ void FglTFExportContextSkeletalMesh::GenerateSkeletalMesh(USkeletalMesh* Skeleta
 				IndexAccessor = AppendAccessor(5125, RenderSection.NumTriangles * 3, "SCALAR", (uint8*)SectionIndices.GetData(), (RenderSection.NumTriangles * 3) * sizeof(uint32));
 			}
 
-			JsonPrimitive->SetNumberField("indices", IndexAccessor);
+			JsonPrimitive->SetNumberField(TEXT("indices"), IndexAccessor);
 
 			TSharedRef<FJsonObject> JsonPrimitiveAttributes = MakeShared<FJsonObject>();
-			JsonPrimitiveAttributes->SetNumberField("POSITION", PositionsAccessor);
+			JsonPrimitiveAttributes->SetNumberField(TEXT("POSITION"), PositionsAccessor);
 
-			JsonPrimitive->SetObjectField("attributes", JsonPrimitiveAttributes);
+			JsonPrimitive->SetObjectField(TEXT("attributes"), JsonPrimitiveAttributes);
 
 			JsonPrimitives.Add(MakeShared<FJsonValueObject>(JsonPrimitive));
 		}
 
-		JsonMesh->SetArrayField("primitives", JsonPrimitives);
+		JsonMesh->SetArrayField(TEXT("primitives"), JsonPrimitives);
 		int32 MeshIndex = JsonMeshes.Add(MakeShared<FJsonValueObject>(JsonMesh));
 
 		TSharedRef<FJsonObject> JsonNode = MakeShared<FJsonObject>();
-		JsonNode->SetStringField("name", FString::Printf(TEXT("LOD_%d"), LodIndex));
-		JsonNode->SetNumberField("mesh", MeshIndex);
+		JsonNode->SetStringField(TEXT("name"), FString::Printf(TEXT("LOD_%d"), LodIndex));
+		JsonNode->SetNumberField(TEXT("mesh"), MeshIndex);
 
 		int32 JsonNodeIndex = JsonNodes.Add(MakeShared<FJsonValueObject>(JsonNode));
 
 		JsonSceneNodes.Add(MakeShared<FJsonValueNumber>(JsonNodeIndex));
 	}
 
-	JsonScene->SetArrayField("nodes", JsonSceneNodes);
+	JsonScene->SetArrayField(TEXT("nodes"), JsonSceneNodes);
 
 	JsonScenes.Add(MakeShared<FJsonValueObject>(JsonScene));
 
-	JsonRoot->SetArrayField("meshes", JsonMeshes);
+	JsonRoot->SetArrayField(TEXT("meshes"), JsonMeshes);
 }
 
 bool USkeletalMeshExporterGLTF::ExportText(const FExportObjectInnerContext* Context, UObject* Object, const TCHAR* Type, FOutputDevice& Ar, FFeedbackContext* Warn, uint32 PortFlags)

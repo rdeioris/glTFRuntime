@@ -19,6 +19,7 @@
 #include "Misc/Compression.h"
 #include "Misc/Crc.h"
 #include "Misc/Paths.h"
+#include "Templates/Atomic.h"
 #include "Interfaces/IPluginManager.h"
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
 #include "RenderMath.h"
@@ -1058,17 +1059,43 @@ bool FglTFRuntimeParser::LoadNodes()
 	return true;
 }
 
+// Assigns Node as the parent of its direct children.
+// This used to recurse into the whole subtree, which made LoadNodes() O(nodes * depth) (every node
+// re-walked all of its descendants) and, more importantly, blew the stack on files whose node graph
+// contains a cycle (a is a child of b, b is a child of a). Since LoadNodes() already calls this for
+// *every* node, walking a single level is enough to give the whole graph its parents.
 void FglTFRuntimeParser::FixNodeParent(FglTFRuntimeNode& Node)
 {
 	for (int32 Index : Node.ChildrenIndices)
 	{
 		AllNodesCache[Index].ParentIndex = Node.Index;
-		FixNodeParent(AllNodesCache[Index]);
 	}
 }
 
-bool FglTFRuntimeParser::LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes)
+// Depth first collection of a node and its descendants.
+// VisitedNodes is an internal bookkeeping set (callers can leave it to nullptr): node graphs coming
+// from a file are not guaranteed to be acyclic, and without it a cycle recurses until the stack dies.
+bool FglTFRuntimeParser::LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes, TSet<int32>* VisitedNodes)
 {
+	if (VisitedNodes)
+	{
+		return LoadNodesRecursive_Internal(NodeIndex, Nodes, *VisitedNodes);
+	}
+
+	TSet<int32> LocalVisitedNodes;
+	return LoadNodesRecursive_Internal(NodeIndex, Nodes, LocalVisitedNodes);
+}
+
+bool FglTFRuntimeParser::LoadNodesRecursive_Internal(const int32 NodeIndex, TArray<FglTFRuntimeNode>& Nodes, TSet<int32>& VisitedNodes)
+{
+	bool bAlreadyVisited = false;
+	VisitedNodes.Add(NodeIndex, &bAlreadyVisited);
+	if (bAlreadyVisited)
+	{
+		AddError("LoadNodesRecursive()", FString::Printf(TEXT("Cycle detected in the node hierarchy at node %d"), NodeIndex));
+		return false;
+	}
+
 	FglTFRuntimeNode Node;
 	if (!LoadNode(NodeIndex, Node))
 	{
@@ -1080,7 +1107,7 @@ bool FglTFRuntimeParser::LoadNodesRecursive(const int32 NodeIndex, TArray<FglTFR
 
 	for (int32 ChildIndex : Node.ChildrenIndices)
 	{
-		if (!LoadNodesRecursive(ChildIndex, Nodes))
+		if (!LoadNodesRecursive_Internal(ChildIndex, Nodes, VisitedNodes))
 		{
 			return false;
 		}
@@ -1747,7 +1774,7 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 				return false;
 			}
 
-			if (ChildIndex >= NodesCount)
+			if (ChildIndex < 0 || ChildIndex >= NodesCount)
 			{
 				return false;
 			}
@@ -2146,7 +2173,11 @@ bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)
 		return false;
 	}
 
-	while (Node.ParentIndex != INDEX_NONE)
+	// A chain of parents can never be longer than the number of nodes: capping it keeps a file with
+	// a cyclic hierarchy (perfectly expressible in json) from spinning here forever.
+	int32 RemainingSteps = AllNodesCache.Num();
+
+	while (Node.ParentIndex != INDEX_NONE && RemainingSteps-- > 0)
 	{
 		if (!LoadNode(Node.ParentIndex, Node))
 		{
@@ -2167,7 +2198,11 @@ int32 FglTFRuntimeParser::FindTopRoot(int32 Index)
 	FglTFRuntimeNode Node;
 	if (!LoadNode(Index, Node))
 		return INDEX_NONE;
-	while (Node.ParentIndex != INDEX_NONE)
+
+	// see HasRoot(): bounded walk, a cyclic hierarchy would otherwise never reach a root
+	int32 RemainingSteps = AllNodesCache.Num();
+
+	while (Node.ParentIndex != INDEX_NONE && RemainingSteps-- > 0)
 	{
 		if (!LoadNode(Node.ParentIndex, Node))
 			return INDEX_NONE;
@@ -3487,6 +3522,18 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			return false;
 		}
 
+		const uint32 NumPositions = static_cast<uint32>(Primitive.Positions.Num());
+
+		// indices addressing an empty vertex buffer can only produce a broken index buffer,
+		// there is no sane value to clamp them to
+		if (Count > 0 && NumPositions == 0)
+		{
+			AddError("LoadPrimitive()", "Primitive declares indices but its POSITION accessor is empty");
+			return false;
+		}
+
+		TAtomic<bool> bFoundOutOfRangeIndices(false);
+
 		Primitive.Indices.AddUninitialized(Count);
 		ParallelFor(Count, [&](const int32 Index)
 			{
@@ -3508,8 +3555,22 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 					VertexIndex = *IndexPtr;
 				}
 
+				// Indices are uploaded to the gpu index buffer verbatim, so an index bigger than the
+				// POSITION accessor makes the driver read past the end of the vertex buffer (the
+				// mesh builders index vertices by Positions.Num()). Clamp instead of trusting it.
+				if (VertexIndex >= NumPositions)
+				{
+					bFoundOutOfRangeIndices = true;
+					VertexIndex = 0;
+				}
+
 				Primitive.Indices[Index] = VertexIndex;
 			});
+
+		if (bFoundOutOfRangeIndices)
+		{
+			AddError("LoadPrimitive()", FString::Printf(TEXT("Out of range vertex indices detected (POSITION count is %u), they have been clamped"), NumPositions));
+		}
 
 		// use indices only if their number is higher than positions (this reduces gpu usage on assets reusing the same POSITION buffer)
 		if (Primitive.Positions.Num() < Primitive.Indices.Num())
@@ -4742,7 +4803,9 @@ bool FglTFRuntimeParser::GetBufferView(const int32 Index, FglTFRuntimeBlob& Blob
 		Stride = 0;
 	}
 
-	if (ByteOffset + ByteLength > BufferBlob.Num)
+	// byteOffset/byteLength/byteStride are untrusted json numbers: a negative value would sail
+	// through the sum below and produce a blob pointing outside of the buffer.
+	if (ByteOffset < 0 || ByteLength < 0 || Stride < 0 || ByteOffset + ByteLength > BufferBlob.Num)
 	{
 		return false;
 	}
@@ -4857,6 +4920,14 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 		return false;
 	}
 
+	// "count", "byteOffset" and "byteStride" all come straight from untrusted json:
+	// reject negative values and anything that would overflow the int64 size computations below
+	// (every bounds check in this function is meaningless if the sizes themselves wrap around).
+	if (Count < 0 || ByteOffset < 0 || Count > (TNumericLimits<int64>::Max() / (ElementSize * Elements)))
+	{
+		return false;
+	}
+
 	int64 FinalSize = ElementSize * Elements * Count;
 
 	if (AdditionalBufferView)
@@ -4907,9 +4978,23 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 			Stride = ElementSize * Elements;
 		}
 
+		// a hostile/corrupted byteStride could make Stride * Count wrap around
+		if (Stride < 0 || (Stride > 0 && Count > (TNumericLimits<int64>::Max() / Stride)))
+		{
+			return false;
+		}
+
 		FinalSize = Stride * Count;
 
-		if (FinalSize > Blob.Num)
+		// Number of bytes an accessor read can actually touch: the last element only needs
+		// (ElementSize * Elements) bytes, not a full trailing stride (and an empty accessor
+		// touches nothing at all, which would otherwise come out negative).
+		const int64 ReadableSize = Count > 0 ? FinalSize - FMath::Max<int64>(Stride - (ElementSize * Elements), 0) : 0;
+
+		// byteOffset is relative to the bufferView, so it has to take part in the bounds check:
+		// without it an accessor sitting near the end of a large bufferView passes the size test
+		// and then reads past the end of the underlying buffer.
+		if (ByteOffset > Blob.Num || ReadableSize > Blob.Num - ByteOffset)
 		{
 			return false;
 		}
@@ -4917,14 +5002,7 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 		if (ByteOffset > 0)
 		{
 			Blob.Data += ByteOffset;
-			if (Stride > ElementSize * Elements)
-			{
-				Blob.Num = FinalSize - (Stride - (ElementSize * Elements));
-			}
-			else
-			{
-				Blob.Num = FinalSize;
-			}
+			Blob.Num = ReadableSize;
 		}
 
 		if (!bHasSparse)
@@ -4947,7 +5025,8 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 		return false;
 	}
 
-	if ((SparseCount > FinalSize) || (SparseCount < 1))
+	// (the sparse loops below index with int32 counters)
+	if ((SparseCount > FinalSize) || (SparseCount < 1) || (SparseCount > TNumericLimits<int32>::Max()))
 	{
 		return false;
 	}
@@ -4970,8 +5049,21 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 		SparseByteOffset = 0;
 	}
 
+	if (SparseByteOffset < 0)
+	{
+		return false;
+	}
+
 	int64 SparseComponentType;
 	if (!(*JsonSparseIndicesObject)->TryGetNumberField(TEXT("componentType"), SparseComponentType))
+	{
+		return false;
+	}
+
+	// sparse indices are UNSIGNED_BYTE/UNSIGNED_SHORT/UNSIGNED_INT only (glTF 2.0 spec).
+	// Validating here (instead of in the decoding loop below) is what keeps
+	// GetComponentTypeSize() from returning 0 and turning the stride into a division by zero.
+	if (SparseComponentType != 5121 && SparseComponentType != 5123 && SparseComponentType != 5125)
 	{
 		return false;
 	}
@@ -4989,12 +5081,22 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 	}
 
 
-	if (((SparseBytesIndices.Num - SparseByteOffset) / SparseBufferViewIndicesStride) < SparseCount)
+	// glTF forbids a byteStride on the sparse indices bufferView, so the stride can never be
+	// smaller than one index: without this the last element of the loop below reads past the view
+	// (the size check only accounts for SparseCount *strides*, not for the width of a read).
+	if (SparseBufferViewIndicesStride < GetComponentTypeSize(SparseComponentType))
+	{
+		return false;
+	}
+
+	if (SparseByteOffset > SparseBytesIndices.Num ||
+		((SparseBytesIndices.Num - SparseByteOffset) / SparseBufferViewIndicesStride) < SparseCount)
 	{
 		return false;
 	}
 
 	TArray<uint32> SparseIndices;
+	SparseIndices.Reserve(SparseCount);
 	uint8* SparseIndicesBase = &SparseBytesIndices.Data[SparseByteOffset];
 
 	for (int32 SparseIndexOffset = 0; SparseIndexOffset < SparseCount; SparseIndexOffset++)
@@ -5011,14 +5113,10 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 			SparseIndices.Add(*SparseIndicesBaseUint16);
 		}
 		// UNSIGNED_INT
-		else if (SparseComponentType == 5125)
+		else // 5125, the only value left after the check above
 		{
 			uint32* SparseIndicesBaseUint32 = (uint32*)SparseIndicesBase;
 			SparseIndices.Add(*SparseIndicesBaseUint32);
-		}
-		else
-		{
-			return false;
 		}
 		SparseIndicesBase += SparseBufferViewIndicesStride;
 	}
@@ -5053,24 +5151,57 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 		SparseBufferViewValuesStride = ElementSize * Elements;
 	}
 
+	// glTF requires the sparse values bufferView to be tightly packed, so the stride can never be
+	// smaller than one element; enforcing it keeps the destination offsets computed below in range.
+	if (SparseBufferViewValuesStride < (ElementSize * Elements) || SparseValueByteOffset < 0)
+	{
+		return false;
+	}
+
 	Stride = SparseBufferViewValuesStride;
+
+	// The replacement values live at [SparseValueByteOffset .. +SparseCount elements[ of their
+	// bufferView. Check that the whole run is inside the view *before* touching anything:
+	// the loop below used to walk the values blob without any bounds check at all.
+	// Expressed as a division so that a hostile stride/count pair cannot overflow the comparison.
+	if (SparseValueByteOffset > SparseBytesValues.Num)
+	{
+		return false;
+	}
+
+	const int64 SparseValuesAvailable = SparseBytesValues.Num - SparseValueByteOffset;
+	if (SparseValuesAvailable < (ElementSize * Elements) ||
+		((SparseValuesAvailable - (ElementSize * Elements)) / SparseBufferViewValuesStride) < (SparseCount - 1))
+	{
+		return false;
+	}
+
+	// Every destination slot must be addressable too. This is validated up-front so that the
+	// cache below is only ever filled with a fully rebuilt (valid) buffer: bailing out halfway
+	// through would leave a partially patched entry that every later lookup would happily reuse.
+	const int64 SparseMaxDestinationElements = Blob.Num / Stride;
+	for (int32 IndexToChange = 0; IndexToChange < SparseCount; IndexToChange++)
+	{
+		if (SparseIndices[IndexToChange] >= SparseMaxDestinationElements)
+		{
+			return false;
+		}
+	}
 
 	SparseAccessorsCache.Add(Index);
 	SparseAccessorsStridesCache.Add(Index, Stride);
 	TArray64<uint8>& SparseData = SparseAccessorsCache[Index];
 	SparseData.Append(Blob.Data, Blob.Num);
 
+	const uint8* SparseValuesBase = SparseBytesValues.Data + SparseValueByteOffset;
+
 	for (int32 IndexToChange = 0; IndexToChange < SparseCount; IndexToChange++)
 	{
-		uint32 SparseIndexToChange = SparseIndices[IndexToChange];
-		if (SparseIndexToChange >= (Blob.Num / Stride))
-		{
-			return false;
-		}
+		const uint32 SparseIndexToChange = SparseIndices[IndexToChange];
 
-		uint8* OriginalValuePtr = (uint8*)(SparseData.GetData() + Stride * SparseIndexToChange);
-		uint8* NewValuePtr = (uint8*)(SparseBytesValues.Data + SparseBufferViewValuesStride * IndexToChange);
-		FMemory::Memcpy(OriginalValuePtr, NewValuePtr, SparseBufferViewValuesStride);
+		uint8* OriginalValuePtr = SparseData.GetData() + (Stride * SparseIndexToChange);
+		const uint8* NewValuePtr = SparseValuesBase + (SparseBufferViewValuesStride * IndexToChange);
+		FMemory::Memcpy(OriginalValuePtr, NewValuePtr, ElementSize * Elements);
 	}
 
 	Blob.Data = SparseData.GetData();
@@ -5422,23 +5553,32 @@ void FglTFRuntimeArchiveZip::SetPassword(const FString& EncryptionKey)
 
 bool FglTFRuntimeArchiveZip::FromData(const uint8* DataPtr, const int64 DataNum)
 {
+	// the backing store is a 32bit FArrayReader, refuse anything it could not index
+	if (DataNum <= 0 || DataNum > TNumericLimits<int32>::Max())
+	{
+		return false;
+	}
+
 	Data.Append(DataPtr, DataNum);
 
-	// step0: retrieve the trailer magic
-	TArray<uint8> Magic;
+	constexpr int64 TrailerMinSize = 22;
+	constexpr int64 CentralDirectoryMinSize = 46;
+
+	// step0: retrieve the trailer magic (the "End Of Central Directory" record).
+	// The EOCD record sits in the last 22 bytes + up to 64KB of archive comment, so the scan is
+	// bounded to that window instead of walking the whole file backwards one byte at a time.
+	// (the previous loop also used an *unsigned* counter, so on a file without a valid EOCD -
+	// any non-zip blob - it wrapped around at 0 and kept indexing out of bounds).
 	bool bIndexFound = false;
-	uint64 Index = 0;
-	for (Index = Data.Num() - 1; Index >= 0; Index--)
+	int64 Index = 0;
+	const int64 DataSize = Data.Num();
+	const int64 ScanLimit = FMath::Max<int64>(DataSize - (TrailerMinSize + 0xFFFF), 0);
+	for (Index = DataSize - 4; Index >= ScanLimit; Index--)
 	{
-		Magic.Insert(Data[Index], 0);
-		if (Magic.Num() == 4)
+		if (Data[Index] == 0x50 && Data[Index + 1] == 0x4b && Data[Index + 2] == 0x05 && Data[Index + 3] == 0x06)
 		{
-			if (Magic[0] == 0x50 && Magic[1] == 0x4b && Magic[2] == 0x05 && Magic[3] == 0x06)
-			{
-				bIndexFound = true;
-				break;
-			}
-			Magic.Pop();
+			bIndexFound = true;
+			break;
 		}
 	}
 
@@ -5453,10 +5593,7 @@ bool FglTFRuntimeArchiveZip::FromData(const uint8* DataPtr, const int64 DataNum)
 	uint32 CentralDirectoryOffset = 0;
 	uint16 CommentLen = 0;
 
-	constexpr uint64 TrailerMinSize = 22;
-	constexpr uint64 CentralDirectoryMinSize = 46;
-
-	if (Index + TrailerMinSize > Data.Num())
+	if (Index + TrailerMinSize > DataSize)
 	{
 		return false;
 	}
@@ -5560,6 +5697,7 @@ bool FglTFRuntimeArchiveZip::GetFileContent(const FString& Filename, TArray64<ui
 	const uint8* CompressedData = Data.GetData() + *Offset + LocalEntryMinSize + FilenameLen + ExtraFieldLen;
 
 	// for streamed zips
+	// (the local header carries zeroed sizes, the real ones only live in the central directory)
 
 	if (CompressedSize == 0 && GlobalSizeMap.Contains(Filename))
 	{
@@ -5569,6 +5707,13 @@ bool FglTFRuntimeArchiveZip::GetFileContent(const FString& Filename, TArray64<ui
 	if (UncompressedSize == 0 && GlobalSizeMap.Contains(Filename))
 	{
 		UncompressedSize = GlobalSizeMap[Filename].Value;
+	}
+
+	// CompressedSize may have just been replaced by the central directory value, so the entry has
+	// to be bounds checked again: the check above only validated the (possibly zero) local one.
+	if (static_cast<uint64>(*Offset) + LocalEntryMinSize + FilenameLen + ExtraFieldLen + CompressedSize > static_cast<uint64>(Data.Num()))
+	{
+		return false;
 	}
 
 	// encrypted ?
@@ -6217,6 +6362,14 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeObject(const int32 NodeIndex)
 
 bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, const int64 Stride, const int64 Elements, const FString& Mode, const FString& Filter, TArray64<uint8>& UncompressedBytes)
 {
+	// Stride and Elements come from the EXT_meshopt_compression json object. The spec caps the
+	// stride at 256 bytes; without an upper bound (8192 / Stride) below collapses to 0 and the
+	// decoding loop stops advancing, hanging the loading thread on a crafted file.
+	if (Stride <= 0 || Stride > 256 || Elements <= 0 || Elements > (TNumericLimits<int64>::Max() / Stride))
+	{
+		return false;
+	}
+
 	auto DecodeZigZag = [](const uint8 V)
 		{
 			return ((V & 1) != 0) ? ~(V >> 1) : (V >> 1);
@@ -6417,7 +6570,8 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 				uint32 V = 0;
 				for (int32 Shift = 0; ; Shift += 7)
 				{
-					if (DataOffset >= Limit)
+					// a stream of continuation bytes would push the shift past the width of V
+					if (DataOffset >= Limit || Shift >= 32)
 					{
 						return false;
 					}

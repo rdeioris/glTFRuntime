@@ -294,7 +294,20 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 			MeshSection.BaseIndex = BaseIndex;
 			MeshSection.NumTriangles = Primitive.Indices.Num() / 3;
 			MeshSection.BaseVertexIndex = BaseVertexIndex;
-			MeshSection.MaxBoneInfluences = FMath::Min(Primitive.Joints.Num() * 4, MAX_TOTAL_INFLUENCES);
+			// JOINTS_n and WEIGHTS_n come from independent accessors and a malformed asset can very
+			// well declare one without the other: only the sets that have both are usable.
+			const int32 UsableJointsSets = FMath::Min(Primitive.Joints.Num(), Primitive.Weights.Num());
+			MeshSection.MaxBoneInfluences = FMath::Min(UsableJointsSets * 4, MAX_TOTAL_INFLUENCES);
+
+			// Nothing guarantees those accessors hold as many elements as the POSITION one either.
+			// The usable vertex count per set is loop invariant, so it is resolved once here instead
+			// of re-reading both array lengths for every vertex of every influence set.
+			TArray<int32, TInlineAllocator<4>> JointsSetVertexLimits;
+			JointsSetVertexLimits.Reserve(UsableJointsSets);
+			for (int32 JointsSetIndex = 0; JointsSetIndex < UsableJointsSets; JointsSetIndex++)
+			{
+				JointsSetVertexLimits.Add(FMath::Min(Primitive.Joints[JointsSetIndex].Num(), Primitive.Weights[JointsSetIndex].Num()));
+			}
 
 			if (MeshSection.MaxBoneInfluences > MaxBoneInfluences)
 			{
@@ -400,9 +413,15 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 				if ((!SkeletalMeshConfig.bIgnoreSkin && SkinIndex > INDEX_NONE) || LOD->Skeleton.Num() > 0)
 				{
 					uint32 TotalWeight = 0;
-					const int32 JointsNum = FMath::Min(Primitive.Joints.Num(), MeshSection.MaxBoneInfluences / 4);
+					const int32 JointsNum = FMath::Min(UsableJointsSets, MeshSection.MaxBoneInfluences / 4);
 					for (int32 JointsIndex = 0; JointsIndex < JointsNum; JointsIndex++)
 					{
+						// skip the vertices this set does not cover (see JointsSetVertexLimits above)
+						if (VertexIndex >= JointsSetVertexLimits[JointsIndex])
+						{
+							continue;
+						}
+
 						const FglTFRuntimeUInt16Vector4& Joints = Primitive.Joints[JointsIndex][VertexIndex];
 						const FVector4& Weights = Primitive.Weights[JointsIndex][VertexIndex];
 						for (int32 j = 0; j < 4; j++)
@@ -520,7 +539,9 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 		}
 
 		// generate indices (and eventually normals/tangents)
-		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(NumLODIndices > MAX_uint16 ? sizeof(uint32) : sizeof(uint16));
+		// The index buffer stores *vertex* indices, so its width has to cover the vertex count as
+		// well: a LOD with few indices pointing at a big vertex buffer would otherwise truncate them.
+		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer((NumLODIndices > MAX_uint16 || NumLODPositions > MAX_uint16) ? sizeof(uint32) : sizeof(uint16));
 
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
 		{
