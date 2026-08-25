@@ -2493,7 +2493,8 @@ namespace glTFRuntime
  * the parser is).
  *
  * Caching: decoded buffers, sparse accessors, meshes, materials, skeletons and textures are cached
- * per index. UObject caches are opt-in per call through FglTFRuntimeConfig/*Config CacheMode, the
+ * per index. UObject caches are opt-in per call through the CacheMode of the config struct passed
+ * to the loader (FglTFRuntimeStaticMeshConfig, FglTFRuntimeMaterialsConfig and friends), the
  * byte level ones (buffers, bufferViews, sparse accessors) are always on since they back the
  * FglTFRuntimeBlob views handed out to callers. ClearCache() drops all of them and invalidates
  * every blob previously returned.
