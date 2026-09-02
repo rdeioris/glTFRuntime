@@ -430,12 +430,15 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 #endif
 
 #if !WITH_EDITOR
-		// this is a hack for allowing texture streaming without messing around with deriveddata
+		if (ImagesConfig.bStreaming)
+		{
+			// this is a hack for allowing texture streaming without messing around with deriveddata
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7
-		Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeparateFile);
+			Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeparateFile);
 #else
-		Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeperateFile);
+			Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeperateFile);
 #endif
+		}
 #endif
 		Mip->BulkData.Lock(LOCK_READ_WRITE);
 
