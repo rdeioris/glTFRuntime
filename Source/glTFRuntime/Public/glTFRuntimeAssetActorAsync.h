@@ -37,7 +37,8 @@ protected:
 public:	
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
-	UglTFRuntimeAsset* Asset;
+	TObjectPtr<UglTFRuntimeAsset> Asset;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	FglTFRuntimeStaticMeshConfig StaticMeshConfig;
@@ -76,7 +77,8 @@ public:
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")
-	USceneComponent* AssetRoot;
+	TObjectPtr<USceneComponent> AssetRoot;
+
 
 	TMap<UPrimitiveComponent*, FglTFRuntimeNode> MeshesToLoad;
 
