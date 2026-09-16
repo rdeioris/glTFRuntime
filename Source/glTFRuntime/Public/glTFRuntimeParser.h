@@ -2797,7 +2797,7 @@ public:
 		{
 			if (Pair.Value.IsValid())
 			{
-				InCallback(Pair.Key, Pair.Value.ToSharedRef(), InArgs...);
+				InCallback(FString(Pair.Key), Pair.Value.ToSharedRef(), InArgs...);
 			}
 		}
 	}
