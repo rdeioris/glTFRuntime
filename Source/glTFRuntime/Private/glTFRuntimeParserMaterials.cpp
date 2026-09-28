@@ -404,7 +404,10 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	Texture->LODBias = (ImagesConfig.LODBias >= 0 && ImagesConfig.LODBias < (Mips.Num() - 1)) ? ImagesConfig.LODBias : 0;
 	Texture->NeverStream = !ImagesConfig.bStreaming;
-
+#if ENGINE_MAJOR_VERSION >= 4 && ENGINE_MINOR_VERSION >= 26 || ENGINE_MAJOR_VERSION >= 5
+	Texture->bNotOfflineProcessed = true;
+#endif
+	
 	if (ImagesConfig.bStreaming)
 	{
 		Texture->AddAssetUserData(NewObject<UglTFRuntimeTextureMipDataProviderFactory>());
@@ -431,9 +434,7 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 #if !WITH_EDITOR
 		// this is a hack for allowing texture streaming without messing around with deriveddata
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7
-		Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeparateFile);
-#else
+#if ENGINE_MAJOR_VERSION <= 4 && ENGINE_MINOR_VERSION < 26
 		Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeperateFile);
 #endif
 #endif
@@ -550,9 +551,7 @@ UVolumeTexture* FglTFRuntimeParser::BuildVolumeTexture(UObject* Outer, const TAr
 
 #if !WITH_EDITOR
 		// this is a hack for allowing texture streaming without messing around with deriveddata
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7
-		Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeparateFile);
-#else
+#if ENGINE_MAJOR_VERSION <= 4 && ENGINE_MINOR_VERSION < 26
 		Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeperateFile);
 #endif
 #endif

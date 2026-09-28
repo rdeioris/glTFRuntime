@@ -52,6 +52,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& 
 
 	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
 	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+	Asset->AddToRoot();
 
 	// Annoying copy, but we do not want to remove the const
 	FglTFRuntimeConfig OverrideConfig = LoaderConfig;
@@ -75,6 +76,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& 
 					{
 						Completed.ExecuteIfBound(nullptr);
 					}
+					Asset->RemoveFromRoot();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
@@ -136,6 +138,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64Async(const FString& Ba
 
 	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
 	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+	Asset->AddToRoot();
 
 	Async(EAsyncExecution::Thread, [Base64, Asset, LoaderConfig, Completed]()
 		{
@@ -143,9 +146,10 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64Async(const FString& Ba
 
 			if (!FBase64::Decode(Base64, BytesBase64))
 			{
-				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+					FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Asset, Completed]()
 					{
 						Completed.ExecuteIfBound(nullptr);
+						Asset->RemoveFromRoot();
 					}, TStatId(), nullptr, ENamedThreads::GameThread);
 				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 				return;
@@ -163,6 +167,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromBase64Async(const FString& Ba
 					{
 						Completed.ExecuteIfBound(nullptr);
 					}
+					Asset->RemoveFromRoot();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
@@ -204,6 +209,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUTF8StringAsync(const FString
 
 	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
 	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+	Asset->AddToRoot();
 
 	Async(EAsyncExecution::Thread, [String, Asset, LoaderConfig, Completed]()
 		{
@@ -225,6 +231,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUTF8StringAsync(const FString
 					{
 						Completed.ExecuteIfBound(nullptr);
 					}
+					Asset->RemoveFromRoot();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
@@ -241,6 +248,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromStringAsync(const FString& Js
 
 	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
 	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+	Asset->AddToRoot();
 
 	Async(EAsyncExecution::Thread, [JsonData, Asset, LoaderConfig, Completed]()
 		{
@@ -256,6 +264,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromStringAsync(const FString& Js
 					{
 						Completed.ExecuteIfBound(nullptr);
 					}
+					Asset->RemoveFromRoot();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
@@ -304,6 +313,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFileMapAsync(const TMap<FStri
 
 	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
 	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+	Asset->AddToRoot();
 
 	Async(EAsyncExecution::Thread, [FileMap, Asset, LoaderConfig, Completed]()
 		{
@@ -330,6 +340,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFileMapAsync(const TMap<FStri
 					{
 						Completed.ExecuteIfBound(nullptr);
 					}
+					Asset->RemoveFromRoot();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
@@ -760,6 +771,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 
 	Asset->RuntimeContextObject = LoaderConfig.RuntimeContextObject;
 	Asset->RuntimeContextString = LoaderConfig.RuntimeContextString;
+	Asset->AddToRoot();
 
 	Async(EAsyncExecution::Thread, [Command, Arguments, WorkingDirectory, Asset, LoaderConfig, Completed, ExpectedExitCode]()
 		{
@@ -770,9 +782,10 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 
 			if (!FPlatformProcess::CreatePipe(ReadPipe, WritePipe))
 			{
-				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Asset, Completed]()
 					{
 						Completed.ExecuteIfBound(nullptr, -1, "Unable to create process pipe");
+						Asset->RemoveFromRoot();
 					}, TStatId(), nullptr, ENamedThreads::GameThread);
 				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 				return;
@@ -793,9 +806,10 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 			if (!ProcHandle.IsValid())
 			{
 				FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
-				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed]()
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Asset, Completed]()
 					{
 						Completed.ExecuteIfBound(nullptr, -1, "Unable to launch process");
+						Asset->RemoveFromRoot();
 					}, TStatId(), nullptr, ENamedThreads::GameThread);
 				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 				return;
@@ -818,18 +832,19 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 
 			if (ReturnCode != ExpectedExitCode)
 			{
-				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Completed, ReturnCode, &Bytes]()
+				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Asset, Completed, ReturnCode, &Bytes]()
 					{
 						FString StdErr;
 						FFileHelper::BufferToString(StdErr, Bytes.GetData(), Bytes.Num());
 						Completed.ExecuteIfBound(nullptr, ReturnCode, StdErr);
+						Asset->RemoveFromRoot();
 					}, TStatId(), nullptr, ENamedThreads::GameThread);
 				FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 				return;
 			}
 
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromData(Bytes, LoaderConfig);
-			if (!WorkingDirectory.IsEmpty())
+			if (Parser.IsValid() && !WorkingDirectory.IsEmpty())
 			{
 				Parser->SetBaseDirectory(WorkingDirectory);
 			}
@@ -844,6 +859,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 					{
 						Completed.ExecuteIfBound(nullptr, ReturnCode, "Unable to parse command output");
 					}
+					Asset->RemoveFromRoot();
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
