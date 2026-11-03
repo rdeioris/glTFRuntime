@@ -857,6 +857,9 @@ struct FglTFRuntimeStaticMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bAllowCPUAccess;
+    
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bContinueOnMeshError;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	EglTFRuntimePivotPosition PivotPosition;
@@ -934,6 +937,7 @@ struct FglTFRuntimeStaticMeshConfig
 		Outer = nullptr;
 		CollisionComplexity = ECollisionTraceFlag::CTF_UseDefault;
 		bAllowCPUAccess = false;
+		bContinueOnMeshError = false;
 		PivotPosition = EglTFRuntimePivotPosition::Asset;
 		NormalsGenerationStrategy = EglTFRuntimeNormalsGenerationStrategy::IfMissing;
 		TangentsGenerationStrategy = EglTFRuntimeTangentsGenerationStrategy::IfMissing;
