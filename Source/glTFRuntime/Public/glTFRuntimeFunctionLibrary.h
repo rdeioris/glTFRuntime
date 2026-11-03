@@ -101,4 +101,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Create 1D BlendSpace"), Category = "glTFRuntime")
 	static UBlendSpace1D* CreateRuntimeBlendSpace1D(const FString& ParameterName, const float Min, const float Max, const TArray<FglTFRuntimeBlendSpaceSample>& Samples);
+
+	// --- OpenFlight (.flt) ingestion -------------------------------------------------------------
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from OpenFlight Filename", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime|OpenFlight")
+	static UglTFRuntimeAsset* glTFLoadAssetFromOpenFlightFilename(const FString& Filename, const bool bPathRelativeToContent, const bool bEmbedTextures, const FglTFRuntimeConfig& LoaderConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from OpenFlight Data", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime|OpenFlight")
+	static UglTFRuntimeAsset* glTFLoadAssetFromOpenFlightData(const TArray<uint8>& Data, const FString& BaseDirectory, const bool bEmbedTextures, const FglTFRuntimeConfig& LoaderConfig);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "glTF Load Asset from OpenFlight Filename Async", AutoCreateRefTerm = "LoaderConfig"), Category = "glTFRuntime|OpenFlight")
+	static void glTFLoadAssetFromOpenFlightFilenameAsync(const FString& Filename, const bool bPathRelativeToContent, const bool bEmbedTextures, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed);
 };
