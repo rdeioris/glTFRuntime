@@ -167,13 +167,17 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				}
 
 				// hack for allowing BC5 compression for plugins
+				FglTFRuntimeImagesConfig& ImagesConfig = const_cast<FglTFRuntimeImagesConfig&>(MaterialsConfig.ImagesConfig);
+				const TEnumAsByte<TextureCompressionSettings> OriginalCompression = ImagesConfig.Compression;
 				if (bForceNormalMapCompression)
 				{
-					FglTFRuntimeImagesConfig& ImagesConfig = const_cast<FglTFRuntimeImagesConfig&>(MaterialsConfig.ImagesConfig);
 					ImagesConfig.Compression = TextureCompressionSettings::TC_Normalmap;
 				}
 
 				ParamTextureCache = LoadTexture(TextureIndex, ParamMips, sRGB, MaterialsConfig, Sampler);
+
+				// restore the compression, otherwise the next textures of the material would be treated as normal maps
+				ImagesConfig.Compression = OriginalCompression;
 
 				return *JsonTextureObject;
 			}
@@ -450,7 +454,8 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 		uint8* Data = reinterpret_cast<uint8*>(Mip->BulkData.Realloc(MipMap.Pixels.Num()));
 		// ETargetPlatformFeatures::NormalmapLAEncodingMode has been added in 5.3 for mobile platforms
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 3 && (PLATFORM_ANDROID || PLATFORM_IOS)
-		if (ImagesConfig.Compression == TC_Normalmap)
+		// the swizzle works only on BGRA8 pixels (compressed blocks would be corrupted)
+		if (ImagesConfig.Compression == TC_Normalmap && MipMap.PixelFormat == EPixelFormat::PF_B8G8R8A8)
 		{
 			for (int32 PIndex = 0; PIndex < MipMap.Pixels.Num(); PIndex += 4)
 			{
