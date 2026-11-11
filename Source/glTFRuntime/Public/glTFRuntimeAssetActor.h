@@ -42,14 +42,16 @@ protected:
 
 	// required for avoiding GC
 	UPROPERTY()
-	TArray<UAnimSequence*> AllSkeletalAnimations;
+	TArray<TObjectPtr<UAnimSequence>> AllSkeletalAnimations;
+
 
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
-	UglTFRuntimeAsset* Asset;
+	TObjectPtr<UglTFRuntimeAsset> Asset;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	FglTFRuntimeStaticMeshConfig StaticMeshConfig;
@@ -64,7 +66,8 @@ public:
 	FglTFRuntimeLightConfig LightConfig;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	TMap<USceneComponent*, UglTFRuntimeAnimationCurve*> CurveBasedAnimations;
+	TMap<TObjectPtr<USceneComponent>, TObjectPtr<UglTFRuntimeAnimationCurve>> CurveBasedAnimations;
+
 
 	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On StaticMeshComponent Created"))
 	void ReceiveOnStaticMeshComponentCreated(UStaticMeshComponent* StaticMeshComponent, const FglTFRuntimeNode& Node);
@@ -127,5 +130,6 @@ public:
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")
-	USceneComponent* AssetRoot;
+	TObjectPtr<USceneComponent> AssetRoot;
+
 };
