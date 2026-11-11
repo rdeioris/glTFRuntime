@@ -1496,6 +1496,30 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 
 	Async(EAsyncExecution::Thread, [this, StaticMeshContext, StaticMeshConfig, ExcludeNodes, NodeName, AsyncCallback]()
 		{
+			// every exit, failed or not, reports back on the game thread: the caller is waiting for AsyncCallback,
+			// and the FGCObject context must be released there
+			auto Finish = [StaticMeshContext, AsyncCallback](const bool bSuccess)
+				{
+					FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([StaticMeshContext, AsyncCallback, bSuccess]()
+						{
+							if (!bSuccess)
+							{
+								StaticMeshContext->StaticMesh = nullptr;
+							}
+
+							if (StaticMeshContext->StaticMesh)
+							{
+								StaticMeshContext->StaticMesh = StaticMeshContext->Parser->FinalizeStaticMesh(StaticMeshContext);
+							}
+
+							AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
+#if (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2) || ENGINE_MAJOR_VERSION > 5
+							// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
+							StaticMeshContext->UnregisterGCObject();
+#endif
+						}, TStatId(), nullptr, ENamedThreads::GameThread);
+					FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+				};
 
 			FglTFRuntimeNode Node;
 			TArray<FglTFRuntimeNode> Nodes;
@@ -1506,6 +1530,7 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 				if (!LoadScene(0, Scene))
 				{
 					AddError("LoadStaticMeshRecursive()", "No Scene found in asset");
+					Finish(false);
 					return;
 				}
 
@@ -1514,6 +1539,7 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 					if (!LoadNodesRecursive(NodeIndex, Nodes))
 					{
 						AddError("LoadStaticMeshRecursive()", "Unable to build Node Tree from first Scene");
+						Finish(false);
 						return;
 					}
 				}
@@ -1523,12 +1549,14 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 				if (!LoadNodeByName(NodeName, Node))
 				{
 					AddError("LoadStaticMeshRecursive()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
+					Finish(false);
 					return;
 				}
 
 				if (!LoadNodesRecursive(Node.Index, Nodes))
 				{
 					AddError("LoadStaticMeshRecursive()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
+					Finish(false);
 					return;
 				}
 			}
@@ -1547,12 +1575,14 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 					TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", ChildNode.MeshIndex);
 					if (!JsonMeshObject)
 					{
+						Finish(false);
 						return;
 					}
 
 					FglTFRuntimeMeshLOD* LOD = nullptr;
 					if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, StaticMeshConfig.MaterialsConfig))
 					{
+						Finish(false);
 						return;
 					}
 
@@ -1563,6 +1593,7 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 					{
 						if (!LoadNode(CurrentNode.ParentIndex, CurrentNode))
 						{
+							Finish(false);
 							return;
 						}
 						AdditionalTransform *= CurrentNode.Transform;
@@ -1584,20 +1615,7 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 
 			StaticMeshContext->StaticMesh = LoadStaticMesh_Internal(StaticMeshContext);
 
-			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([StaticMeshContext, AsyncCallback]()
-				{
-					if (StaticMeshContext->StaticMesh)
-					{
-						StaticMeshContext->StaticMesh = StaticMeshContext->Parser->FinalizeStaticMesh(StaticMeshContext);
-					}
-
-					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
-#if (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2) || ENGINE_MAJOR_VERSION > 5
-					// this is ugly, but we need to avoid at all costs to have the FGCObject dtor to be run out of the game thread
-					StaticMeshContext->UnregisterGCObject();
-#endif
-				}, TStatId(), nullptr, ENamedThreads::GameThread);
-			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
+			Finish(true);
 		});
 }
 
