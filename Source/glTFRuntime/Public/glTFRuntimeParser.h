@@ -3148,7 +3148,7 @@ public:
 			ComponentFunction = ComponentUnsignedShort;
 			break;
 		default:
-			UE_LOG(LogGLTFRuntime, Error, TEXT("Unsupported type %d"), ComponentType);
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unsupported type %lld"), ComponentType);
 			return false;
 		}
 
@@ -3257,7 +3257,7 @@ public:
 			ComponentFunction = ComponentUnsignedShort;
 			break;
 		default:
-			UE_LOG(LogGLTFRuntime, Error, TEXT("Unsupported type %d"), ComponentType);
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unsupported type %lld"), ComponentType);
 			return false;
 		}
 

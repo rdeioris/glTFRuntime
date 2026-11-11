@@ -6063,7 +6063,7 @@ bool FglTFRuntimeParser::GetJsonObjectBytes(TSharedRef<FJsonObject> JsonObject, 
 			FglTFRuntimeBlob Blob;
 			if (!GetBufferView(BufferViewIndex, Blob, Stride))
 			{
-				AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to get bufferView: %d"), BufferViewIndex));
+				AddError("GetJsonObjectBytes()", FString::Printf(TEXT("Unable to get bufferView: %lld"), BufferViewIndex));
 				return false;
 			}
 			Bytes.Append(Blob.Data, Blob.Num);
