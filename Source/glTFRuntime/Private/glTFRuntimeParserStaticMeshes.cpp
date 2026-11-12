@@ -1450,6 +1450,11 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshRecursive(const FString& NodeName
 			FglTFRuntimeMeshLOD* LOD = nullptr;
 			if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, StaticMeshConfig.MaterialsConfig))
 			{
+				if (StaticMeshConfig.bContinueOnMeshError)
+				{
+					UE_LOG(LogGLTFRuntime, Warning, TEXT("LoadStaticMeshRecursive(): skipping node '%s', unable to load its mesh"), *ChildNode.Name);
+					continue;
+				}
 				return nullptr;
 			}
 
@@ -1475,6 +1480,12 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMeshRecursive(const FString& NodeName
 				}
 			}
 		}
+	}
+	
+	if (CombinedLOD.Primitives.Num() == 0)
+	{
+		AddError("LoadStaticMeshRecursive()", "No valid meshes found");
+		return nullptr;
 	}
 
 	StaticMeshContext->LODs.Add(&CombinedLOD);
@@ -1553,6 +1564,11 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 					FglTFRuntimeMeshLOD* LOD = nullptr;
 					if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, StaticMeshConfig.MaterialsConfig))
 					{
+						if (StaticMeshConfig.bContinueOnMeshError)
+						{
+							UE_LOG(LogGLTFRuntime, Warning, TEXT("LoadStaticMeshRecursive(): skipping node \"%s\", unable to load its mesh"), *ChildNode.Name);
+							continue;
+						}
 						return;
 					}
 
@@ -1579,10 +1595,17 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 					}
 				}
 			}
-
-			StaticMeshContext->LODs.Add(&CombinedLOD);
-
-			StaticMeshContext->StaticMesh = LoadStaticMesh_Internal(StaticMeshContext);
+		
+			if (CombinedLOD.Primitives.Num() == 0)
+			{
+				AddError("LoadStaticMeshRecursive()", "No valid meshes found");
+				StaticMeshContext->StaticMesh = nullptr;
+			}
+			else
+			{
+				StaticMeshContext->LODs.Add(&CombinedLOD);
+				StaticMeshContext->StaticMesh = LoadStaticMesh_Internal(StaticMeshContext);
+			}
 
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([StaticMeshContext, AsyncCallback]()
 				{
