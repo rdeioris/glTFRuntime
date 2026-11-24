@@ -65,5 +65,7 @@ public class glTFRuntime : ModuleRules
             {
             }
             );
+
+        PublicDefinitions.Add("PLATFORM_WEAKLY_CONSISTENT_MEMORY=1");
     }
 }
