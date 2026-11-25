@@ -240,10 +240,16 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 
 		int32 NumLODIndices = 0;
 		int32 NumLODPositions = 0;
+		int32 NumUVs = 1;
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD->Primitives.Num(); PrimitiveIndex++)
 		{
 			NumLODIndices += LOD->Primitives[PrimitiveIndex].Indices.Num();
 			NumLODPositions += LOD->Primitives[PrimitiveIndex].Positions.Num();
+
+			if (LOD->Primitives[PrimitiveIndex].UVs.Num() > NumUVs)
+			{
+				NumUVs = LOD->Primitives[PrimitiveIndex].UVs.Num();
+			}
 
 			if (LOD->Primitives[PrimitiveIndex].bHighPrecisionUVs)
 			{
@@ -262,7 +268,7 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 		LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumLODPositions);
 		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(bUseHighPrecisionUVs || SkeletalMeshConfig.bUseHighPrecisionUVs);
 		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseHighPrecisionTangentBasis(SkeletalMeshConfig.bUseHighPrecisionTangentBasis);
-		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumLODPositions, 1);
+		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumLODPositions, NumUVs);
 		if (LOD->bHasVertexColors)
 		{
 			LodRenderData->StaticVertexBuffers.ColorVertexBuffer.Init(NumLODPositions);
@@ -402,6 +408,26 @@ bool glTFRuntime::FillSkeletalMeshRenderData(FSkeletalMeshRenderData* RenderData
 				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(BaseVertexIndex) = ModelVertex.Position;
 				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexTangents(BaseVertexIndex, ModelVertex.TangentX, TangentY, ModelVertex.TangentZ);
 				LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(BaseVertexIndex, 0, ModelVertex.TexCoord);
+
+				// additional UV channels (e.g. TEXCOORD_1 used by KHR texCoord material slots)
+				for (int32 UVChannel = 1; UVChannel < NumUVs; UVChannel++)
+				{
+#if ENGINE_MAJOR_VERSION > 4
+					FVector2f AdditionalTexCoord = FVector2f::ZeroVector;
+#else
+					FVector2D AdditionalTexCoord = FVector2D::ZeroVector;
+#endif
+					if (UVChannel < Primitive.UVs.Num() && VertexIndex < Primitive.UVs[UVChannel].Num())
+					{
+#if ENGINE_MAJOR_VERSION > 4
+						AdditionalTexCoord = FVector2f(Primitive.UVs[UVChannel][VertexIndex]);
+#else
+						AdditionalTexCoord = Primitive.UVs[UVChannel][VertexIndex];
+#endif
+					}
+					LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetVertexUV(BaseVertexIndex, UVChannel, AdditionalTexCoord);
+				}
+
 				if (LOD->bHasVertexColors)
 				{
 					LodRenderData->StaticVertexBuffers.ColorVertexBuffer.VertexColor(BaseVertexIndex) = Color;
