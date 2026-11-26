@@ -984,6 +984,17 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	RenderData->Bounds = StaticMeshContext->BoundingBoxAndSphere;
 	StaticMesh->CalculateExtendedBounds();
 
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 7)
+	// Populate SourceMeshBounds for each LOD from the mesh's actual bounds
+	// This is what the cook pipeline does for pre-cooked meshes
+	// Discovered when using StaticMesh for SplineMeshComponent (U.E 5.7+ requires SourceMeshBounds to be populated)
+	const FBoxSphereBounds MeshBounds = StaticMesh->GetBounds();
+	for (FStaticMeshLODResources& LODResource : RenderData->LODResources)
+	{
+		LODResource.SourceMeshBounds = MeshBounds;
+	}
+#endif
+
 	if (!BodySetup)
 	{
 		StaticMesh->CreateBodySetup();
